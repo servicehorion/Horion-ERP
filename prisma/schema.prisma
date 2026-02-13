@@ -1,0 +1,1106 @@
+// Horion ERP - Schema Prisma complet
+// Infrastructure commerciale Chine -> Congo
+// ~43 modeles couvrant tous les domaines metier
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================
+// A. IDENTITY & ACCESS
+// ============================================================
+
+model Tenant {
+  id        String   @id @default(cuid())
+  name      String
+  country   String   @default("CG")
+  currency  String   @default("XAF")
+  timezone  String   @default("Africa/Brazzaville")
+  settings  Json     @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users           User[]
+  orders          Order[]
+  contacts        Contact[]
+  tasks           Task[]
+  ledgerAccounts  LedgerAccount[]
+  auditLogs       AuditLog[]
+  delegationRules DelegationRule[]
+  channels        Channel[]
+
+  @@map("tenants")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  tenantId  String
+  email     String   @unique
+  password  String
+  name      String
+  role      UserRole @default(OPS)
+  avatarUrl String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant          Tenant           @relation(fields: [tenantId], references: [id])
+  taskAssignments TaskAssignment[]
+  approvals       Approval[]
+  auditLogs       AuditLog[]
+
+  @@index([tenantId])
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  DIRECTION
+  FINANCE
+  OPS
+  COMMERCIAL
+  VIEWER
+}
+
+model DelegationRule {
+  id               String   @id @default(cuid())
+  tenantId         String
+  role             UserRole
+  action           String
+  maxAmountXAF     Decimal? @db.Decimal(15, 2)
+  maxAmountUSD     Decimal? @db.Decimal(15, 2)
+  maxAmountRMB     Decimal? @db.Decimal(15, 2)
+  requiresApproval Boolean  @default(false)
+  approverRole     UserRole?
+  conditions       Json     @default("{}")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, role, action])
+  @@map("delegation_rules")
+}
+
+// ============================================================
+// B. CRM & CLIENT INTELLIGENCE
+// ============================================================
+
+model Contact {
+  id         String      @id @default(cuid())
+  tenantId   String
+  type       ContactType
+  name       String
+  company    String?
+  phone      String?
+  email      String?
+  whatsapp   String?
+  city       String?
+  country    String      @default("CG")
+  notes      String?
+  trustScore Int         @default(50)
+  tags       Json        @default("[]")
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  tenant               Tenant                @relation(fields: [tenantId], references: [id])
+  orders               Order[]
+  leads                Lead[]
+  conversations        Conversation[]
+  communityMemberships CommunityMembership[]
+  engagementEvents     EngagementEvent[]
+  inboundIntents       InboundIntent[]
+
+  @@index([tenantId])
+  @@index([tenantId, type])
+  @@map("contacts")
+}
+
+enum ContactType {
+  CLIENT
+  PROSPECT
+  SUPPLIER
+  FREIGHT_PARTNER
+  CUSTOMS_BROKER
+  QC_PARTNER
+  OTHER
+}
+
+model Lead {
+  id             String     @id @default(cuid())
+  contactId      String
+  status         LeadStatus @default(NEW)
+  source         String?
+  description    String?
+  estimatedValue Decimal?   @db.Decimal(15, 2)
+  currency       String     @default("XAF")
+  category       String?
+  assignedTo     String?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  contact Contact @relation(fields: [contactId], references: [id])
+
+  @@index([contactId])
+  @@map("leads")
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  QUOTED
+  WON
+  LOST
+}
+
+model Conversation {
+  id         String   @id @default(cuid())
+  contactId  String
+  channelId  String?
+  platform   String   @default("whatsapp")
+  externalId String?
+  status     String   @default("active")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  contact  Contact   @relation(fields: [contactId], references: [id])
+  channel  Channel?  @relation(fields: [channelId], references: [id])
+  messages Message[]
+
+  @@index([contactId])
+  @@map("conversations")
+}
+
+model Message {
+  id             String   @id @default(cuid())
+  conversationId String
+  direction      String
+  senderType     String   @default("human")
+  content        String
+  contentType    String   @default("text")
+  mediaUrl       String?
+  metadata       Json     @default("{}")
+  createdAt      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+
+  @@index([conversationId])
+  @@map("messages")
+}
+
+// ============================================================
+// C. COMMERCE / ORDERS (NOYAU CENTRAL)
+// ============================================================
+
+model Order {
+  id               String      @id @default(cuid())
+  tenantId         String
+  orderNumber      String      @unique
+  contactId        String
+  status           OrderStatus @default(DEMANDE)
+  priority         Priority    @default(NORMAL)
+  merchandiseTotal Decimal     @db.Decimal(15, 2) @default(0)
+  logisticsCost    Decimal     @db.Decimal(15, 2) @default(0)
+  commissionRate   Decimal     @db.Decimal(5, 4)  @default(0.10)
+  commissionAmount Decimal     @db.Decimal(15, 2) @default(0)
+  insuranceAmount  Decimal     @db.Decimal(15, 2) @default(0)
+  totalClient      Decimal     @db.Decimal(15, 2) @default(0)
+  currency         String      @default("XAF")
+  originCountry    String      @default("CN")
+  destinationCity  String      @default("Brazzaville")
+  estimatedDelivery DateTime?
+  actualDelivery    DateTime?
+  notes            String?
+  riskLevel        RiskLevel   @default(LOW)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  tenant        Tenant          @relation(fields: [tenantId], references: [id])
+  contact       Contact         @relation(fields: [contactId], references: [id])
+  items         OrderItem[]
+  quotes        Quote[]
+  timeline      OrderTimeline[]
+  sourcingCases SourcingCase[]
+  qcRequests    QCRequest[]
+  shipments     Shipment[]
+  payments      Payment[]
+  tasks         Task[]
+  disputes      Dispute[]
+  marginReport  MarginReport?
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([orderNumber])
+  @@map("orders")
+}
+
+enum OrderStatus {
+  DEMANDE
+  RECHERCHE_PRODUIT
+  DEVIS
+  PAIEMENT_EN_COURS
+  SOURCING
+  EN_PRODUCTION
+  QC_EN_COURS
+  QC_VALIDE
+  EN_TRANSIT
+  DEDOUANE
+  LIVRE
+  CLOTURE
+  ANNULE
+  LITIGE
+}
+
+enum Priority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+model OrderItem {
+  id           String  @id @default(cuid())
+  orderId      String
+  description  String
+  quantity     Int
+  unitPrice    Decimal @db.Decimal(15, 2)
+  currency     String  @default("RMB")
+  unitPriceXAF Decimal @db.Decimal(15, 2) @default(0)
+  totalXAF     Decimal @db.Decimal(15, 2) @default(0)
+  hsCode       String?
+  weight       Decimal? @db.Decimal(10, 2)
+  volume       Decimal? @db.Decimal(10, 4)
+  notes        String?
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("order_items")
+}
+
+model Quote {
+  id               String      @id @default(cuid())
+  orderId          String
+  version          Int         @default(1)
+  status           QuoteStatus @default(DRAFT)
+  merchandiseTotal Decimal     @db.Decimal(15, 2)
+  logisticsCost    Decimal     @db.Decimal(15, 2)
+  commission       Decimal     @db.Decimal(15, 2)
+  insuranceCost    Decimal     @db.Decimal(15, 2) @default(0)
+  total            Decimal     @db.Decimal(15, 2)
+  currency         String      @default("XAF")
+  validUntil       DateTime?
+  sentAt           DateTime?
+  acceptedAt       DateTime?
+  pricingSnapshot  Json        @default("{}")
+  createdAt        DateTime    @default(now())
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@index([orderId])
+  @@map("quotes")
+}
+
+enum QuoteStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
+model OrderTimeline {
+  id        String   @id @default(cuid())
+  orderId   String
+  event     String
+  fromValue String?
+  toValue   String?
+  note      String?
+  userId    String?
+  createdAt DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@map("order_timeline")
+}
+
+model Dispute {
+  id          String        @id @default(cuid())
+  orderId     String
+  type        DisputeType
+  status      DisputeStatus @default(OPEN)
+  description String
+  resolution  String?
+  amount      Decimal?      @db.Decimal(15, 2)
+  currency    String        @default("XAF")
+  createdAt   DateTime      @default(now())
+  resolvedAt  DateTime?
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@index([orderId])
+  @@map("disputes")
+}
+
+enum DisputeType {
+  QUALITY
+  DELAY
+  PRICING
+  MISSING_ITEMS
+  DAMAGE
+  OTHER
+}
+
+enum DisputeStatus {
+  OPEN
+  INVESTIGATING
+  RESOLVED
+  ESCALATED
+  CLOSED
+}
+
+// ============================================================
+// D. SOURCING
+// ============================================================
+
+model Supplier {
+  id           String   @id @default(cuid())
+  name         String
+  country      String   @default("CN")
+  city         String?
+  contactName  String?
+  phone        String?
+  wechat       String?
+  email        String?
+  category     String?
+  rating       Int      @default(50)
+  leadTimeDays Int?
+  moq          String?
+  paymentTerms String?
+  notes        String?
+  isVerified   Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  offers         Offer[]
+  sourcingCases  SourcingCase[]
+  supplierScores SupplierScore[]
+
+  @@map("suppliers")
+}
+
+model SupplierScore {
+  id         String   @id @default(cuid())
+  supplierId String
+  dimension  String
+  score      Int
+  orderId    String?
+  notes      String?
+  createdAt  DateTime @default(now())
+
+  supplier Supplier @relation(fields: [supplierId], references: [id])
+
+  @@index([supplierId])
+  @@map("supplier_scores")
+}
+
+model SourcingCase {
+  id          String         @id @default(cuid())
+  orderId     String
+  supplierId  String?
+  status      SourcingStatus @default(SEARCHING)
+  requirement String
+  budget      Decimal?       @db.Decimal(15, 2)
+  currency    String         @default("RMB")
+  selectedAt  DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  order        Order            @relation(fields: [orderId], references: [id])
+  supplier     Supplier?        @relation(fields: [supplierId], references: [id])
+  offers       Offer[]
+  negotiations NegotiationLog[]
+
+  @@index([orderId])
+  @@map("sourcing_cases")
+}
+
+enum SourcingStatus {
+  SEARCHING
+  OFFERS_RECEIVED
+  NEGOTIATING
+  SELECTED
+  CONFIRMED
+  CANCELLED
+}
+
+model Offer {
+  id              String   @id @default(cuid())
+  sourcingCaseId  String
+  supplierId      String
+  unitPrice       Decimal  @db.Decimal(15, 2)
+  currency        String   @default("RMB")
+  moq             Int?
+  leadTimeDays    Int?
+  sampleAvailable Boolean  @default(false)
+  notes           String?
+  isSelected      Boolean  @default(false)
+  createdAt       DateTime @default(now())
+
+  sourcingCase SourcingCase @relation(fields: [sourcingCaseId], references: [id])
+  supplier     Supplier     @relation(fields: [supplierId], references: [id])
+
+  @@index([sourcingCaseId])
+  @@map("offers")
+}
+
+model NegotiationLog {
+  id             String   @id @default(cuid())
+  sourcingCaseId String
+  message        String
+  direction      String
+  channel        String?
+  createdAt      DateTime @default(now())
+
+  sourcingCase SourcingCase @relation(fields: [sourcingCaseId], references: [id])
+
+  @@index([sourcingCaseId])
+  @@map("negotiation_logs")
+}
+
+// ============================================================
+// E. QC (CONTROLE QUALITE)
+// ============================================================
+
+model QCRequest {
+  id          String   @id @default(cuid())
+  orderId     String
+  type        QCType   @default(PRE_SHIPMENT)
+  status      QCStatus @default(PENDING)
+  inspector   String?
+  cost        Decimal? @db.Decimal(15, 2)
+  currency    String   @default("USD")
+  scheduledAt DateTime?
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  order   Order      @relation(fields: [orderId], references: [id])
+  reports QCReport[]
+
+  @@index([orderId])
+  @@map("qc_requests")
+}
+
+enum QCType {
+  DURING_PRODUCTION
+  PRE_SHIPMENT
+  CONTAINER_LOADING
+}
+
+enum QCStatus {
+  PENDING
+  SCHEDULED
+  IN_PROGRESS
+  PASSED
+  FAILED
+  CONDITIONAL
+  CANCELLED
+}
+
+model QCReport {
+  id             String   @id @default(cuid())
+  qcRequestId    String
+  overallResult  String
+  defectRate     Decimal? @db.Decimal(5, 2)
+  photos         Json     @default("[]")
+  findings       Json     @default("[]")
+  recommendation String?
+  createdAt      DateTime @default(now())
+
+  qcRequest       QCRequest         @relation(fields: [qcRequestId], references: [id])
+  nonConformities QCNonConformity[]
+
+  @@index([qcRequestId])
+  @@map("qc_reports")
+}
+
+model QCNonConformity {
+  id          String   @id @default(cuid())
+  reportId    String
+  category    String
+  severity    String
+  description String
+  photoUrl    String?
+  resolution  String?
+  createdAt   DateTime @default(now())
+
+  report QCReport @relation(fields: [reportId], references: [id])
+
+  @@index([reportId])
+  @@map("qc_non_conformities")
+}
+
+// ============================================================
+// F. LOGISTICS
+// ============================================================
+
+model FreightPartner {
+  id          String   @id @default(cuid())
+  name        String
+  type        String
+  country     String
+  contactName String?
+  phone       String?
+  email       String?
+  wechat      String?
+  rating      Int      @default(50)
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  shipments Shipment[]
+
+  @@map("freight_partners")
+}
+
+model Shipment {
+  id                   String         @id @default(cuid())
+  orderId              String
+  mode                 ShipmentMode
+  status               ShipmentStatus @default(PENDING)
+  freightPartnerId     String?
+  consolidationBatchId String?
+  origin               String         @default("Guangzhou")
+  destination          String         @default("Pointe-Noire")
+  containerNumber      String?
+  blNumber             String?
+  weight               Decimal?       @db.Decimal(10, 2)
+  volume               Decimal?       @db.Decimal(10, 4)
+  estimatedDeparture   DateTime?
+  actualDeparture      DateTime?
+  estimatedArrival     DateTime?
+  actualArrival        DateTime?
+  cost                 Decimal?       @db.Decimal(15, 2)
+  currency             String         @default("USD")
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+
+  order              Order               @relation(fields: [orderId], references: [id])
+  freightPartner     FreightPartner?     @relation(fields: [freightPartnerId], references: [id])
+  consolidationBatch ConsolidationBatch? @relation(fields: [consolidationBatchId], references: [id])
+  trackingEvents     TrackingEvent[]
+  customsClearance   CustomsClearance?
+
+  @@index([orderId])
+  @@map("shipments")
+}
+
+enum ShipmentMode {
+  SEA
+  AIR
+  RAIL
+  ROAD
+  MULTIMODAL
+}
+
+enum ShipmentStatus {
+  PENDING
+  BOOKED
+  PICKED_UP
+  IN_TRANSIT
+  ARRIVED_PORT
+  CUSTOMS
+  CLEARED
+  IN_DELIVERY
+  DELIVERED
+}
+
+model TrackingEvent {
+  id          String   @id @default(cuid())
+  shipmentId  String
+  event       String
+  location    String?
+  description String?
+  occurredAt  DateTime
+  createdAt   DateTime @default(now())
+
+  shipment Shipment @relation(fields: [shipmentId], references: [id])
+
+  @@index([shipmentId])
+  @@map("tracking_events")
+}
+
+model ConsolidationBatch {
+  id          String   @id @default(cuid())
+  batchNumber String   @unique
+  status      String   @default("open")
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  shipments Shipment[]
+
+  @@map("consolidation_batches")
+}
+
+model CustomsClearance {
+  id             String        @id @default(cuid())
+  shipmentId     String        @unique
+  status         CustomsStatus @default(PENDING)
+  declarationNum String?
+  dutyAmount     Decimal?      @db.Decimal(15, 2)
+  dutyCurrency   String        @default("XAF")
+  brokerName     String?
+  documents      Json          @default("[]")
+  submittedAt    DateTime?
+  clearedAt      DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  shipment Shipment @relation(fields: [shipmentId], references: [id])
+
+  @@map("customs_clearances")
+}
+
+enum CustomsStatus {
+  PENDING
+  DOCUMENTS_SUBMITTED
+  UNDER_REVIEW
+  DUTY_ASSESSED
+  DUTY_PAID
+  CLEARED
+  HELD
+  REJECTED
+}
+
+// ============================================================
+// G. FINANCE
+// ============================================================
+
+model LedgerAccount {
+  id        String      @id @default(cuid())
+  tenantId  String
+  code      String
+  name      String
+  type      AccountType
+  currency  String      @default("XAF")
+  balance   Decimal     @db.Decimal(15, 2) @default(0)
+  createdAt DateTime    @default(now())
+
+  tenant  Tenant        @relation(fields: [tenantId], references: [id])
+  entries LedgerEntry[]
+
+  @@unique([tenantId, code])
+  @@map("ledger_accounts")
+}
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  REVENUE
+  EXPENSE
+}
+
+model LedgerEntry {
+  id          String   @id @default(cuid())
+  accountId   String
+  orderId     String?
+  type        String
+  amount      Decimal  @db.Decimal(15, 2)
+  currency    String
+  description String
+  reference   String?
+  createdAt   DateTime @default(now())
+
+  account LedgerAccount @relation(fields: [accountId], references: [id])
+
+  @@index([accountId])
+  @@index([orderId])
+  @@map("ledger_entries")
+}
+
+model Payment {
+  id          String           @id @default(cuid())
+  orderId     String
+  direction   PaymentDirection
+  type        PaymentType
+  status      PaymentStatus    @default(PENDING)
+  amount      Decimal          @db.Decimal(15, 2)
+  currency    String
+  amountXAF   Decimal          @db.Decimal(15, 2)
+  fxRate      Decimal?         @db.Decimal(12, 6)
+  method      String?
+  reference   String?
+  paidAt      DateTime?
+  confirmedAt DateTime?
+  notes       String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@index([orderId])
+  @@map("payments")
+}
+
+enum PaymentDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum PaymentType {
+  CLIENT_DEPOSIT
+  CLIENT_BALANCE
+  SUPPLIER_PAYMENT
+  FREIGHT_PAYMENT
+  CUSTOMS_DUTY
+  QC_PAYMENT
+  COMMISSION
+  REFUND
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  CONFIRMED
+  FAILED
+  CANCELLED
+  REFUNDED
+}
+
+model FXRate {
+  id           String   @id @default(cuid())
+  fromCurrency String
+  toCurrency   String
+  rate         Decimal  @db.Decimal(12, 6)
+  source       String   @default("manual")
+  effectiveAt  DateTime @default(now())
+  createdAt    DateTime @default(now())
+
+  @@index([fromCurrency, toCurrency, effectiveAt])
+  @@map("fx_rates")
+}
+
+model MarginReport {
+  id            String   @id @default(cuid())
+  orderId       String   @unique
+  revenue       Decimal  @db.Decimal(15, 2)
+  cogs          Decimal  @db.Decimal(15, 2)
+  commission    Decimal  @db.Decimal(15, 2)
+  grossMargin   Decimal  @db.Decimal(15, 2)
+  marginPercent Decimal  @db.Decimal(5, 2)
+  currency      String   @default("XAF")
+  calculatedAt  DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@map("margin_reports")
+}
+
+// ============================================================
+// H. TASK ENGINE (CENTRALISE)
+// ============================================================
+
+model Task {
+  id                String     @id @default(cuid())
+  tenantId          String
+  entityType        String
+  entityId          String
+  taskType          String
+  title             String
+  description       String?
+  status            TaskStatus @default(PENDING)
+  priority          Priority   @default(NORMAL)
+  ownerType         OwnerType  @default(HUMAN)
+  module            String
+  slaDeadline       DateTime?
+  slaBreach         Boolean    @default(false)
+  blockedBy         String?
+  requiredApproval  Boolean    @default(false)
+  automationAllowed Boolean    @default(false)
+  riskLevel         RiskLevel  @default(LOW)
+  completedAt       DateTime?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  tenant      Tenant           @relation(fields: [tenantId], references: [id])
+  order       Order?           @relation(fields: [entityId], references: [id])
+  assignments TaskAssignment[]
+  approvals   Approval[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, module])
+  @@index([entityType, entityId])
+  @@index([slaDeadline])
+  @@map("tasks")
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  WAITING_APPROVAL
+  BLOCKED
+  COMPLETED
+  CANCELLED
+}
+
+enum OwnerType {
+  HUMAN
+  AI_AGENT
+  SYSTEM
+}
+
+model TaskAssignment {
+  id         String   @id @default(cuid())
+  taskId     String
+  userId     String
+  role       String   @default("assignee")
+  assignedAt DateTime @default(now())
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([taskId, userId])
+  @@map("task_assignments")
+}
+
+model Approval {
+  id        String           @id @default(cuid())
+  taskId    String
+  userId    String
+  decision  ApprovalDecision
+  comment   String?
+  decidedAt DateTime         @default(now())
+
+  task Task @relation(fields: [taskId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("approvals")
+}
+
+enum ApprovalDecision {
+  APPROVED
+  REJECTED
+  ESCALATED
+}
+
+// ============================================================
+// I. AUDIT & EVENTS
+// ============================================================
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  tenantId   String
+  userId     String?
+  action     String
+  entityType String
+  entityId   String
+  oldValue   Json?
+  newValue   Json?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User?  @relation(fields: [userId], references: [id])
+
+  @@index([tenantId, entityType, entityId])
+  @@index([tenantId, createdAt])
+  @@map("audit_logs")
+}
+
+model Event {
+  id          String    @id @default(cuid())
+  type        String
+  entityType  String
+  entityId    String
+  payload     Json
+  processed   Boolean   @default(false)
+  processedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([processed, createdAt])
+  @@index([entityType, entityId])
+  @@map("events")
+}
+
+model Incident {
+  id          String    @id @default(cuid())
+  type        String
+  severity    String    @default("medium")
+  entityType  String?
+  entityId    String?
+  title       String
+  description String?
+  status      String    @default("open")
+  resolvedAt  DateTime?
+  resolution  String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("incidents")
+}
+
+// ============================================================
+// J. WHATSAPP & COMMUNITY
+// ============================================================
+
+model Channel {
+  id        String   @id @default(cuid())
+  tenantId  String
+  platform  String
+  type      String
+  name      String
+  link      String?
+  category  String?
+  status    String   @default("active")
+  rules     Json     @default("{}")
+  ownerId   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant               Tenant                @relation(fields: [tenantId], references: [id])
+  conversations        Conversation[]
+  communityMemberships CommunityMembership[]
+  publishingQueues     PublishingQueue[]
+  engagementEvents     EngagementEvent[]
+
+  @@index([tenantId, platform])
+  @@map("channels")
+}
+
+model CommunityMembership {
+  id        String    @id @default(cuid())
+  contactId String
+  channelId String
+  role      String    @default("member")
+  source    String?
+  joinedAt  DateTime  @default(now())
+  leftAt    DateTime?
+  tags      Json      @default("[]")
+
+  contact Contact @relation(fields: [contactId], references: [id])
+  channel Channel @relation(fields: [channelId], references: [id])
+
+  @@unique([contactId, channelId])
+  @@map("community_memberships")
+}
+
+model InboundIntent {
+  id              String    @id @default(cuid())
+  contactId       String
+  sourceMessageId String?
+  intentType      String
+  category        String?
+  urgency         String    @default("normal")
+  budgetHint      String?
+  confidence      Decimal   @db.Decimal(3, 2) @default(0)
+  routedTo        String?
+  processedAt     DateTime?
+  createdAt       DateTime  @default(now())
+
+  contact Contact @relation(fields: [contactId], references: [id])
+
+  @@index([contactId])
+  @@index([intentType])
+  @@map("inbound_intents")
+}
+
+// ============================================================
+// K. MARKETING
+// ============================================================
+
+model ContentPost {
+  id             String    @id @default(cuid())
+  format         String
+  theme          String?
+  category       String?
+  title          String?
+  body           String?
+  language       String    @default("fr")
+  assets         Json      @default("[]")
+  status         String    @default("draft")
+  createdBy      String    @default("human")
+  channelTargets Json      @default("[]")
+  publishedAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  publishingQueues PublishingQueue[]
+
+  @@map("content_posts")
+}
+
+model PublishingQueue {
+  id          String    @id @default(cuid())
+  postId      String
+  channelId   String
+  scheduledAt DateTime
+  publishedAt DateTime?
+  result      String?
+  errorLog    String?
+  createdAt   DateTime  @default(now())
+
+  post    ContentPost @relation(fields: [postId], references: [id])
+  channel Channel     @relation(fields: [channelId], references: [id])
+
+  @@index([scheduledAt])
+  @@map("publishing_queue")
+}
+
+model Campaign {
+  id         String    @id @default(cuid())
+  name       String
+  objective  String
+  channels   Json      @default("[]")
+  kpiTargets Json      @default("{}")
+  status     String    @default("draft")
+  startDate  DateTime?
+  endDate    DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@map("campaigns")
+}
+
+model EngagementEvent {
+  id        String   @id @default(cuid())
+  channelId String
+  contactId String?
+  eventType String
+  metadata  Json     @default("{}")
+  createdAt DateTime @default(now())
+
+  channel Channel  @relation(fields: [channelId], references: [id])
+  contact Contact? @relation(fields: [contactId], references: [id])
+
+  @@index([channelId, eventType])
+  @@index([createdAt])
+  @@map("engagement_events")
+}
+
+model SocialAccount {
+  id           String   @id @default(cuid())
+  platform     String
+  handle       String?
+  pageId       String?
+  authStatus   String   @default("disconnected")
+  postingRules Json     @default("{}")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("social_accounts")
+}
