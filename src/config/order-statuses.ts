@@ -51,6 +51,23 @@ export const ORDER_STATUS_COLORS: Record<OrderStatus, string> = {
   LITIGE:            "bg-red-200 text-red-900",
 };
 
+export const ORDER_STATUSES = [
+  { value: "DEMANDE", label: "Demande" },
+  { value: "RECHERCHE_PRODUIT", label: "Recherche produit" },
+  { value: "DEVIS", label: "Devis" },
+  { value: "PAIEMENT_EN_COURS", label: "Paiement en cours" },
+  { value: "SOURCING", label: "Sourcing" },
+  { value: "EN_PRODUCTION", label: "En production" },
+  { value: "QC_EN_COURS", label: "QC en cours" },
+  { value: "QC_VALIDE", label: "QC validé" },
+  { value: "EN_TRANSIT", label: "En transit" },
+  { value: "DEDOUANE", label: "Dédouané" },
+  { value: "LIVRE", label: "Livré" },
+  { value: "CLOTURE", label: "Clôturé" },
+  { value: "ANNULE", label: "Annulé" },
+  { value: "LITIGE", label: "Litige" },
+] as const;
+
 export function canTransition(from: OrderStatus, to: OrderStatus): boolean {
   return ORDER_STATUS_TRANSITIONS[from]?.includes(to) ?? false;
 }
