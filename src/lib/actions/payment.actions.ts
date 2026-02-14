@@ -1,0 +1,157 @@
+"use server";
+
+import { auth } from "@/lib/auth";
+import { PaymentService } from "@/lib/services/payment.service";
+import { MarginService } from "@/lib/services/margin.service";
+import { AuditService } from "@/lib/services/audit.service";
+import { checkPermission } from "@/lib/permissions";
+import { createPaymentSchema } from "@/lib/validators/payment";
+import { revalidatePath } from "next/cache";
+import type { PaymentDirection, PaymentStatus, UserRole } from "@prisma/client";
+
+async function getSession() {
+  const session = await auth();
+  if (!session?.user) throw new Error("Non authentifié");
+  return session.user as { id: string; email: string; name: string; role: UserRole; tenantId: string };
+}
+
+export async function createPayment(formData: Record<string, unknown>) {
+  try {
+    const user = await getSession();
+    checkPermission(user.role, "payment.create");
+
+    const validated = createPaymentSchema.parse(formData);
+    const payment = await PaymentService.create(validated);
+
+    await AuditService.log({
+      tenantId: user.tenantId,
+      userId: user.id,
+      action: "payment.created",
+      entityType: "payment",
+      entityId: payment.id,
+      newValue: {
+        orderId: validated.orderId,
+        direction: validated.direction,
+        amount: validated.amount,
+        currency: validated.currency,
+      },
+    });
+
+    revalidatePath("/finance/payments");
+    revalidatePath("/dashboard");
+    return { data: payment };
+  } catch (error) {
+    console.error("Error creating payment:", error);
+    return { error: error instanceof Error ? error.message : "Erreur lors de la création du paiement" };
+  }
+}
+
+export async function getPayments(options?: {
+  orderId?: string;
+  direction?: string;
+  status?: string;
+  page?: number;
+  limit?: number;
+}) {
+  try {
+    await getSession();
+    const result = await PaymentService.list({
+      orderId: options?.orderId,
+      direction: options?.direction as PaymentDirection | undefined,
+      status: options?.status as PaymentStatus | undefined,
+      page: options?.page,
+      limit: options?.limit,
+    });
+    return { data: result.payments };
+  } catch (error) {
+    console.error("Error fetching payments:", error);
+    return { error: error instanceof Error ? error.message : "Erreur" };
+  }
+}
+
+export async function confirmPayment(paymentId: string) {
+  try {
+    const user = await getSession();
+    checkPermission(user.role, "payment.confirm");
+
+    const payment = await PaymentService.confirm(paymentId);
+
+    await AuditService.log({
+      tenantId: user.tenantId,
+      userId: user.id,
+      action: "payment.confirmed",
+      entityType: "payment",
+      entityId: paymentId,
+    });
+
+    revalidatePath("/finance/payments");
+    revalidatePath("/dashboard");
+    return { data: payment };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Erreur" };
+  }
+}
+
+export async function cancelPayment(paymentId: string) {
+  try {
+    const user = await getSession();
+    const payment = await PaymentService.cancel(paymentId);
+
+    revalidatePath("/finance/payments");
+    return { data: payment };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Erreur" };
+  }
+}
+
+export async function getPaymentSummary(orderId: string) {
+  try {
+    await getSession();
+    return { data: await PaymentService.getOrderPaymentSummary(orderId) };
+  } catch (error) {
+    return { error: "Erreur" };
+  }
+}
+
+export async function getMonthlyPaymentStats() {
+  try {
+    const user = await getSession();
+    return { data: await PaymentService.getMonthlyStats(user.tenantId) };
+  } catch (error) {
+    return { error: "Erreur" };
+  }
+}
+
+// --- Margins ---
+
+export async function calculateMargin(orderId: string) {
+  try {
+    const user = await getSession();
+    const report = await MarginService.calculateForOrder(orderId);
+
+    revalidatePath("/finance/margins");
+    return { data: report };
+  } catch (error) {
+    console.error("Error calculating margin:", error);
+    return { error: error instanceof Error ? error.message : "Erreur" };
+  }
+}
+
+export async function getMargins(options?: { page?: number; limit?: number }) {
+  try {
+    const user = await getSession();
+    const result = await MarginService.list(user.tenantId, options);
+    return { data: result.reports };
+  } catch (error) {
+    return { error: "Erreur" };
+  }
+}
+
+export async function getAverageMargin() {
+  try {
+    const user = await getSession();
+    return { data: await MarginService.getAverageMargin(user.tenantId) };
+  } catch (error) {
+    return { error: "Erreur" };
+  }
+}
