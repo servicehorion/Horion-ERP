@@ -24,14 +24,17 @@ model Tenant {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users           User[]
-  orders          Order[]
-  contacts        Contact[]
-  tasks           Task[]
-  ledgerAccounts  LedgerAccount[]
-  auditLogs       AuditLog[]
-  delegationRules DelegationRule[]
-  channels        Channel[]
+  users              User[]
+  orders             Order[]
+  contacts           Contact[]
+  tasks              Task[]
+  ledgerAccounts     LedgerAccount[]
+  auditLogs          AuditLog[]
+  delegationRules    DelegationRule[]
+  channels           Channel[]
+  catalogProducts    CatalogProduct[]
+  productCategories  ProductCategory[]
+  catalogMedia       CatalogMedia[]
 
   @@map("tenants")
 }
@@ -273,6 +276,8 @@ enum RiskLevel {
 model OrderItem {
   id           String  @id @default(cuid())
   orderId      String
+  productId    String?
+  supplierId   String?
   description  String
   quantity     Int
   unitPrice    Decimal @db.Decimal(15, 2)
@@ -284,8 +289,12 @@ model OrderItem {
   volume       Decimal? @db.Decimal(10, 4)
   notes        String?
 
-  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order    Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product  CatalogProduct? @relation(fields: [productId], references: [id])
+  supplier Supplier?       @relation(fields: [supplierId], references: [id])
 
+  @@index([productId])
+  @@index([supplierId])
   @@map("order_items")
 }
 
@@ -376,29 +385,46 @@ enum DisputeStatus {
 // ============================================================
 
 model Supplier {
-  id           String   @id @default(cuid())
-  name         String
-  country      String   @default("CN")
-  city         String?
-  contactName  String?
-  phone        String?
-  wechat       String?
-  email        String?
-  category     String?
-  rating       Int      @default(50)
-  leadTimeDays Int?
-  moq          String?
-  paymentTerms String?
-  notes        String?
-  isVerified   Boolean  @default(false)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                   String         @id @default(cuid())
+  name                 String
+  country              String         @default("CN")
+  city                 String?
+  platform             String?        // 1688, alibaba, offline
+  status               SupplierStatus @default(ACTIVE)
+  contactName          String?
+  phone                String?
+  wechat               String?
+  email                String?
+  category             String?
+  rating               Int            @default(50)
+  leadTimeDays         Int?
+  moq                  String?
+  paymentTerms         String?
+  contactsJson         Json           @default("{}") // WeChat, WhatsApp, email, horaires, langue
+  negotiatedTermsJson  Json           @default("{}") // paiement, incoterm, délais, garanties
+  qcPassRate           Decimal?       @db.Decimal(5, 2)
+  logisticsReliability Decimal?       @db.Decimal(5, 2)
+  incidentRate         Decimal?       @db.Decimal(5, 2)
+  notes                String?
+  isVerified           Boolean        @default(false)
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
 
-  offers         Offer[]
-  sourcingCases  SourcingCase[]
-  supplierScores SupplierScore[]
+  offers           Offer[]
+  sourcingCases    SourcingCase[]
+  supplierScores   SupplierScore[]
+  supplierProducts SupplierProduct[]
+  catalogMedia     CatalogMedia[]
+  orderItems       OrderItem[]
 
   @@map("suppliers")
+}
+
+enum SupplierStatus {
+  ACTIVE
+  TESTING
+  SUSPENDED
+  BLACKLIST
 }
 
 model SupplierScore {
@@ -447,22 +473,33 @@ enum SourcingStatus {
 }
 
 model Offer {
-  id              String   @id @default(cuid())
-  sourcingCaseId  String
-  supplierId      String
-  unitPrice       Decimal  @db.Decimal(15, 2)
-  currency        String   @default("RMB")
-  moq             Int?
-  leadTimeDays    Int?
-  sampleAvailable Boolean  @default(false)
-  notes           String?
-  isSelected      Boolean  @default(false)
-  createdAt       DateTime @default(now())
+  id                String   @id @default(cuid())
+  sourcingCaseId    String?
+  supplierId        String
+  supplierProductId String?
+  productId         String?
+  unitPrice         Decimal  @db.Decimal(15, 2)
+  currency          String   @default("RMB")
+  moq               Int?
+  leadTimeDays      Int?
+  sampleAvailable   Boolean  @default(false)
+  notes             String?
+  isSelected        Boolean  @default(false)
+  validFrom         DateTime @default(now())
+  validTo           DateTime?
+  sourceType        String   @default("sourcing") // sourcing, order, manual
+  sourceId          String?
+  createdAt         DateTime @default(now())
 
-  sourcingCase SourcingCase @relation(fields: [sourcingCaseId], references: [id])
-  supplier     Supplier     @relation(fields: [supplierId], references: [id])
+  sourcingCase    SourcingCase?    @relation(fields: [sourcingCaseId], references: [id])
+  supplier        Supplier         @relation(fields: [supplierId], references: [id])
+  supplierProduct SupplierProduct? @relation(fields: [supplierProductId], references: [id])
+  product         CatalogProduct?  @relation(fields: [productId], references: [id])
 
   @@index([sourcingCaseId])
+  @@index([supplierId])
+  @@index([productId])
+  @@index([supplierProductId])
   @@map("offers")
 }
 
@@ -523,6 +560,8 @@ enum QCStatus {
 model QCReport {
   id             String   @id @default(cuid())
   qcRequestId    String
+  productId      String?
+  supplierId     String?
   overallResult  String
   defectRate     Decimal? @db.Decimal(5, 2)
   photos         Json     @default("[]")
@@ -531,9 +570,11 @@ model QCReport {
   createdAt      DateTime @default(now())
 
   qcRequest       QCRequest         @relation(fields: [qcRequestId], references: [id])
+  product         CatalogProduct?   @relation(fields: [productId], references: [id])
   nonConformities QCNonConformity[]
 
   @@index([qcRequestId])
+  @@index([productId])
   @@map("qc_reports")
 }
 
