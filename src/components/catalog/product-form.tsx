@@ -355,7 +355,7 @@ export function ProductForm({ categories }: ProductFormProps) {
                   value={
                     typeof field.value === "object" && field.value
                       ? JSON.stringify(field.value, null, 2)
-                      : (field.value as string) ?? ""
+                      : String(field.value ?? "")
                   }
                   onChange={(e) => field.onChange(e.target.value)}
                   placeholder='{"couleur": "noir", "taille": "256GB"}'

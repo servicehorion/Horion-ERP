@@ -110,13 +110,19 @@ model Contact {
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
 
-  tenant               Tenant                @relation(fields: [tenantId], references: [id])
+  tenant               Tenant                     @relation(fields: [tenantId], references: [id])
   orders               Order[]
   leads                Lead[]
   conversations        Conversation[]
   communityMemberships CommunityMembership[]
   engagementEvents     EngagementEvent[]
   inboundIntents       InboundIntent[]
+  financialMetrics     CustomerFinancialMetrics?
+  riskProfile          CustomerRiskProfile?
+  pipelineIntents      CustomerPipelineIntent[]
+  aiProfile            CustomerAIProfile?
+  supplyChains         CustomerSupplyChain[]
+  segmentations        CustomerSegmentation[]
 
   @@index([tenantId])
   @@index([tenantId, type])
@@ -416,6 +422,7 @@ model Supplier {
   supplierProducts SupplierProduct[]
   catalogMedia     CatalogMedia[]
   orderItems       OrderItem[]
+  customerSupplyChains CustomerSupplyChain[]
 
   @@map("suppliers")
 }
@@ -613,6 +620,7 @@ model FreightPartner {
   updatedAt   DateTime @updatedAt
 
   shipments Shipment[]
+  customerSupplyChains CustomerSupplyChain[]
 
   @@map("freight_partners")
 }
@@ -1280,4 +1288,153 @@ model KnowledgePack {
 
   @@index([tenantId])
   @@map("knowledge_packs")
+}
+
+// ============================================================
+// M. CUSTOMER INTELLIGENCE (Bloomberg-level CRM)
+// ============================================================
+
+model CustomerFinancialMetrics {
+  id                    String   @id @default(cuid())
+  contactId             String   @unique
+  lifetimeGrossRevenue  Decimal  @db.Decimal(15, 2) @default(0)
+  lifetimeNetProfit     Decimal  @db.Decimal(15, 2) @default(0)
+  averageMarginPercent  Decimal  @db.Decimal(5, 2) @default(0)
+  cashAtRisk            Decimal  @db.Decimal(15, 2) @default(0) // money in China/transit/customs
+  daysOfCashImmobil     Int      @default(0) // DCI
+  customerAcqCost       Decimal? @db.Decimal(15, 2) // CAC
+  paybackPeriodDays     Int?
+  contributionScore     Decimal  @db.Decimal(5, 2) @default(0) // importance to cashflow (0-100)
+  totalOrdersCount      Int      @default(0)
+  avgOrderValue         Decimal  @db.Decimal(15, 2) @default(0)
+  lastOrderDate         DateTime?
+  calculatedAt          DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([contactId])
+  @@map("customer_financial_metrics")
+}
+
+model CustomerRiskProfile {
+  id                    String   @id @default(cuid())
+  contactId             String   @unique
+  globalRiskScore       Int      @default(50) // 0-100
+  paymentRisk           Int      @default(50) // 0-100
+  logisticsRisk         Int      @default(50)
+  customsRisk           Int      @default(50)
+  disputeFrequency      Decimal  @db.Decimal(5, 2) @default(0) // disputes per order
+  supplierReliability   Decimal  @db.Decimal(5, 2) @default(50)
+  countryRegulatoryRisk Int      @default(50)
+  cashExposure          Decimal  @db.Decimal(15, 2) @default(0) // Horion money at risk
+  riskBadges            Json     @default("[]") // ["LOW_RISK", "CASH_RISK", "SUPPLY_RISK", etc.]
+  riskFactors           Json     @default("{}") // detailed risk breakdown
+  calculatedAt          DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([contactId])
+  @@index([globalRiskScore])
+  @@map("customer_risk_profiles")
+}
+
+model CustomerPipelineIntent {
+  id                String    @id @default(cuid())
+  contactId         String
+  productCategory   String?
+  productName       String?
+  estimatedOrderDate DateTime?
+  estimatedSize     Decimal?  @db.Decimal(15, 2)
+  currency          String    @default("XAF")
+  probability       Decimal   @db.Decimal(3, 2) @default(0.5) // 0.0-1.0
+  expectedRevenue   Decimal   @db.Decimal(15, 2) @default(0) // size * probability
+  source            String?   // whatsapp, crm, website, etc.
+  notes             String?
+  status            String    @default("active") // active, converted, lost
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([contactId])
+  @@index([contactId, status])
+  @@map("customer_pipeline_intents")
+}
+
+model CustomerAIProfile {
+  id                       String   @id @default(cuid())
+  contactId                String   @unique
+  buyingPersonality        String?  // price_driven, quality_driven, urgent, seasonal
+  negotiationStyle         String?  // aggressive, collaborative, passive
+  sensitivityToDelays      String?  // low, medium, high
+  priceElasticity          String?  // low, medium, high
+  recommendedPricingStrategy String?
+  recommendedPaymentTerms  String?
+  recommendedLogisticsStrategy String?
+  upsellSuggestions        Json     @default("[]")
+  crossSellSuggestions     Json     @default("[]")
+  behavioralInsights       Json     @default("{}")
+  predictedChurnRisk       Decimal? @db.Decimal(3, 2) // 0.0-1.0
+  predictedLTV             Decimal? @db.Decimal(15, 2)
+  calculatedAt             DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([contactId])
+  @@map("customer_ai_profiles")
+}
+
+model CustomerSupplyChain {
+  id                   String   @id @default(cuid())
+  contactId            String
+  supplierId           String
+  transitPartnerId     String?
+  route                String?  // e.g. "Guangzhou-Pointe-Noire"
+  ordersCount          Int      @default(0)
+  avgDelayDays         Decimal? @db.Decimal(5, 2)
+  qcIssuesCount        Int      @default(0)
+  customsIssuesCount   Int      @default(0)
+  reliabilityScore     Decimal  @db.Decimal(5, 2) @default(50)
+  lastUsedAt           DateTime?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  contact     Contact         @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  supplier    Supplier        @relation(fields: [supplierId], references: [id])
+  transitPartner FreightPartner? @relation(fields: [transitPartnerId], references: [id])
+
+  @@unique([contactId, supplierId])
+  @@index([contactId])
+  @@index([supplierId])
+  @@map("customer_supply_chains")
+}
+
+enum CustomerSegment {
+  CASHFLOW_DRIVER
+  STRATEGIC_GROWTH
+  HIGH_RISK_HIGH_REWARD
+  LOW_MARGIN_VOLUME
+  TEST_CLIENT
+  ONE_TIME_BUYER
+  KEY_ACCOUNT
+  AT_RISK
+}
+
+model CustomerSegmentation {
+  id        String          @id @default(cuid())
+  contactId String
+  segment   CustomerSegment
+  score     Decimal         @db.Decimal(5, 2) @default(0) // relevance score
+  assignedAt DateTime       @default(now())
+  notes     String?
+
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@unique([contactId, segment])
+  @@index([contactId])
+  @@index([segment])
+  @@map("customer_segmentations")
 }

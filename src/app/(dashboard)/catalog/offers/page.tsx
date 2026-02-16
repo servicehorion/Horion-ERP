@@ -121,7 +121,7 @@ async function OffersList({ sourceType }: { sourceType?: string } = {}) {
           {offers.map((offer) => (
             <TableRow key={offer.id}>
               <TableCell className="font-medium">
-                {offer.product?.name || "-"}
+                {(offer as any).product?.name || "-"}
               </TableCell>
               <TableCell>{offer.supplier.name}</TableCell>
               <TableCell>

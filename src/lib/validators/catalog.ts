@@ -4,7 +4,7 @@ export const createProductSchema = z.object({
   name: z.string().min(1, "Nom obligatoire"),
   categoryId: z.string().optional(),
   status: z.enum(["TESTING", "TESTED", "CURATED", "BLACKLIST"]).optional(),
-  specsJson: z.record(z.unknown()).optional(),
+  specsJson: z.record(z.string(), z.unknown()).optional(),
   weightEstimate: z.number().nonnegative().optional(),
   volumeEstimate: z.number().nonnegative().optional(),
   qcRecommendedLevel: z.string().optional(),
@@ -12,7 +12,7 @@ export const createProductSchema = z.object({
   priceMin: z.number().nonnegative().optional(),
   priceMax: z.number().nonnegative().optional(),
   priceCurrency: z.string().optional(),
-  shippingHints: z.record(z.unknown()).optional(),
+  shippingHints: z.record(z.string(), z.unknown()).optional(),
   notes: z.string().optional(),
 });
 
@@ -32,8 +32,8 @@ export const createSupplierSchema = z.object({
   leadTimeDays: z.number().int().nonnegative().optional(),
   moq: z.string().optional(),
   paymentTerms: z.string().optional(),
-  contactsJson: z.record(z.unknown()).optional(),
-  negotiatedTermsJson: z.record(z.unknown()).optional(),
+  contactsJson: z.record(z.string(), z.unknown()).optional(),
+  negotiatedTermsJson: z.record(z.string(), z.unknown()).optional(),
   notes: z.string().optional(),
 });
 
