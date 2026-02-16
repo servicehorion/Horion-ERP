@@ -1,19 +1,12 @@
 "use server";
 
-import { auth } from "@/lib/auth";
+import { getSession } from "@/lib/session";
 import { OrderService } from "@/lib/services/order.service";
 import { AuditService } from "@/lib/services/audit.service";
 import { checkPermission } from "@/lib/permissions";
 import { createOrderSchema, updateOrderStatusSchema, createQuoteSchema } from "@/lib/validators/order";
 import { revalidatePath } from "next/cache";
 import type { OrderStatus } from "@prisma/client";
-import type { UserRole } from "@prisma/client";
-
-async function getSession() {
-  const session = await auth();
-  if (!session?.user) throw new Error("Non authentifie");
-  return session.user as { id: string; email: string; name: string; role: UserRole; tenantId: string; tenantName: string };
-}
 
 export async function createOrder(formData: {
   contactId: string;
@@ -102,6 +95,12 @@ export async function updateOrderStatus(orderId: string, newStatus: string, note
     const user = await getSession();
     checkPermission(user.role, "order.update_status");
 
+    // Verify order belongs to tenant before update
+    const existing = await OrderService.getById(orderId);
+    if (!existing || existing.tenantId !== user.tenantId) {
+      return { error: "Commande introuvable" };
+    }
+
     const validated = updateOrderStatusSchema.parse({ orderId, newStatus, note });
 
     const order = await OrderService.updateStatus(
@@ -117,7 +116,7 @@ export async function updateOrderStatus(orderId: string, newStatus: string, note
       action: "order.status_changed",
       entityType: "order",
       entityId: validated.orderId,
-      oldValue: { status: newStatus },
+      oldValue: { status: existing.status },
       newValue: { status: validated.newStatus },
     });
 
@@ -134,8 +133,12 @@ export async function updateOrderStatus(orderId: string, newStatus: string, note
 }
 
 export async function getOrderStatusCounts() {
-  const user = await getSession();
-  return OrderService.getStatusCounts(user.tenantId);
+  try {
+    const user = await getSession();
+    return { data: await OrderService.getStatusCounts(user.tenantId) };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Erreur lors de la récupération des compteurs" };
+  }
 }
 
 export async function createQuote(data: {
@@ -147,39 +150,49 @@ export async function createQuote(data: {
   currency?: string;
   validUntil?: string;
 }) {
-  const user = await getSession();
-  checkPermission(user.role, "quote.create");
+  try {
+    const user = await getSession();
+    checkPermission(user.role, "quote.create");
 
-  const validated = createQuoteSchema.parse(data);
-  const { prisma } = await import("@/lib/db");
+    // Verify order belongs to tenant
+    const order = await OrderService.getById(data.orderId);
+    if (!order || order.tenantId !== user.tenantId) {
+      return { error: "Commande introuvable" };
+    }
 
-  // Get latest version
-  const latestQuote = await prisma.quote.findFirst({
-    where: { orderId: validated.orderId },
-    orderBy: { version: "desc" },
-    select: { version: true },
-  });
+    const validated = createQuoteSchema.parse(data);
+    const { prisma } = await import("@/lib/db");
 
-  const quote = await prisma.quote.create({
-    data: {
-      orderId: validated.orderId,
-      version: (latestQuote?.version || 0) + 1,
-      merchandiseTotal: validated.merchandiseTotal,
-      logisticsCost: validated.logisticsCost,
-      commission: validated.commission,
-      insuranceCost: validated.insuranceCost || 0,
-      total:
-        validated.merchandiseTotal +
-        validated.logisticsCost +
-        validated.commission +
-        (validated.insuranceCost || 0),
-      currency: validated.currency || "XAF",
-      validUntil: validated.validUntil
-        ? new Date(validated.validUntil)
-        : undefined,
-    },
-  });
+    const latestQuote = await prisma.quote.findFirst({
+      where: { orderId: validated.orderId },
+      orderBy: { version: "desc" },
+      select: { version: true },
+    });
 
-  revalidatePath(`/orders/${validated.orderId}`);
-  return { success: true, quote };
+    const quote = await prisma.quote.create({
+      data: {
+        orderId: validated.orderId,
+        version: (latestQuote?.version || 0) + 1,
+        merchandiseTotal: validated.merchandiseTotal,
+        logisticsCost: validated.logisticsCost,
+        commission: validated.commission,
+        insuranceCost: validated.insuranceCost || 0,
+        total:
+          validated.merchandiseTotal +
+          validated.logisticsCost +
+          validated.commission +
+          (validated.insuranceCost || 0),
+        currency: validated.currency || "XAF",
+        validUntil: validated.validUntil
+          ? new Date(validated.validUntil)
+          : undefined,
+      },
+    });
+
+    revalidatePath(`/orders/${validated.orderId}`);
+    return { data: quote };
+  } catch (error) {
+    console.error("Error creating quote:", error);
+    return { error: error instanceof Error ? error.message : "Erreur lors de la création du devis" };
+  }
 }

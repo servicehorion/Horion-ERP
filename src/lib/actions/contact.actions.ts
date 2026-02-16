@@ -1,22 +1,19 @@
 "use server";
 
-import { auth } from "@/lib/auth";
+import { getSession } from "@/lib/session";
 import { ContactService } from "@/lib/services/contact.service";
 import { LeadService } from "@/lib/services/lead.service";
 import { AuditService } from "@/lib/services/audit.service";
+import { checkPermission } from "@/lib/permissions";
 import { createContactSchema, createLeadSchema, updateContactSchema } from "@/lib/validators/contact";
 import { revalidatePath } from "next/cache";
-import type { ContactType, LeadStatus, UserRole } from "@prisma/client";
-
-async function getSession() {
-  const session = await auth();
-  if (!session?.user) throw new Error("Non authentifié");
-  return session.user as { id: string; email: string; name: string; role: UserRole; tenantId: string };
-}
+import type { ContactType, LeadStatus } from "@prisma/client";
 
 export async function createContact(formData: Record<string, unknown>) {
   try {
     const user = await getSession();
+    checkPermission(user.role, "contact.manage");
+
     const validated = createContactSchema.parse(formData);
     const contact = await ContactService.create(user.tenantId, validated);
 
@@ -41,6 +38,14 @@ export async function createContact(formData: Record<string, unknown>) {
 export async function updateContact(contactId: string, formData: Record<string, unknown>) {
   try {
     const user = await getSession();
+    checkPermission(user.role, "contact.manage");
+
+    // Verify tenant ownership
+    const existing = await ContactService.getById(contactId);
+    if (!existing || existing.tenantId !== user.tenantId) {
+      return { error: "Contact introuvable" };
+    }
+
     const validated = updateContactSchema.parse(formData);
     const contact = await ContactService.update(contactId, validated);
 
@@ -55,6 +60,7 @@ export async function updateContact(contactId: string, formData: Record<string, 
 
     revalidatePath("/contacts");
     revalidatePath(`/contacts/${contactId}`);
+    revalidatePath("/crm");
     return { data: contact };
   } catch (error) {
     console.error("Error updating contact:", error);
@@ -93,7 +99,7 @@ export async function getContactById(contactId: string) {
     return { data: contact };
   } catch (error) {
     console.error("Error fetching contact:", error);
-    return { error: error instanceof Error ? error.message : "Erreur" };
+    return { error: error instanceof Error ? error.message : "Erreur lors de la récupération" };
   }
 }
 
@@ -102,7 +108,7 @@ export async function getContactTypeCount() {
     const user = await getSession();
     return { data: await ContactService.getTypeCount(user.tenantId) };
   } catch (error) {
-    return { error: "Erreur" };
+    return { error: error instanceof Error ? error.message : "Erreur lors de la récupération" };
   }
 }
 
@@ -111,6 +117,8 @@ export async function getContactTypeCount() {
 export async function createLead(formData: Record<string, unknown>) {
   try {
     const user = await getSession();
+    checkPermission(user.role, "lead.manage");
+
     const validated = createLeadSchema.parse(formData);
     const lead = await LeadService.create(validated);
 
@@ -139,18 +147,20 @@ export async function getLeads(options?: {
     return { data: result.leads };
   } catch (error) {
     console.error("Error fetching leads:", error);
-    return { error: error instanceof Error ? error.message : "Erreur" };
+    return { error: error instanceof Error ? error.message : "Erreur lors de la récupération" };
   }
 }
 
 export async function updateLeadStatus(leadId: string, status: string) {
   try {
-    await getSession();
+    const user = await getSession();
+    checkPermission(user.role, "lead.manage");
+
     const lead = await LeadService.updateStatus(leadId, status as LeadStatus);
     revalidatePath("/crm");
     return { data: lead };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Erreur" };
+    return { error: error instanceof Error ? error.message : "Erreur lors de la mise à jour" };
   }
 }
 
@@ -159,6 +169,6 @@ export async function getLeadPipeline() {
     const user = await getSession();
     return { data: await LeadService.getPipelineStats(user.tenantId) };
   } catch (error) {
-    return { error: "Erreur" };
+    return { error: error instanceof Error ? error.message : "Erreur lors de la récupération" };
   }
 }

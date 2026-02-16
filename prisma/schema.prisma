@@ -1145,3 +1145,139 @@ model SocialAccount {
 
   @@map("social_accounts")
 }
+
+// ============================================================
+// L. CATALOG OS (Produits, Fournisseurs, Offres, Preuves)
+// ============================================================
+
+model ProductCategory {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  slug      String?
+  parentId  String?
+  createdAt DateTime @default(now())
+
+  tenant   Tenant            @relation(fields: [tenantId], references: [id])
+  parent   ProductCategory?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children ProductCategory[] @relation("CategoryTree")
+  products CatalogProduct[]
+
+  @@unique([tenantId, name])
+  @@map("product_categories")
+}
+
+model CatalogProduct {
+  id                  String        @id @default(cuid())
+  tenantId            String
+  name                String
+  categoryId          String?
+  status              ProductStatus @default(TESTING)
+  specsJson           Json          @default("{}") // dimensions, matériaux, compatibilités, packaging
+  mediaIds            Json          @default("[]")
+  weightEstimate      Decimal?      @db.Decimal(10, 2)
+  volumeEstimate      Decimal?      @db.Decimal(10, 4)
+  qcRecommendedLevel  String?       // VIRTUAL, PRE_SHIPMENT, EXTREME
+  demandScore         Int           @default(0)
+  moqMin              Int?
+  priceMin            Decimal?      @db.Decimal(15, 2)
+  priceMax            Decimal?      @db.Decimal(15, 2)
+  priceCurrency       String        @default("RMB")
+  averageMargin       Decimal?      @db.Decimal(5, 2)
+  averageLeadTime     Int?          // en jours
+  lastOrderedAt       DateTime?
+  shippingHints       Json          @default("{}") // fragile, batteries, restrictions
+  marketingPack       Json          @default("{}") // textes, prix indicatif, hook, CTA
+  notes               String?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  tenant           Tenant            @relation(fields: [tenantId], references: [id])
+  category         ProductCategory?  @relation(fields: [categoryId], references: [id])
+  supplierProducts SupplierProduct[]
+  orderItems       OrderItem[]
+  offers           Offer[]
+  qcReports        QCReport[]
+  media            CatalogMedia[]
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, categoryId])
+  @@map("catalog_products")
+}
+
+enum ProductStatus {
+  TESTING
+  TESTED
+  CURATED
+  BLACKLIST
+}
+
+model SupplierProduct {
+  id               String                @id @default(cuid())
+  supplierId       String
+  productId        String
+  moq              Int?
+  priceMin         Decimal?              @db.Decimal(15, 2)
+  priceMax         Decimal?              @db.Decimal(15, 2)
+  currency         String                @default("RMB")
+  leadTimeDays     Int?
+  reliabilityNotes String?
+  status           SupplierProductStatus @default(ACTIVE)
+  isPrimary        Boolean               @default(false)
+  lastVerifiedAt   DateTime?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+
+  supplier Supplier        @relation(fields: [supplierId], references: [id])
+  product  CatalogProduct  @relation(fields: [productId], references: [id])
+  offers   Offer[]
+
+  @@unique([supplierId, productId])
+  @@index([productId])
+  @@index([supplierId])
+  @@map("supplier_products")
+}
+
+enum SupplierProductStatus {
+  ACTIVE
+  PAUSED
+}
+
+model CatalogMedia {
+  id               String    @id @default(cuid())
+  tenantId         String
+  type             String    // image, video, pdf, document
+  url              String
+  filename         String?
+  tags             Json      @default("[]")
+  linkedEntityType String    // product, supplier, order, qc_report
+  linkedEntityId   String
+  productId        String?
+  supplierId       String?
+  orderId          String?
+  createdAt        DateTime  @default(now())
+
+  tenant   Tenant          @relation(fields: [tenantId], references: [id])
+  product  CatalogProduct? @relation(fields: [productId], references: [id])
+  supplier Supplier?       @relation(fields: [supplierId], references: [id])
+
+  @@index([linkedEntityType, linkedEntityId])
+  @@index([productId])
+  @@index([supplierId])
+  @@index([tenantId])
+  @@map("catalog_media")
+}
+
+model KnowledgePack {
+  id          String   @id @default(cuid())
+  tenantId    String
+  version     Int      @default(1)
+  content     Json     @default("{}") // top suppliers, top products, playbooks, benchmarks
+  status      String   @default("draft") // draft, published
+  publishedAt DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId])
+  @@map("knowledge_packs")
+}

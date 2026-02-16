@@ -46,6 +46,7 @@ export class PaymentService {
 
   static async list(
     options: {
+      tenantId?: string;
       orderId?: string;
       direction?: PaymentDirection;
       status?: PaymentStatus;
@@ -53,9 +54,10 @@ export class PaymentService {
       limit?: number;
     } = {}
   ) {
-    const { orderId, direction, status, page = 1, limit = 20 } = options;
+    const { tenantId, orderId, direction, status, page = 1, limit = 20 } = options;
 
     const where: Prisma.PaymentWhereInput = {
+      ...(tenantId && { order: { tenantId } }),
       ...(orderId && { orderId }),
       ...(direction && { direction }),
       ...(status && { status }),
@@ -77,12 +79,24 @@ export class PaymentService {
     return { payments, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
-  static async confirm(paymentId: string) {
+  static async confirm(paymentId: string, tenantId?: string) {
+    // Verify tenant ownership if provided
+    if (tenantId) {
+      const existing = await prisma.payment.findFirst({
+        where: { id: paymentId, order: { tenantId } },
+      });
+      if (!existing) throw new Error("Paiement introuvable");
+      if (existing.status !== "PENDING" && existing.status !== "PROCESSING") {
+        throw new Error(`Impossible de confirmer un paiement ${existing.status}`);
+      }
+    }
+
     const payment = await prisma.payment.update({
       where: { id: paymentId },
       data: {
         status: "CONFIRMED",
         confirmedAt: new Date(),
+        paidAt: new Date(),
       },
     });
 
@@ -94,7 +108,17 @@ export class PaymentService {
     return payment;
   }
 
-  static async cancel(paymentId: string) {
+  static async cancel(paymentId: string, tenantId?: string) {
+    if (tenantId) {
+      const existing = await prisma.payment.findFirst({
+        where: { id: paymentId, order: { tenantId } },
+      });
+      if (!existing) throw new Error("Paiement introuvable");
+      if (existing.status === "CONFIRMED") {
+        throw new Error("Impossible d'annuler un paiement déjà confirmé");
+      }
+    }
+
     return prisma.payment.update({
       where: { id: paymentId },
       data: { status: "CANCELLED" },

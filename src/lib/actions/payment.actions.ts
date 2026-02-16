@@ -1,19 +1,13 @@
 "use server";
 
-import { auth } from "@/lib/auth";
+import { getSession } from "@/lib/session";
 import { PaymentService } from "@/lib/services/payment.service";
 import { MarginService } from "@/lib/services/margin.service";
 import { AuditService } from "@/lib/services/audit.service";
 import { checkPermission } from "@/lib/permissions";
 import { createPaymentSchema } from "@/lib/validators/payment";
 import { revalidatePath } from "next/cache";
-import type { PaymentDirection, PaymentStatus, UserRole } from "@prisma/client";
-
-async function getSession() {
-  const session = await auth();
-  if (!session?.user) throw new Error("Non authentifié");
-  return session.user as { id: string; email: string; name: string; role: UserRole; tenantId: string };
-}
+import type { PaymentDirection, PaymentStatus } from "@prisma/client";
 
 export async function createPayment(formData: Record<string, unknown>) {
   try {
@@ -54,8 +48,9 @@ export async function getPayments(options?: {
   limit?: number;
 }) {
   try {
-    await getSession();
+    const user = await getSession();
     const result = await PaymentService.list({
+      tenantId: user.tenantId,
       orderId: options?.orderId,
       direction: options?.direction as PaymentDirection | undefined,
       status: options?.status as PaymentStatus | undefined,
@@ -65,7 +60,7 @@ export async function getPayments(options?: {
     return { data: result.payments };
   } catch (error) {
     console.error("Error fetching payments:", error);
-    return { error: error instanceof Error ? error.message : "Erreur" };
+    return { error: error instanceof Error ? error.message : "Erreur lors de la récupération des paiements" };
   }
 }
 
@@ -74,7 +69,7 @@ export async function confirmPayment(paymentId: string) {
     const user = await getSession();
     checkPermission(user.role, "payment.confirm");
 
-    const payment = await PaymentService.confirm(paymentId);
+    const payment = await PaymentService.confirm(paymentId, user.tenantId);
 
     await AuditService.log({
       tenantId: user.tenantId,
@@ -88,19 +83,22 @@ export async function confirmPayment(paymentId: string) {
     revalidatePath("/dashboard");
     return { data: payment };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Erreur" };
+    return { error: error instanceof Error ? error.message : "Erreur lors de la confirmation" };
   }
 }
 
 export async function cancelPayment(paymentId: string) {
   try {
     const user = await getSession();
-    const payment = await PaymentService.cancel(paymentId);
+    checkPermission(user.role, "payment.confirm");
+
+    const payment = await PaymentService.cancel(paymentId, user.tenantId);
 
     revalidatePath("/finance/payments");
+    revalidatePath("/dashboard");
     return { data: payment };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Erreur" };
+    return { error: error instanceof Error ? error.message : "Erreur lors de l'annulation" };
   }
 }
 
@@ -109,7 +107,7 @@ export async function getPaymentSummary(orderId: string) {
     await getSession();
     return { data: await PaymentService.getOrderPaymentSummary(orderId) };
   } catch (error) {
-    return { error: "Erreur" };
+    return { error: error instanceof Error ? error.message : "Erreur lors de la récupération" };
   }
 }
 
@@ -118,7 +116,7 @@ export async function getMonthlyPaymentStats() {
     const user = await getSession();
     return { data: await PaymentService.getMonthlyStats(user.tenantId) };
   } catch (error) {
-    return { error: "Erreur" };
+    return { error: error instanceof Error ? error.message : "Erreur lors de la récupération" };
   }
 }
 
@@ -126,14 +124,15 @@ export async function getMonthlyPaymentStats() {
 
 export async function calculateMargin(orderId: string) {
   try {
-    const user = await getSession();
+    await getSession();
     const report = await MarginService.calculateForOrder(orderId);
 
     revalidatePath("/finance/margins");
+    revalidatePath("/dashboard");
     return { data: report };
   } catch (error) {
     console.error("Error calculating margin:", error);
-    return { error: error instanceof Error ? error.message : "Erreur" };
+    return { error: error instanceof Error ? error.message : "Erreur lors du calcul de la marge" };
   }
 }
 
@@ -143,7 +142,7 @@ export async function getMargins(options?: { page?: number; limit?: number }) {
     const result = await MarginService.list(user.tenantId, options);
     return { data: result.reports };
   } catch (error) {
-    return { error: "Erreur" };
+    return { error: error instanceof Error ? error.message : "Erreur lors de la récupération des marges" };
   }
 }
 
@@ -152,6 +151,6 @@ export async function getAverageMargin() {
     const user = await getSession();
     return { data: await MarginService.getAverageMargin(user.tenantId) };
   } catch (error) {
-    return { error: "Erreur" };
+    return { error: error instanceof Error ? error.message : "Erreur lors de la récupération" };
   }
 }

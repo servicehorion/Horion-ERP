@@ -1,4 +1,4 @@
-import { Package, DollarSign, TrendingUp, CheckSquare, Clock, AlertCircle } from "lucide-react";
+import { Package, DollarSign, CheckSquare, AlertCircle } from "lucide-react";
 import Link from "next/link";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -86,6 +86,7 @@ export default async function DashboardPage() {
     prisma.task.count({
       where: {
         tenantId,
+        slaBreach: true,
         status: {
           notIn: ["COMPLETED", "CANCELLED"],
         },

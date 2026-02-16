@@ -1,15 +1,10 @@
 "use server";
 
-import { auth } from "@/lib/auth";
+import { getSession } from "@/lib/session";
 import { TaskService } from "@/lib/services/task.service";
+import { checkPermission } from "@/lib/permissions";
 import { revalidatePath } from "next/cache";
-import type { TaskStatus, UserRole } from "@prisma/client";
-
-async function getSession() {
-  const session = await auth();
-  if (!session?.user) throw new Error("Non authentifie");
-  return session.user as { id: string; email: string; name: string; role: UserRole; tenantId: string; tenantName: string };
-}
+import type { TaskStatus } from "@prisma/client";
 
 export async function getTasks(options?: {
   module?: string;
@@ -36,7 +31,8 @@ export async function getTasks(options?: {
 
 export async function updateTaskStatus(taskId: string, newStatus: string) {
   try {
-    await getSession();
+    const user = await getSession();
+    checkPermission(user.role, "task.update");
 
     const task = await TaskService.updateStatus(taskId, newStatus as TaskStatus);
 
@@ -51,21 +47,34 @@ export async function updateTaskStatus(taskId: string, newStatus: string) {
 }
 
 export async function assignTask(taskId: string, userId: string) {
-  await getSession();
+  try {
+    const user = await getSession();
+    checkPermission(user.role, "task.assign");
 
-  const assignment = await TaskService.assignTask(taskId, userId);
+    const assignment = await TaskService.assignTask(taskId, userId);
 
-  revalidatePath("/tasks");
-
-  return { success: true, assignment };
+    revalidatePath("/tasks");
+    return { data: assignment };
+  } catch (error) {
+    console.error("Error assigning task:", error);
+    return { error: error instanceof Error ? error.message : "Erreur lors de l'assignation" };
+  }
 }
 
 export async function getTaskModuleCounts() {
-  const user = await getSession();
-  return TaskService.getModuleCounts(user.tenantId);
+  try {
+    const user = await getSession();
+    return { data: await TaskService.getModuleCounts(user.tenantId) };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Erreur lors de la récupération" };
+  }
 }
 
 export async function getPendingTaskCount() {
-  const user = await getSession();
-  return TaskService.getPendingCount(user.tenantId);
+  try {
+    const user = await getSession();
+    return { data: await TaskService.getPendingCount(user.tenantId) };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Erreur lors de la récupération" };
+  }
 }
