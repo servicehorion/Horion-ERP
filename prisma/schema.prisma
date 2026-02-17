@@ -424,6 +424,13 @@ model Supplier {
   orderItems       OrderItem[]
   customerSupplyChains CustomerSupplyChain[]
 
+  // Supplier Intelligence
+  financialMetrics    SupplierFinancialMetrics?
+  performanceProfile  SupplierPerformanceProfile?
+  riskProfile         SupplierRiskProfile?
+  aiProfile           SupplierAIProfile?
+  segmentations       SupplierSegmentation[]
+
   @@map("suppliers")
 }
 
@@ -1437,4 +1444,149 @@ model CustomerSegmentation {
   @@index([contactId])
   @@index([segment])
   @@map("customer_segmentations")
+}
+
+// ============================================================
+// N. SUPPLIER INTELLIGENCE (Bloomberg-level Sourcing)
+// ============================================================
+
+model SupplierFinancialMetrics {
+  id                     String    @id @default(cuid())
+  supplierId             String    @unique
+  totalOrdersCount       Int       @default(0)
+  lifetimeSpend          Decimal   @db.Decimal(15, 2) @default(0)
+  totalPaymentsOut       Decimal   @db.Decimal(15, 2) @default(0)
+  avgOrderValue          Decimal   @db.Decimal(15, 2) @default(0)
+  lastOrderDate          DateTime?
+  spendConcentration     Decimal   @db.Decimal(5, 2) @default(0)
+  supplierDependency     Decimal   @db.Decimal(5, 2) @default(0)
+  priceTrendDirection    String?   // INCREASING, DECREASING, STABLE
+  priceTrendPercent      Decimal?  @db.Decimal(5, 2)
+  savingsRealized        Decimal   @db.Decimal(15, 2) @default(0)
+  avgNegotiationDiscount Decimal   @db.Decimal(5, 2) @default(0)
+  costEfficiencyScore    Decimal   @db.Decimal(5, 2) @default(50)
+  totalCostOfOwnership   Decimal   @db.Decimal(15, 2) @default(0)
+  calculatedAt           DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@index([supplierId])
+  @@map("supplier_financial_metrics")
+}
+
+model SupplierPerformanceProfile {
+  id                    String    @id @default(cuid())
+  supplierId            String    @unique
+  onTimeDeliveryRate    Decimal   @db.Decimal(5, 2) @default(0)
+  avgLeadTimeDays       Decimal?  @db.Decimal(5, 2)
+  leadTimeVariance      Decimal?  @db.Decimal(5, 2)
+  earlyDeliveryCount    Int       @default(0)
+  lateDeliveryCount     Int       @default(0)
+  avgDelayDays          Decimal?  @db.Decimal(5, 2)
+  qualityScore          Decimal   @db.Decimal(5, 2) @default(50)
+  qcPassRate            Decimal   @db.Decimal(5, 2) @default(0)
+  defectRate            Decimal   @db.Decimal(5, 2) @default(0)
+  qcIssuesCount         Int       @default(0)
+  disputeRate           Decimal   @db.Decimal(5, 2) @default(0)
+  disputeResolutionDays Decimal?  @db.Decimal(5, 2)
+  incidentCount         Int       @default(0)
+  responseTimeHours     Decimal?  @db.Decimal(5, 2)
+  communicationScore    Decimal   @db.Decimal(5, 2) @default(50)
+  reliabilityIndex      Decimal   @db.Decimal(5, 2) @default(50)
+  calculatedAt          DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@index([supplierId])
+  @@index([reliabilityIndex])
+  @@map("supplier_performance_profiles")
+}
+
+model SupplierRiskProfile {
+  id                     String   @id @default(cuid())
+  supplierId             String   @unique
+  globalRiskScore        Int      @default(50)
+  concentrationRisk      Int      @default(50)
+  qualityRisk            Int      @default(50)
+  deliveryRisk           Int      @default(50)
+  financialRisk          Int      @default(50)
+  geopoliticalRisk       Int      @default(50)
+  complianceRisk         Int      @default(50)
+  outstandingOrdersValue Decimal  @db.Decimal(15, 2) @default(0)
+  cashAtRisk             Decimal  @db.Decimal(15, 2) @default(0)
+  riskBadges             Json     @default("[]")
+  riskFactors            Json     @default("{}")
+  mitigationActions      Json     @default("[]")
+  blacklistHistory       Boolean  @default(false)
+  suspensionCount        Int      @default(0)
+  lastIncidentDate       DateTime?
+  calculatedAt           DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@index([supplierId])
+  @@index([globalRiskScore])
+  @@map("supplier_risk_profiles")
+}
+
+model SupplierAIProfile {
+  id                         String    @id @default(cuid())
+  supplierId                 String    @unique
+  supplierPersonality        String?   // PRICE_FLEXIBLE, RIGID, QUALITY_FOCUSED, VOLUME_DRIVEN
+  negotiationLeverage        String?   // HIGH, MEDIUM, LOW
+  responsiveness             String?   // FAST, MEDIUM, SLOW
+  strategicValue             String?   // STRATEGIC_PARTNER, COMMODITY, BOTTLENECK, LEVERAGE
+  supplierPowerScore         Decimal   @db.Decimal(5, 2) @default(50)
+  recommendedStrategy        String?   // CONSOLIDATE, DIVERSIFY, NEGOTIATE, DEVELOP, EXIT
+  consolidationOpportunities Json      @default("[]")
+  alternativeSuggestions     Json      @default("[]")
+  predictedPriceDirection    String?   // UP, DOWN, STABLE
+  predictedPriceChange       Decimal?  @db.Decimal(5, 2)
+  churnRiskScore             Decimal?  @db.Decimal(3, 2)
+  optimalOrderSize           Decimal?  @db.Decimal(15, 2)
+  optimalOrderFrequency      String?   // WEEKLY, MONTHLY, QUARTERLY
+  estimatedAnnualValue       Decimal?  @db.Decimal(15, 2)
+  strengthFactors            Json      @default("[]")
+  weaknessFactors            Json      @default("[]")
+  behavioralInsights         Json      @default("{}")
+  calculatedAt               DateTime  @default(now())
+  updatedAt                  DateTime  @updatedAt
+
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@index([supplierId])
+  @@map("supplier_ai_profiles")
+}
+
+enum SupplierSegment {
+  STRATEGIC_PARTNER
+  LEVERAGE_SUPPLIER
+  BOTTLENECK
+  ROUTINE
+  A_SUPPLIER
+  B_SUPPLIER
+  C_SUPPLIER
+  AT_RISK
+  PREFERRED
+  DEVELOPING
+  EXITING
+}
+
+model SupplierSegmentation {
+  id         String          @id @default(cuid())
+  supplierId String
+  segment    SupplierSegment
+  score      Decimal         @db.Decimal(5, 2) @default(0)
+  assignedAt DateTime        @default(now())
+  notes      String?
+
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@unique([supplierId, segment])
+  @@index([supplierId])
+  @@index([segment])
+  @@map("supplier_segmentations")
 }

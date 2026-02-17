@@ -8,13 +8,12 @@ import {
   Factory,
   Clock,
   Package,
-  ShieldCheck,
-  AlertTriangle,
-  Truck,
   FileText,
   Image as ImageIcon,
   Video,
   File,
+  RefreshCw,
+  Link as LinkIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -33,10 +32,15 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
-import { getSupplierById } from "@/lib/actions/catalog.actions";
+import { getSupplierIntelligence } from "@/lib/actions/supplier-intelligence.actions";
+import { RecalculateSupplierButton } from "@/components/sourcing/recalculate-supplier-button";
+import { SupplierFinancialPanel } from "@/components/sourcing/supplier-financial-panel";
+import { SupplierPerformanceMeter } from "@/components/sourcing/supplier-performance-meter";
+import { SupplierRiskGauge } from "@/components/sourcing/supplier-risk-gauge";
+import { SupplierAIBrain } from "@/components/sourcing/supplier-ai-brain";
 import { formatDate } from "@/lib/utils";
 
-export const metadata = { title: "Fiche fournisseur | Horion ERP" };
+export const metadata = { title: "Intelligence Fournisseur | Horion ERP" };
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -56,6 +60,34 @@ const STATUS_LABELS: Record<string, string> = {
   BLACKLIST: "Blacklisté",
 };
 
+const SEGMENT_COLORS: Record<string, string> = {
+  STRATEGIC_PARTNER: "bg-purple-100 text-purple-800",
+  LEVERAGE_SUPPLIER: "bg-blue-100 text-blue-800",
+  BOTTLENECK: "bg-orange-100 text-orange-800",
+  ROUTINE: "bg-gray-100 text-gray-800",
+  A_SUPPLIER: "bg-emerald-100 text-emerald-800",
+  B_SUPPLIER: "bg-teal-100 text-teal-800",
+  C_SUPPLIER: "bg-slate-100 text-slate-800",
+  AT_RISK: "bg-red-100 text-red-800",
+  PREFERRED: "bg-green-100 text-green-800",
+  DEVELOPING: "bg-yellow-100 text-yellow-800",
+  EXITING: "bg-rose-100 text-rose-800",
+};
+
+const SEGMENT_LABELS: Record<string, string> = {
+  STRATEGIC_PARTNER: "Partenaire stratégique",
+  LEVERAGE_SUPPLIER: "Fournisseur levier",
+  BOTTLENECK: "Goulot",
+  ROUTINE: "Routine",
+  A_SUPPLIER: "Fournisseur A",
+  B_SUPPLIER: "Fournisseur B",
+  C_SUPPLIER: "Fournisseur C",
+  AT_RISK: "À risque",
+  PREFERRED: "Préféré",
+  DEVELOPING: "En développement",
+  EXITING: "En sortie",
+};
+
 const MEDIA_ICONS: Record<string, React.ReactNode> = {
   image: <ImageIcon className="h-5 w-5" />,
   video: <Video className="h-5 w-5" />,
@@ -63,28 +95,40 @@ const MEDIA_ICONS: Record<string, React.ReactNode> = {
   document: <File className="h-5 w-5" />,
 };
 
-export default async function SupplierDetailPage({ params }: Props) {
+export default async function SupplierIntelligencePage({ params }: Props) {
   const { id } = await params;
-  const result = await getSupplierById(id);
+  const result = await getSupplierIntelligence(id);
 
   if (result.error || !result.data) notFound();
 
   const supplier = result.data;
+  const {
+    financialMetrics,
+    performanceProfile,
+    riskProfile,
+    aiProfile,
+    segmentations,
+  } = supplier;
+
   const negotiatedTerms =
     supplier.negotiatedTermsJson &&
     typeof supplier.negotiatedTermsJson === "object"
       ? (supplier.negotiatedTermsJson as Record<string, unknown>)
       : {};
 
+  const hasIntelligence = !!(financialMetrics && performanceProfile && riskProfile);
+  const globalRisk = riskProfile?.globalRiskScore ?? null;
+
   return (
     <div className="space-y-6">
-      {/* Back button */}
-      <div className="flex items-center gap-4">
+      {/* Back + recalculate */}
+      <div className="flex items-center justify-between">
         <Button variant="ghost" size="icon" asChild>
           <Link href="/catalog/suppliers">
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
+        <RecalculateSupplierButton supplierId={supplier.id} />
       </div>
 
       {/* Header */}
@@ -92,12 +136,10 @@ export default async function SupplierDetailPage({ params }: Props) {
         <div>
           <h1 className="text-3xl font-bold">{supplier.name}</h1>
           {supplier.category && (
-            <p className="text-lg text-muted-foreground">
-              {supplier.category}
-            </p>
+            <p className="text-lg text-muted-foreground">{supplier.category}</p>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap justify-end">
           <Badge
             variant="secondary"
             className={STATUS_COLORS[supplier.status] || ""}
@@ -109,48 +151,102 @@ export default async function SupplierDetailPage({ params }: Props) {
               Vérifié
             </Badge>
           )}
+          {globalRisk !== null && globalRisk >= 60 && (
+            <Badge variant="destructive">
+              Risque {globalRisk >= 80 ? "élevé" : "moyen"} ({globalRisk})
+            </Badge>
+          )}
+          {globalRisk !== null && globalRisk < 30 && (
+            <Badge variant="secondary" className="bg-green-100 text-green-800">
+              Faible risque
+            </Badge>
+          )}
         </div>
       </div>
 
-      {/* Score bar */}
-      <Card>
-        <CardContent className="py-4">
-          <div className="flex items-center gap-4">
-            <span className="text-sm font-medium">Score global</span>
-            <div className="flex-1">
-              <div className="h-3 w-full rounded-full bg-muted">
-                <div
-                  className="h-3 rounded-full bg-primary transition-all"
-                  style={{ width: `${supplier.rating}%` }}
-                />
-              </div>
-            </div>
-            <span className="text-lg font-bold">{supplier.rating}/100</span>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Segment Badges Row */}
+      {segmentations && segmentations.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {segmentations.map((seg) => (
+            <Badge
+              key={seg.id}
+              variant="secondary"
+              className={SEGMENT_COLORS[seg.segment] || "bg-gray-100 text-gray-800"}
+            >
+              {SEGMENT_LABELS[seg.segment] || seg.segment}
+            </Badge>
+          ))}
+        </div>
+      )}
+
+      {/* Quick Stats Bar */}
+      {hasIntelligence && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="pt-4">
+              <p className="text-xs text-muted-foreground">Volume total</p>
+              <p className="text-xl font-bold">
+                {Number(financialMetrics!.lifetimeSpend).toLocaleString("fr-FR")} XAF
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4">
+              <p className="text-xs text-muted-foreground">Fiabilité</p>
+              <p className="text-xl font-bold">
+                {Number(performanceProfile!.reliabilityIndex).toFixed(0)}/100
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4">
+              <p className="text-xs text-muted-foreground">Score risque</p>
+              <p className="text-xl font-bold">
+                {riskProfile!.globalRiskScore}/100
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4">
+              <p className="text-xs text-muted-foreground">Livraison à temps</p>
+              <p className="text-xl font-bold">
+                {Number(performanceProfile!.onTimeDeliveryRate).toFixed(0)}%
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Tabs */}
       <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList>
+        <TabsList className="flex-wrap h-auto gap-1">
           <TabsTrigger value="overview">Vue d&apos;ensemble</TabsTrigger>
-          <TabsTrigger value="performance">Performance</TabsTrigger>
-          <TabsTrigger value="conditions">Conditions</TabsTrigger>
-          <TabsTrigger value="orders">
-            Commandes ({supplier._count.sourcingCases})
+          <TabsTrigger value="financier" disabled={!financialMetrics}>
+            Financier
           </TabsTrigger>
-          <TabsTrigger value="products">
+          <TabsTrigger value="performance" disabled={!performanceProfile}>
+            Performance
+          </TabsTrigger>
+          <TabsTrigger value="risque" disabled={!riskProfile}>
+            Risque
+          </TabsTrigger>
+          <TabsTrigger value="ia" disabled={!aiProfile}>
+            IA
+          </TabsTrigger>
+          <TabsTrigger value="produits">
             Produits ({supplier._count.supplierProducts})
           </TabsTrigger>
-          <TabsTrigger value="media">
-            Médias ({supplier._count.catalogMedia})
+          <TabsTrigger value="offres">
+            Offres ({supplier._count.offers})
+          </TabsTrigger>
+          <TabsTrigger value="historique">
+            Historique ({supplier._count.sourcingCases})
           </TabsTrigger>
         </TabsList>
 
         {/* Vue d'ensemble */}
         <TabsContent value="overview">
           <div className="grid gap-6 md:grid-cols-2">
-            {/* Identité */}
             <Card>
               <CardHeader>
                 <CardTitle>Identité</CardTitle>
@@ -179,7 +275,6 @@ export default async function SupplierDetailPage({ params }: Props) {
               </CardContent>
             </Card>
 
-            {/* Contacts */}
             <Card>
               <CardHeader>
                 <CardTitle>Contacts</CardTitle>
@@ -220,7 +315,6 @@ export default async function SupplierDetailPage({ params }: Props) {
               </CardContent>
             </Card>
 
-            {/* Capacités */}
             <Card className="md:col-span-2">
               <CardHeader>
                 <CardTitle>Capacités</CardTitle>
@@ -229,242 +323,106 @@ export default async function SupplierDetailPage({ params }: Props) {
                 <div className="grid gap-4 sm:grid-cols-3">
                   <div className="rounded-lg border p-3 text-center">
                     <Clock className="mx-auto h-5 w-5 text-muted-foreground mb-1" />
-                    <p className="text-xs text-muted-foreground">
-                      Délai de production
-                    </p>
+                    <p className="text-xs text-muted-foreground">Délai production</p>
                     <p className="text-lg font-semibold">
-                      {supplier.leadTimeDays
-                        ? `${supplier.leadTimeDays} jours`
-                        : "-"}
+                      {supplier.leadTimeDays ? `${supplier.leadTimeDays} jours` : "-"}
                     </p>
                   </div>
                   <div className="rounded-lg border p-3 text-center">
                     <Package className="mx-auto h-5 w-5 text-muted-foreground mb-1" />
                     <p className="text-xs text-muted-foreground">MOQ</p>
-                    <p className="text-lg font-semibold">
-                      {supplier.moq || "-"}
-                    </p>
+                    <p className="text-lg font-semibold">{supplier.moq || "-"}</p>
                   </div>
                   <div className="rounded-lg border p-3 text-center">
                     <FileText className="mx-auto h-5 w-5 text-muted-foreground mb-1" />
-                    <p className="text-xs text-muted-foreground">
-                      Conditions de paiement
-                    </p>
-                    <p className="text-lg font-semibold">
-                      {supplier.paymentTerms || "-"}
-                    </p>
+                    <p className="text-xs text-muted-foreground">Conditions paiement</p>
+                    <p className="text-lg font-semibold">{supplier.paymentTerms || "-"}</p>
                   </div>
                 </div>
                 {supplier.notes && (
                   <div className="mt-4 pt-4 border-t">
-                    <p className="text-sm text-muted-foreground">
-                      {supplier.notes}
-                    </p>
+                    <p className="text-sm text-muted-foreground">{supplier.notes}</p>
                   </div>
                 )}
               </CardContent>
             </Card>
+
+            {/* Intelligence CTA if not yet calculated */}
+            {!hasIntelligence && (
+              <Card className="md:col-span-2 border-dashed">
+                <CardContent className="py-8 text-center text-muted-foreground space-y-3">
+                  <p className="font-medium">Intelligence non calculée</p>
+                  <p className="text-sm">
+                    Cliquez sur &quot;Recalculer Intelligence&quot; en haut de page pour
+                    générer le profil complet : financier, performance, risque et IA.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
           </div>
+        </TabsContent>
+
+        {/* Financier */}
+        <TabsContent value="financier">
+          {financialMetrics ? (
+            <SupplierFinancialPanel financialMetrics={financialMetrics} />
+          ) : (
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground">
+                Recalculez l&apos;intelligence pour voir les métriques financières.
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         {/* Performance */}
         <TabsContent value="performance">
-          <div className="grid gap-6 md:grid-cols-3">
+          {performanceProfile ? (
+            <SupplierPerformanceMeter performanceProfile={performanceProfile} />
+          ) : (
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <ShieldCheck className="h-5 w-5" />
-                  Taux QC
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-3xl font-bold">
-                  {supplier.qcPassRate
-                    ? `${Number(supplier.qcPassRate)}%`
-                    : "-"}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  Taux de passage QC
-                </p>
+              <CardContent className="py-8 text-center text-muted-foreground">
+                Recalculez l&apos;intelligence pour voir le profil de performance.
               </CardContent>
             </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Truck className="h-5 w-5" />
-                  Fiabilité logistique
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-3xl font-bold">
-                  {supplier.logisticsReliability
-                    ? `${Number(supplier.logisticsReliability)}%`
-                    : "-"}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  Fiabilité des expéditions
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <AlertTriangle className="h-5 w-5" />
-                  Taux d&apos;incidents
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-3xl font-bold">
-                  {supplier.incidentRate
-                    ? `${Number(supplier.incidentRate)}%`
-                    : "-"}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  Incidents signalés
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Scores history */}
-          <Card className="mt-6">
-            <CardHeader>
-              <CardTitle>Historique des scores</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {supplier.supplierScores.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  Aucun score enregistré
-                </p>
-              ) : (
-                <div className="space-y-3">
-                  {supplier.supplierScores.map((score) => (
-                    <div
-                      key={score.id}
-                      className="flex items-center justify-between rounded-lg border p-3"
-                    >
-                      <div>
-                        <p className="font-medium">{score.dimension}</p>
-                        {score.notes && (
-                          <p className="text-xs text-muted-foreground">
-                            {score.notes}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-2">
-                          <div className="h-2 w-16 rounded-full bg-muted">
-                            <div
-                              className="h-2 rounded-full bg-primary"
-                              style={{ width: `${score.score}%` }}
-                            />
-                          </div>
-                          <span className="text-sm font-medium">
-                            {score.score}/100
-                          </span>
-                        </div>
-                        <span className="text-xs text-muted-foreground">
-                          {formatDate(score.createdAt)}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          )}
         </TabsContent>
 
-        {/* Conditions */}
-        <TabsContent value="conditions">
-          <Card>
-            <CardHeader>
-              <CardTitle>Conditions négociées</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {Object.keys(negotiatedTerms).length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  Aucune condition négociée enregistrée
-                </p>
-              ) : (
-                <div className="space-y-3">
-                  {Object.entries(negotiatedTerms).map(([key, value]) => (
-                    <div
-                      key={key}
-                      className="flex items-start justify-between rounded-lg border p-3"
-                    >
-                      <span className="font-medium capitalize">
-                        {key.replace(/_/g, " ")}
-                      </span>
-                      <span className="text-sm text-muted-foreground">
-                        {typeof value === "object"
-                          ? JSON.stringify(value)
-                          : String(value)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+        {/* Risque */}
+        <TabsContent value="risque">
+          {riskProfile ? (
+            <SupplierRiskGauge riskProfile={riskProfile} />
+          ) : (
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground">
+                Recalculez l&apos;intelligence pour voir le profil de risque.
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
-        {/* Commandes (sourcing cases) */}
-        <TabsContent value="orders">
-          <Card>
-            <CardHeader>
-              <CardTitle>Dossiers de sourcing</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {supplier.sourcingCases.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  Aucun dossier de sourcing
-                </p>
-              ) : (
-                <div className="space-y-3">
-                  {supplier.sourcingCases.map((sc) => (
-                    <div
-                      key={sc.id}
-                      className="flex items-center justify-between rounded-lg border p-3"
-                    >
-                      <div>
-                        <Link
-                          href={`/orders/${sc.orderId}`}
-                          className="font-medium text-primary hover:underline"
-                        >
-                          {sc.order.orderNumber}
-                        </Link>
-                        <p className="text-xs text-muted-foreground">
-                          {sc.requirement}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <Badge variant="secondary">{sc.status}</Badge>
-                        <span className="text-xs text-muted-foreground">
-                          {formatDate(sc.createdAt)}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+        {/* IA */}
+        <TabsContent value="ia">
+          {aiProfile ? (
+            <SupplierAIBrain aiProfile={aiProfile} />
+          ) : (
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground">
+                Recalculez l&apos;intelligence pour voir le profil IA.
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         {/* Produits */}
-        <TabsContent value="products">
+        <TabsContent value="produits">
           <Card>
             <CardHeader>
               <CardTitle>Produits liés</CardTitle>
             </CardHeader>
             <CardContent>
               {supplier.supplierProducts.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  Aucun produit lié
-                </p>
+                <p className="text-sm text-muted-foreground">Aucun produit lié</p>
               ) : (
                 <div className="space-y-3">
                   {supplier.supplierProducts.map((sp) => (
@@ -496,8 +454,7 @@ export default async function SupplierDetailPage({ params }: Props) {
                       <div className="text-right text-sm">
                         {sp.priceMin && sp.priceMax ? (
                           <p>
-                            {Number(sp.priceMin)} - {Number(sp.priceMax)}{" "}
-                            {sp.currency}
+                            {Number(sp.priceMin)} - {Number(sp.priceMax)} {sp.currency}
                           </p>
                         ) : sp.priceMin ? (
                           <p>
@@ -505,9 +462,7 @@ export default async function SupplierDetailPage({ params }: Props) {
                           </p>
                         ) : null}
                         {sp.moq && (
-                          <p className="text-xs text-muted-foreground">
-                            MOQ: {sp.moq}
-                          </p>
+                          <p className="text-xs text-muted-foreground">MOQ: {sp.moq}</p>
                         )}
                         {sp.leadTimeDays && (
                           <p className="text-xs text-muted-foreground">
@@ -523,51 +478,180 @@ export default async function SupplierDetailPage({ params }: Props) {
           </Card>
         </TabsContent>
 
-        {/* Médias */}
-        <TabsContent value="media">
+        {/* Offres */}
+        <TabsContent value="offres">
           <Card>
             <CardHeader>
-              <CardTitle>Médias et preuves</CardTitle>
+              <CardTitle>Historique des offres</CardTitle>
             </CardHeader>
             <CardContent>
-              {supplier.catalogMedia.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  Aucun média associé
-                </p>
+              {supplier.offers.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Aucune offre</p>
               ) : (
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {supplier.catalogMedia.map((media) => (
+                <div className="space-y-3">
+                  {supplier.offers.map((offer) => (
                     <div
-                      key={media.id}
-                      className="rounded-lg border p-4 space-y-2"
+                      key={offer.id}
+                      className="flex items-center justify-between rounded-lg border p-3"
                     >
-                      <div className="flex items-center gap-2">
-                        <span className="text-muted-foreground">
-                          {MEDIA_ICONS[media.type] || (
-                            <File className="h-5 w-5" />
-                          )}
-                        </span>
-                        <span className="text-sm font-medium truncate">
-                          {media.filename || media.url}
-                        </span>
+                      <div>
+                        <p className="font-medium text-sm">
+                          {offer.product?.name || "Produit non lié"}
+                        </p>
+                        {offer.leadTimeDays && (
+                          <p className="text-xs text-muted-foreground">
+                            Délai: {offer.leadTimeDays} jours
+                          </p>
+                        )}
+                        {offer.moq && (
+                          <p className="text-xs text-muted-foreground">MOQ: {offer.moq}</p>
+                        )}
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="text-xs">
-                          {media.type}
-                        </Badge>
-                        <Badge variant="outline" className="text-xs">
-                          {media.linkedEntityType}
-                        </Badge>
+                      <div className="text-right">
+                        <p className="font-bold">
+                          {Number(offer.unitPrice)} {offer.currency}
+                        </p>
+                        {offer.isSelected && (
+                          <Badge
+                            variant="secondary"
+                            className="bg-green-100 text-green-800 text-xs"
+                          >
+                            Sélectionné
+                          </Badge>
+                        )}
+                        <p className="text-xs text-muted-foreground">
+                          {formatDate(offer.createdAt)}
+                        </p>
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        {formatDate(media.createdAt)}
-                      </p>
                     </div>
                   ))}
                 </div>
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Historique */}
+        <TabsContent value="historique">
+          <div className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Dossiers de sourcing</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {supplier.sourcingCases.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Aucun dossier</p>
+                ) : (
+                  <div className="space-y-3">
+                    {supplier.sourcingCases.map((sc) => (
+                      <div
+                        key={sc.id}
+                        className="flex items-center justify-between rounded-lg border p-3"
+                      >
+                        <div>
+                          <Link
+                            href={`/orders/${sc.orderId}`}
+                            className="font-medium text-primary hover:underline"
+                          >
+                            {sc.order.orderNumber}
+                          </Link>
+                          <p className="text-xs text-muted-foreground">{sc.requirement}</p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <Badge variant="secondary">{sc.status}</Badge>
+                          <span className="text-xs text-muted-foreground">
+                            {formatDate(sc.createdAt)}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Order Items History */}
+            {supplier.orderItems.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Lignes de commandes</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {supplier.orderItems.map((item) => (
+                      <div
+                        key={item.id}
+                        className="flex items-center justify-between rounded-lg border p-3"
+                      >
+                        <div>
+                          <Link
+                            href={`/orders/${item.orderId}`}
+                            className="font-medium text-primary hover:underline text-sm"
+                          >
+                            {item.order.orderNumber}
+                          </Link>
+                          <p className="text-xs text-muted-foreground">
+                            {item.description} · qté {item.quantity}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-medium text-sm">
+                            {Number(item.totalXAF).toLocaleString("fr-FR")} XAF
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatDate(item.order.createdAt)}
+                          </p>
+                          <Badge variant="outline" className="text-xs">
+                            {item.order.status}
+                          </Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Scores history */}
+            {supplier.supplierScores.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Historique des scores</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {supplier.supplierScores.map((score) => (
+                      <div
+                        key={score.id}
+                        className="flex items-center justify-between rounded-lg border p-3"
+                      >
+                        <div>
+                          <p className="font-medium">{score.dimension}</p>
+                          {score.notes && (
+                            <p className="text-xs text-muted-foreground">{score.notes}</p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-2">
+                            <div className="h-2 w-16 rounded-full bg-muted">
+                              <div
+                                className="h-2 rounded-full bg-primary"
+                                style={{ width: `${score.score}%` }}
+                              />
+                            </div>
+                            <span className="text-sm font-medium">{score.score}/100</span>
+                          </div>
+                          <span className="text-xs text-muted-foreground">
+                            {formatDate(score.createdAt)}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </TabsContent>
       </Tabs>
     </div>
