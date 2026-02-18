@@ -402,6 +402,68 @@ export async function getCategories() {
   }
 }
 
+export async function updateProductStatus(productId: string, status: string) {
+  try {
+    const user = await getSession();
+    checkPermission(user.role, "catalog.manage");
+
+    const existing = await CatalogProductService.getById(productId);
+    if (!existing || existing.tenantId !== user.tenantId) {
+      return { error: "Produit introuvable" };
+    }
+
+    const product = await CatalogProductService.update(productId, { status: status as ProductStatus });
+
+    await AuditService.log({
+      tenantId: user.tenantId,
+      userId: user.id,
+      action: "catalog.product.status_changed",
+      entityType: "product",
+      entityId: productId,
+      oldValue: { status: existing.status },
+      newValue: { status },
+    });
+
+    revalidatePath(`/catalog/products/${productId}`);
+    revalidatePath("/catalog/products");
+    revalidatePath("/catalog");
+    return { data: product };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Erreur lors de la mise à jour du statut" };
+  }
+}
+
+export async function exportProductsCSV() {
+  try {
+    const user = await getSession();
+    const result = await CatalogProductService.list(user.tenantId, { limit: 1000 });
+
+    const headers = ["Nom", "Catégorie", "Statut", "MOQ Min", "Prix Min", "Prix Max", "Devise", "Score Demande", "Fournisseurs", "Commandes", "QC", "Créé le"];
+    const rows = result.products.map((p: any) => [
+      p.name,
+      p.category?.name || "",
+      p.status,
+      p.moqMin ?? "",
+      p.priceMin != null ? Number(p.priceMin) : "",
+      p.priceMax != null ? Number(p.priceMax) : "",
+      p.priceCurrency,
+      p.demandScore,
+      p._count?.supplierProducts ?? 0,
+      p._count?.orderItems ?? 0,
+      p._count?.qcReports ?? 0,
+      new Date(p.createdAt).toLocaleDateString("fr-FR"),
+    ]);
+
+    const csv = [headers, ...rows]
+      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+
+    return { data: csv };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Erreur lors de l'export" };
+  }
+}
+
 // ============================================================
 // CATALOG DASHBOARD STATS
 // ============================================================
@@ -411,14 +473,20 @@ export async function getCatalogDashboardStats() {
     const user = await getSession();
     const tenantId = user.tenantId;
 
-    const [productCounts, supplierCounts, topProducts, topSuppliers, recentOffers, mediaCounts] = await Promise.all([
+    const [productCounts, supplierCounts, topProducts, topSuppliers, recentOffers, mediaCounts, categoryStats] = await Promise.all([
       CatalogProductService.getStatusCounts(tenantId),
       CatalogSupplierService.getStatusCounts(),
-      CatalogProductService.getTopByDemand(tenantId, 5),
+      CatalogProductService.getTopByDemand(tenantId, 8),
       CatalogSupplierService.getTopByRating(5),
-      CatalogOfferService.list({ page: 1, limit: 5 }),
+      CatalogOfferService.list({ page: 1, limit: 10 }),
       CatalogMediaService.getCountsByType(tenantId),
+      CatalogProductService.getCategoryStats(tenantId),
     ]);
+
+    // Avg demand score from top products
+    const avgDemandScore = topProducts.length > 0
+      ? Math.round(topProducts.reduce((s: number, p: any) => s + p.demandScore, 0) / topProducts.length)
+      : 0;
 
     return {
       data: {
@@ -428,6 +496,8 @@ export async function getCatalogDashboardStats() {
         topSuppliers,
         recentOffers: recentOffers.offers,
         mediaCounts,
+        categoryStats,
+        avgDemandScore,
       },
     };
   } catch (error) {
