@@ -17,6 +17,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { getSourcingDashboardIntelligence } from "@/lib/actions/supplier-intelligence.actions";
+import { ExportSuppliersButton } from "@/components/sourcing/export-suppliers-button";
 
 export const metadata = { title: "Sourcing Intelligence | Horion ERP" };
 
@@ -66,12 +67,15 @@ export default async function SourcingIntelligencePage() {
           <h1 className="text-3xl font-bold">Sourcing Intelligence</h1>
           <p className="text-muted-foreground">Vue 360° de votre base fournisseurs</p>
         </div>
-        <Link
-          href="/catalog/suppliers"
-          className="text-sm text-primary hover:underline"
-        >
-          Gérer les fournisseurs →
-        </Link>
+        <div className="flex items-center gap-2">
+          <ExportSuppliersButton />
+          <Link
+            href="/catalog/suppliers"
+            className="text-sm text-primary hover:underline"
+          >
+            Gérer les fournisseurs →
+          </Link>
+        </div>
       </div>
 
       {/* Quick Stats */}

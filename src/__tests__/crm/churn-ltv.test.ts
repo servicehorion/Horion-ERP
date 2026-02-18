@@ -362,6 +362,86 @@ describe("assignSegments", () => {
   });
 });
 
+// ─── TESTS SUPPLIER CHURN RISK ────────────────────────────────────────────────
+
+function calculateSupplierChurnRisk(params: {
+  daysSinceLastOrder: number;
+  qualityScore: number;
+  onTimeRate: number;
+  disputeRate: number;
+  alternativeCount: number;
+}): number {
+  const { daysSinceLastOrder, qualityScore, onTimeRate, disputeRate, alternativeCount } = params;
+
+  const recencySignal = Math.min(1, daysSinceLastOrder / 180);
+  const qualitySignal = Math.max(0, (100 - qualityScore) / 100);
+  const deliverySignal = Math.max(0, (100 - onTimeRate) / 100);
+  const disputeSignal = Math.min(1, disputeRate * 3);
+  const alternativeSignal = alternativeCount > 3 ? 0.3 : 0;
+
+  return Math.min(1,
+    recencySignal * 0.30 +
+    qualitySignal * 0.25 +
+    deliverySignal * 0.20 +
+    disputeSignal * 0.15 +
+    alternativeSignal * 0.10
+  );
+}
+
+describe("calculateSupplierChurnRisk", () => {
+  it("devrait retourner un risque faible pour un fournisseur performant", () => {
+    const risk = calculateSupplierChurnRisk({
+      daysSinceLastOrder: 10,
+      qualityScore: 90,
+      onTimeRate: 95,
+      disputeRate: 0,
+      alternativeCount: 1,
+    });
+    expect(risk).toBeLessThan(0.15);
+  });
+
+  it("devrait retourner un risque élevé pour un fournisseur défaillant", () => {
+    const risk = calculateSupplierChurnRisk({
+      daysSinceLastOrder: 200,
+      qualityScore: 30,
+      onTimeRate: 40,
+      disputeRate: 0.5,
+      alternativeCount: 5,
+    });
+    expect(risk).toBeGreaterThan(0.60);
+  });
+
+  it("devrait amplifier le risque si beaucoup d'alternatives existent", () => {
+    const riskWithAlts = calculateSupplierChurnRisk({
+      daysSinceLastOrder: 30,
+      qualityScore: 70,
+      onTimeRate: 70,
+      disputeRate: 0.1,
+      alternativeCount: 5,
+    });
+    const riskWithoutAlts = calculateSupplierChurnRisk({
+      daysSinceLastOrder: 30,
+      qualityScore: 70,
+      onTimeRate: 70,
+      disputeRate: 0.1,
+      alternativeCount: 1,
+    });
+    expect(riskWithAlts).toBeGreaterThan(riskWithoutAlts);
+  });
+
+  it("devrait rester dans la plage [0, 1]", () => {
+    const extreme = calculateSupplierChurnRisk({
+      daysSinceLastOrder: 500,
+      qualityScore: 0,
+      onTimeRate: 0,
+      disputeRate: 1,
+      alternativeCount: 10,
+    });
+    expect(extreme).toBeGreaterThanOrEqual(0);
+    expect(extreme).toBeLessThanOrEqual(1);
+  });
+});
+
 // ─── TESTS EXPORT CSV ─────────────────────────────────────────────────────────
 
 describe("CSV Export - échappement des champs", () => {

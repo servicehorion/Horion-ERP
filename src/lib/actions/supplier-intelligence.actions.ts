@@ -112,6 +112,81 @@ export async function removeSupplierSegment(supplierId: string, segment: Supplie
   }
 }
 
+export async function exportSuppliersCSV() {
+  try {
+    const user = await getSession();
+
+    const suppliers = await prisma.supplier.findMany({
+      where: { tenantId: user.tenantId },
+      include: {
+        financialMetrics: true,
+        performanceProfile: true,
+        riskProfile: true,
+        _count: { select: { orderItems: true, offers: true, supplierProducts: true } },
+      },
+      orderBy: { name: "asc" },
+    });
+
+    const STATUS_LABELS: Record<string, string> = {
+      ACTIVE: "Actif",
+      TESTING: "En test",
+      SUSPENDED: "Suspendu",
+      BLACKLIST: "Blacklisté",
+    };
+
+    const headers = [
+      "Nom",
+      "Statut",
+      "Pays",
+      "Ville",
+      "Rating",
+      "Commandes",
+      "Produits",
+      "Offres",
+      "Dépense totale (XAF)",
+      "Fiabilité (%)",
+      "OTD (%)",
+      "Score qualité",
+      "Risque global",
+      "Cash à risque (XAF)",
+    ];
+
+    const rows = suppliers.map((s) => [
+      s.name,
+      STATUS_LABELS[s.status] || s.status,
+      s.country,
+      s.city || "",
+      String(s.rating),
+      String(s._count.orderItems),
+      String(s._count.supplierProducts),
+      String(s._count.offers),
+      s.financialMetrics ? String(Math.round(Number(s.financialMetrics.lifetimeSpend))) : "0",
+      s.performanceProfile ? String(Math.round(Number(s.performanceProfile.reliabilityIndex))) : "—",
+      s.performanceProfile ? String(Math.round(Number(s.performanceProfile.onTimeDeliveryRate))) : "—",
+      s.performanceProfile ? String(Math.round(Number(s.performanceProfile.qualityScore))) : "—",
+      s.riskProfile ? String(s.riskProfile.globalRiskScore) : "—",
+      s.riskProfile ? String(Math.round(Number(s.riskProfile.cashAtRisk))) : "0",
+    ]);
+
+    const escapeCsvField = (field: string) => {
+      if (field.includes(",") || field.includes('"') || field.includes("\n")) {
+        return `"${field.replace(/"/g, '""')}"`;
+      }
+      return field;
+    };
+
+    const csv = [
+      headers.map(escapeCsvField).join(","),
+      ...rows.map((row) => row.map(escapeCsvField).join(",")),
+    ].join("\n");
+
+    return { data: csv };
+  } catch (error) {
+    console.error("Error exporting suppliers:", error);
+    return { error: error instanceof Error ? error.message : "Erreur lors de l'export" };
+  }
+}
+
 export async function getSourcingDashboardIntelligence() {
   try {
     const user = await getSession();

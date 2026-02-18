@@ -245,7 +245,11 @@ export class SupplierIntelligenceService {
       ? Math.max(0, Math.min(100, qcPassRate * 0.7 + (100 - defectRate) * 0.3))
       : 50;
 
-    const communicationScore = 50; // placeholder until messaging is tracked
+    // Communication score derived from dispute rate + on-time rate
+    const communicationScore = Math.max(0, Math.min(100, Math.round(
+      (100 - Math.min(disputeRate * 200, 50)) * 0.5 +
+      onTimeDeliveryRate * 0.5
+    )));
 
     const reliabilityIndex = Math.round(
       onTimeDeliveryRate * 0.4 +
@@ -381,11 +385,29 @@ export class SupplierIntelligenceService {
     });
     const cashAtRisk = riskPayments.reduce((s, p) => s + Number(p.amountXAF), 0);
 
+    // Compliance risk: based on QC failures + dispute history
+    const qcReports = await prisma.qCReport.findMany({
+      where: { supplierId },
+      select: { overallResult: true },
+    });
+    const disputes = await prisma.dispute.findMany({
+      where: { order: { items: { some: { supplierId } } } },
+      select: { id: true },
+    });
+    const qcFailRate = qcReports.length > 0
+      ? (qcReports.filter((r) => r.overallResult !== "PASSED").length / qcReports.length) * 100
+      : 0;
+    const complianceRisk = Math.min(100, Math.round(
+      qcFailRate * 0.6 +
+      Math.min(disputes.length * 10, 40)
+    ));
+
     // Mitigation actions
     const mitigationActions: string[] = [];
     if (concentrationRisk > 60) mitigationActions.push("Identifier des fournisseurs alternatifs");
     if (qualityRisk > 60) mitigationActions.push("Renforcer les inspections QC");
     if (deliveryRisk > 60) mitigationActions.push("Négocier des pénalités de retard");
+    if (complianceRisk > 60) mitigationActions.push("Audit de conformité requis");
     if (globalRiskScore > 70) mitigationActions.push("Plan de contingence urgent");
 
     // Check for last incident
@@ -407,7 +429,7 @@ export class SupplierIntelligenceService {
         deliveryRisk,
         financialRisk,
         geopoliticalRisk,
-        complianceRisk: 50,
+        complianceRisk,
         outstandingOrdersValue,
         cashAtRisk,
         riskBadges: JSON.parse(JSON.stringify(riskBadges)),
@@ -556,50 +578,90 @@ export class SupplierIntelligenceService {
       orderCount > 4 ? "QUARTERLY" :
       "SEMI_ANNUAL";
 
+    // --- SUPPLIER CHURN RISK (0.0 = stable, 1.0 = likely to exit) ---
+    const lastOrderDate = financialMetrics.lastOrderDate;
+    const daysSinceLastOrder = lastOrderDate
+      ? Math.floor((Date.now() - lastOrderDate.getTime()) / (1000 * 60 * 60 * 24))
+      : 365;
+
+    const onTimeRate = Number(perfProfile?.onTimeDeliveryRate || 0);
+    const disputeRate = Number(perfProfile?.disputeRate || 0);
+
+    // Churn signals (0-1 each)
+    const recencySignal = Math.min(1, daysSinceLastOrder / 180);    // 0 if recent, 1 if >6 months
+    const qualitySignal = Math.max(0, (100 - qualityScore) / 100);   // 0 if high quality, 1 if poor
+    const deliverySignal = Math.max(0, (100 - onTimeRate) / 100);    // 0 if on-time, 1 if late
+    const disputeSignal = Math.min(1, disputeRate * 3);               // amplified dispute rate
+    const alternativeSignal = alternativeSuggestions.length > 3 ? 0.3 : 0; // many alternatives = we may switch
+
+    const churnRiskScore = Math.min(1,
+      recencySignal * 0.30 +
+      qualitySignal * 0.25 +
+      deliverySignal * 0.20 +
+      disputeSignal * 0.15 +
+      alternativeSignal * 0.10
+    );
+
+    // --- SUPPLIER LTV (Valeur Vie Fournisseur en XAF) ---
+    // Estimated based on current spend trend + expected relationship duration
+    const observedDays = lastOrderDate && financialMetrics.lastOrderDate
+      ? Math.max(30, Math.floor((Date.now() - new Date(Math.min(
+          ...([financialMetrics.lastOrderDate] as Date[]).map(d => d.getTime())
+        )).getTime()) / (1000 * 60 * 60 * 24)))
+      : 365;
+    const spendPerMonth = observedDays > 0 ? (spendValue / observedDays) * 30 : 0;
+
+    const expectedLifetimeMonths =
+      churnRiskScore < 0.3 ? 60 :
+      churnRiskScore < 0.6 ? 36 :
+      churnRiskScore < 0.8 ? 12 :
+      6;
+
+    const estimatedAnnualValue = Math.round(spendPerMonth * 12);
+    const supplierLTV = Math.round(spendPerMonth * expectedLifetimeMonths);
+
+    // Responsiveness derived from on-time + dispute rate
+    const responsiveness =
+      onTimeRate > 80 && disputeRate < 0.1 ? "FAST" :
+      onTimeRate < 50 || disputeRate > 0.3 ? "SLOW" :
+      "MEDIUM";
+
+    const profileData = {
+      supplierPersonality,
+      negotiationLeverage,
+      responsiveness,
+      strategicValue,
+      supplierPowerScore,
+      recommendedStrategy,
+      alternativeSuggestions: JSON.parse(JSON.stringify(alternativeSuggestions)),
+      predictedPriceDirection: priceTrend || "STABLE",
+      predictedPriceChange: financialMetrics.priceTrendPercent,
+      churnRiskScore,
+      optimalOrderFrequency,
+      estimatedAnnualValue: estimatedAnnualValue > 0 ? estimatedAnnualValue : null,
+      strengthFactors: JSON.parse(JSON.stringify(strengthFactors)),
+      weaknessFactors: JSON.parse(JSON.stringify(weaknessFactors)),
+      behavioralInsights: JSON.parse(JSON.stringify({
+        avgOrderValue: Number(financialMetrics.avgOrderValue),
+        totalOrders: financialMetrics.totalOrdersCount,
+        qualityScore,
+        onTimeRate,
+        daysSinceLastOrder,
+        spendPerMonth: Math.round(spendPerMonth),
+        expectedLifetimeMonths,
+        supplierLTV,
+      })),
+    };
+
     return prisma.supplierAIProfile.upsert({
       where: { supplierId },
       create: {
         supplierId,
-        supplierPersonality,
-        negotiationLeverage,
-        responsiveness: "MEDIUM",
-        strategicValue,
-        supplierPowerScore,
-        recommendedStrategy,
         consolidationOpportunities: JSON.parse(JSON.stringify([])),
-        alternativeSuggestions: JSON.parse(JSON.stringify(alternativeSuggestions)),
-        predictedPriceDirection: priceTrend || "STABLE",
-        predictedPriceChange: financialMetrics.priceTrendPercent,
-        optimalOrderFrequency,
-        estimatedAnnualValue: spendValue > 0 ? spendValue * 1.1 : null,
-        strengthFactors: JSON.parse(JSON.stringify(strengthFactors)),
-        weaknessFactors: JSON.parse(JSON.stringify(weaknessFactors)),
-        behavioralInsights: JSON.parse(JSON.stringify({
-          avgOrderValue: Number(financialMetrics.avgOrderValue),
-          totalOrders: financialMetrics.totalOrdersCount,
-          qualityScore,
-          onTimeRate: Number(perfProfile?.onTimeDeliveryRate || 0),
-        })),
+        ...profileData,
       },
       update: {
-        supplierPersonality,
-        negotiationLeverage,
-        strategicValue,
-        supplierPowerScore,
-        recommendedStrategy,
-        alternativeSuggestions: JSON.parse(JSON.stringify(alternativeSuggestions)),
-        predictedPriceDirection: priceTrend || "STABLE",
-        predictedPriceChange: financialMetrics.priceTrendPercent,
-        optimalOrderFrequency,
-        estimatedAnnualValue: spendValue > 0 ? spendValue * 1.1 : null,
-        strengthFactors: JSON.parse(JSON.stringify(strengthFactors)),
-        weaknessFactors: JSON.parse(JSON.stringify(weaknessFactors)),
-        behavioralInsights: JSON.parse(JSON.stringify({
-          avgOrderValue: Number(financialMetrics.avgOrderValue),
-          totalOrders: financialMetrics.totalOrdersCount,
-          qualityScore,
-          onTimeRate: Number(perfProfile?.onTimeDeliveryRate || 0),
-        })),
+        ...profileData,
         updatedAt: new Date(),
       },
     });

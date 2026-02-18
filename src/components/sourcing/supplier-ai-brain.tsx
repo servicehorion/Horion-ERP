@@ -15,6 +15,7 @@ import {
   CheckCircle2,
   XCircle,
   Minus,
+  AlertCircle,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -357,6 +358,70 @@ export function SupplierAIBrain({ aiProfile }: SupplierAIBrainProps) {
             </Card>
           )}
         </div>
+      )}
+
+      {/* Predictive Metrics: Churn Risk + LTV */}
+      {(aiProfile.churnRiskScore !== null || aiProfile.estimatedAnnualValue !== null) && (
+        <Card className="bg-gradient-to-br from-orange-500/5 to-red-500/5 border-orange-200 dark:border-orange-800">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <AlertCircle className="h-4 w-4 text-orange-600" />
+              Prédictions IA
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            {/* Churn Risk */}
+            {aiProfile.churnRiskScore !== null && (() => {
+              const churn = Number(aiProfile.churnRiskScore);
+              const churnPct = Math.round(churn * 100);
+              const churnLabel = churn < 0.3 ? "Stable" : churn < 0.6 ? "À surveiller" : churn < 0.8 ? "À risque" : "Sortie probable";
+              const churnColor = churn < 0.3 ? "bg-green-500" : churn < 0.6 ? "bg-yellow-500" : churn < 0.8 ? "bg-orange-500" : "bg-red-500";
+              const churnTextColor = churn < 0.3 ? "text-green-600" : churn < 0.6 ? "text-yellow-600" : churn < 0.8 ? "text-orange-600" : "text-red-600";
+              return (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium">Risque de perte fournisseur</span>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-lg font-bold ${churnTextColor}`}>{churnPct}%</span>
+                      <Badge variant="outline" className={`text-xs ${churnTextColor}`}>{churnLabel}</Badge>
+                    </div>
+                  </div>
+                  <div className="h-2.5 w-full rounded-full bg-muted">
+                    <div className={`h-2.5 rounded-full ${churnColor}`} style={{ width: `${churnPct}%` }} />
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Basé sur récence, qualité, délais et litiges
+                  </p>
+                </div>
+              );
+            })()}
+
+            {/* Supplier LTV + Annual Value */}
+            <div className="grid grid-cols-2 gap-4">
+              {aiProfile.estimatedAnnualValue !== null && Number(aiProfile.estimatedAnnualValue) > 0 && (
+                <div>
+                  <div className="text-xs text-muted-foreground">Valeur annuelle estimée</div>
+                  <div className="text-lg font-bold text-blue-600">
+                    {Math.round(Number(aiProfile.estimatedAnnualValue)).toLocaleString("fr-FR")} FCFA
+                  </div>
+                </div>
+              )}
+              {(behavioralInsights as Record<string, unknown>).supplierLTV !== undefined && Number((behavioralInsights as Record<string, unknown>).supplierLTV) > 0 && (
+                <div>
+                  <div className="text-xs text-muted-foreground">LTV Fournisseur</div>
+                  <div className="text-lg font-bold text-green-600">
+                    {Math.round(Number((behavioralInsights as Record<string, unknown>).supplierLTV)).toLocaleString("fr-FR")} FCFA
+                  </div>
+                  {(behavioralInsights as Record<string, unknown>).expectedLifetimeMonths && (
+                    <p className="text-xs text-muted-foreground">
+                      Horizon : {String((behavioralInsights as Record<string, unknown>).expectedLifetimeMonths)} mois
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Behavioral Insights */}
