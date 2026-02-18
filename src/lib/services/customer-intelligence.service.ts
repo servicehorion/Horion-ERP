@@ -288,6 +288,52 @@ export class CustomerIntelligenceService {
         ? "Express air freight, priority handling"
         : "Standard sea freight";
 
+    // --- PREDICTIVE CHURN RISK (0.0 = fidèle, 1.0 = churné) ---
+    const sortedOrders = [...orders].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    const lastOrderDate = sortedOrders[0]?.createdAt;
+    const daysSinceLastOrder = lastOrderDate
+      ? Math.floor((Date.now() - lastOrderDate.getTime()) / (1000 * 60 * 60 * 24))
+      : 365;
+
+    const firstOrderDate = sortedOrders[sortedOrders.length - 1]?.createdAt;
+    const observedDays = firstOrderDate
+      ? Math.max(1, Math.floor((Date.now() - firstOrderDate.getTime()) / (1000 * 60 * 60 * 24)))
+      : 30;
+    const ordersPerMonth = (orders.length / observedDays) * 30;
+
+    const paymentFailureRate = orders.length > 0
+      ? orders.filter((o) => o.payments.some((p) => p.status === "FAILED")).length / orders.length
+      : 0;
+
+    // Composantes churn (0-1 chacune)
+    const recencyScore = Math.min(1, daysSinceLastOrder / 180);    // 0 si récent, 1 si >6 mois
+    const frequencyScore = Math.max(0, 1 - ordersPerMonth / 2);    // 0 si >2/mois, 1 si inactif
+    const paymentRiskScore = Math.min(1, paymentFailureRate * 2);
+    const singleOrderPenalty = orders.length === 1 ? 0.2 : 0;
+
+    const predictedChurnRisk = Math.min(1,
+      recencyScore * 0.45 +
+      frequencyScore * 0.30 +
+      paymentRiskScore * 0.15 +
+      singleOrderPenalty * 0.10
+    );
+
+    // --- PREDICTIVE LTV (Valeur Vie Client en XAF) ---
+    const lifetimeGrossRevenue = orders.reduce((sum, o) => sum + Number(o.totalClient), 0);
+    const avgOrderValue = lifetimeGrossRevenue / orders.length;
+
+    // Durée de vie client attendue selon le risque de churn
+    const expectedLifetimeMonths =
+      predictedChurnRisk < 0.3 ? 60 :
+      predictedChurnRisk < 0.6 ? 36 :
+      predictedChurnRisk < 0.8 ? 12 :
+      6;
+
+    // LTV = valeur moy × fréquence mensuelle × durée vie × facteur marge
+    const predictedLTV = Math.round(
+      avgOrderValue * ordersPerMonth * expectedLifetimeMonths * (1 + avgMargin / 100)
+    );
+
     return prisma.customerAIProfile.upsert({
       where: { contactId },
       create: {
@@ -298,7 +344,16 @@ export class CustomerIntelligenceService {
         recommendedPricingStrategy,
         recommendedPaymentTerms,
         recommendedLogisticsStrategy,
-        behavioralInsights: JSON.parse(JSON.stringify({ avgMargin, marginVariance, urgentOrders })),
+        predictedChurnRisk,
+        predictedLTV,
+        behavioralInsights: JSON.parse(JSON.stringify({
+          avgMargin,
+          marginVariance,
+          urgentOrders,
+          daysSinceLastOrder,
+          ordersPerMonth: Math.round(ordersPerMonth * 100) / 100,
+          expectedLifetimeMonths,
+        })),
       },
       update: {
         buyingPersonality,
@@ -307,7 +362,16 @@ export class CustomerIntelligenceService {
         recommendedPricingStrategy,
         recommendedPaymentTerms,
         recommendedLogisticsStrategy,
-        behavioralInsights: JSON.parse(JSON.stringify({ avgMargin, marginVariance, urgentOrders })),
+        predictedChurnRisk,
+        predictedLTV,
+        behavioralInsights: JSON.parse(JSON.stringify({
+          avgMargin,
+          marginVariance,
+          urgentOrders,
+          daysSinceLastOrder,
+          ordersPerMonth: Math.round(ordersPerMonth * 100) / 100,
+          expectedLifetimeMonths,
+        })),
         updatedAt: new Date(),
       },
     });

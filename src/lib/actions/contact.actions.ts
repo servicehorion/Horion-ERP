@@ -164,11 +164,110 @@ export async function updateLeadStatus(leadId: string, status: string) {
   }
 }
 
+export async function getLeadById(leadId: string) {
+  try {
+    const user = await getSession();
+    const lead = await LeadService.getById(leadId);
+    if (!lead || lead.contact.tenantId !== user.tenantId) {
+      return { error: "Lead introuvable" };
+    }
+    return { data: lead };
+  } catch (error) {
+    console.error("Error fetching lead:", error);
+    return { error: error instanceof Error ? error.message : "Erreur lors de la récupération" };
+  }
+}
+
+export async function updateLead(leadId: string, data: Record<string, unknown>) {
+  try {
+    const user = await getSession();
+    checkPermission(user.role, "lead.manage");
+
+    const existing = await LeadService.getById(leadId);
+    if (!existing || existing.contact.tenantId !== user.tenantId) {
+      return { error: "Lead introuvable" };
+    }
+
+    const lead = await LeadService.update(leadId, data as any);
+    revalidatePath("/crm");
+    revalidatePath(`/crm/leads/${leadId}`);
+    return { data: lead };
+  } catch (error) {
+    console.error("Error updating lead:", error);
+    return { error: error instanceof Error ? error.message : "Erreur lors de la mise à jour" };
+  }
+}
+
 export async function getLeadPipeline() {
   try {
     const user = await getSession();
     return { data: await LeadService.getPipelineStats(user.tenantId) };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur lors de la récupération" };
+  }
+}
+
+export async function exportContactsCSV() {
+  try {
+    const user = await getSession();
+    const result = await ContactService.list(user.tenantId, { limit: 10000 });
+    const contacts = result.contacts;
+
+    const TYPE_LABELS: Record<string, string> = {
+      CLIENT: "Client",
+      PROSPECT: "Prospect",
+      SUPPLIER: "Fournisseur",
+      FREIGHT_PARTNER: "Transitaire",
+      CUSTOMS_BROKER: "Douanier",
+      QC_PARTNER: "QC",
+      OTHER: "Autre",
+    };
+
+    const headers = [
+      "Nom",
+      "Type",
+      "Entreprise",
+      "Téléphone",
+      "Email",
+      "WhatsApp",
+      "Ville",
+      "Pays",
+      "Score de confiance",
+      "Commandes",
+      "Leads",
+      "Créé le",
+    ];
+
+    const rows = contacts.map((c) => [
+      c.name,
+      TYPE_LABELS[c.type] || c.type,
+      c.company || "",
+      c.phone || "",
+      c.email || "",
+      c.whatsapp || "",
+      c.city || "",
+      c.country,
+      String(c.trustScore),
+      String(c._count.orders),
+      String(c._count.leads),
+      c.createdAt.toISOString().split("T")[0],
+    ]);
+
+    const escapeCsvField = (field: string) => {
+      if (field.includes(",") || field.includes('"') || field.includes("\n")) {
+        return `"${field.replace(/"/g, '""')}"`;
+      }
+      return field;
+    };
+
+    const csv = [
+      headers.map(escapeCsvField).join(","),
+      ...rows.map((row) => row.map(escapeCsvField).join(",")),
+    ].join("\n");
+
+    return { data: csv };
+  } catch (error) {
+    console.error("Error exporting contacts:", error);
+    return { error: error instanceof Error ? error.message : "Erreur lors de l'export" };
   }
 }

@@ -136,6 +136,9 @@ export const contactColumns: ColumnDef<ContactTableRow>[] = [
               <Link href={`/contacts/${contact.id}`}>Voir fiche</Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
+              <Link href={`/contacts/${contact.id}/edit`}>Modifier</Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
               <Link href={`/orders/new?contactId=${contact.id}`}>Nouvelle commande</Link>
             </DropdownMenuItem>
           </DropdownMenuContent>

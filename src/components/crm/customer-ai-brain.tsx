@@ -291,34 +291,62 @@ export function CustomerAIBrain({ aiProfile }: CustomerAIBrainProps) {
       )}
 
       {/* Predictive Metrics */}
-      {(aiProfile.predictedChurnRisk || aiProfile.predictedLTV) && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {aiProfile.predictedChurnRisk && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm">Risque de Churn</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-orange-600">
-                  {(Number(aiProfile.predictedChurnRisk) * 100).toFixed(0)}%
+      {(aiProfile.predictedChurnRisk !== null || aiProfile.predictedLTV !== null) && (
+        <Card className="bg-gradient-to-br from-orange-500/5 to-red-500/5 border-orange-200 dark:border-orange-800">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <AlertCircle className="h-4 w-4 text-orange-600" />
+              Prédictions IA
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            {/* Churn Risk */}
+            {aiProfile.predictedChurnRisk !== null && (() => {
+              const churn = Number(aiProfile.predictedChurnRisk);
+              const churnPct = Math.round(churn * 100);
+              const churnLabel = churn < 0.3 ? "Fidèle" : churn < 0.6 ? "À surveiller" : churn < 0.8 ? "À risque" : "Churn imminent";
+              const churnColor = churn < 0.3 ? "bg-green-500" : churn < 0.6 ? "bg-yellow-500" : churn < 0.8 ? "bg-orange-500" : "bg-red-500";
+              const churnTextColor = churn < 0.3 ? "text-green-600" : churn < 0.6 ? "text-yellow-600" : churn < 0.8 ? "text-orange-600" : "text-red-600";
+              return (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium">Risque de Churn</span>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-lg font-bold ${churnTextColor}`}>{churnPct}%</span>
+                      <Badge variant="outline" className={`text-xs ${churnTextColor}`}>{churnLabel}</Badge>
+                    </div>
+                  </div>
+                  <div className="h-2.5 w-full rounded-full bg-muted">
+                    <div className={`h-2.5 rounded-full ${churnColor}`} style={{ width: `${churnPct}%` }} />
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Basé sur récence, fréquence et comportement paiement
+                  </p>
                 </div>
-              </CardContent>
-            </Card>
-          )}
+              );
+            })()}
 
-          {aiProfile.predictedLTV && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm">LTV Prédite</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-600">
-                  {Number(aiProfile.predictedLTV).toLocaleString("fr-FR")} FCFA
+            {/* Predicted LTV */}
+            {aiProfile.predictedLTV !== null && (
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">LTV Prédite</span>
+                  <span className="text-lg font-bold text-green-600">
+                    {Number(aiProfile.predictedLTV) > 0
+                      ? `${Math.round(Number(aiProfile.predictedLTV)).toLocaleString("fr-FR")} FCFA`
+                      : "—"}
+                  </span>
                 </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+                {behavioralInsights.expectedLifetimeMonths && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Durée de vie client estimée : {behavioralInsights.expectedLifetimeMonths} mois
+                    {behavioralInsights.ordersPerMonth && ` · ${behavioralInsights.ordersPerMonth} cmd/mois`}
+                  </p>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       )}
     </div>
   )

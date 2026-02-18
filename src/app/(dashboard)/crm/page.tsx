@@ -13,6 +13,7 @@ import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { formatCurrency } from "@/config/currencies";
 import { formatDate } from "@/lib/utils";
+import { LeadsKanban } from "@/components/crm/leads-kanban";
 
 export const metadata = {
   title: "Customer Intelligence CRM | Horion ERP",
@@ -145,11 +146,12 @@ export default async function CRMPage() {
 
       {/* Intelligence Tabs */}
       <Tabs defaultValue="contributors" className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="contributors">Top Contributeurs</TabsTrigger>
           <TabsTrigger value="risk">Risques Élevés</TabsTrigger>
           <TabsTrigger value="at-risk">Clients Inactifs</TabsTrigger>
           <TabsTrigger value="pipeline">Pipeline Leads</TabsTrigger>
+          <TabsTrigger value="kanban">Kanban</TabsTrigger>
           <TabsTrigger value="segments">Segmentation</TabsTrigger>
         </TabsList>
 
@@ -374,9 +376,10 @@ export default async function CRMPage() {
                 ) : (
                   <div className="space-y-3">
                     {leads.slice(0, 5).map((lead) => (
-                      <div
+                      <Link
                         key={lead.id}
-                        className="flex items-center justify-between rounded-lg border p-3"
+                        href={`/crm/leads/${lead.id}`}
+                        className="flex items-center justify-between rounded-lg border p-3 hover:bg-accent transition-colors"
                       >
                         <div>
                           <p className="text-sm font-medium">{lead.contact.name}</p>
@@ -387,13 +390,37 @@ export default async function CRMPage() {
                         <Badge className={LEAD_STATUS_COLORS[lead.status] || ""}>
                           {LEAD_STATUS_LABELS[lead.status] || lead.status}
                         </Badge>
-                      </div>
+                      </Link>
                     ))}
                   </div>
                 )}
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        {/* Kanban Tab */}
+        <TabsContent value="kanban" className="space-y-4">
+          {leads.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center text-muted-foreground">
+                <p>Aucun lead à afficher dans le Kanban</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <LeadsKanban
+              leads={leads.map((l) => ({
+                id: l.id,
+                status: l.status,
+                description: l.description,
+                source: l.source,
+                estimatedValue: l.estimatedValue ? String(l.estimatedValue) : null,
+                currency: l.currency,
+                category: l.category,
+                contact: l.contact,
+              }))}
+            />
+          )}
         </TabsContent>
 
         {/* Segmentation Tab */}

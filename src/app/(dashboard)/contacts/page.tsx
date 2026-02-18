@@ -7,6 +7,7 @@ import { DataTable } from "@/components/shared/data-table";
 import { TableSkeleton } from "@/components/shared/loading-skeleton";
 import { EmptyState } from "@/components/shared/empty-state";
 import { contactColumns, type ContactTableRow } from "@/components/contacts/contact-table";
+import { ExportContactsButton } from "@/components/contacts/export-contacts-button";
 import { getContacts } from "@/lib/actions/contact.actions";
 
 export const metadata = {
@@ -23,12 +24,15 @@ export default async function ContactsPage() {
             Clients, fournisseurs et partenaires
           </p>
         </div>
-        <Button asChild>
-          <Link href="/contacts/new">
-            <Plus className="mr-2 h-4 w-4" />
-            Nouveau contact
-          </Link>
-        </Button>
+        <div className="flex gap-2">
+          <ExportContactsButton />
+          <Button asChild>
+            <Link href="/contacts/new">
+              <Plus className="mr-2 h-4 w-4" />
+              Nouveau contact
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <Suspense fallback={<TableSkeleton />}>

@@ -72,6 +72,49 @@ export class LeadService {
     return { leads, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
+  static async getById(leadId: string) {
+    return prisma.lead.findUnique({
+      where: { id: leadId },
+      include: {
+        contact: {
+          select: {
+            id: true,
+            name: true,
+            company: true,
+            phone: true,
+            email: true,
+            whatsapp: true,
+            city: true,
+            country: true,
+            type: true,
+            tenantId: true,
+          },
+        },
+      },
+    });
+  }
+
+  static async update(
+    leadId: string,
+    data: Partial<{
+      source: string;
+      description: string;
+      estimatedValue: number;
+      currency: string;
+      category: string;
+      assignedTo: string;
+      status: LeadStatus;
+    }>
+  ) {
+    return prisma.lead.update({
+      where: { id: leadId },
+      data,
+      include: {
+        contact: { select: { name: true } },
+      },
+    });
+  }
+
   static async getPipelineStats(tenantId: string) {
     const pipeline = await prisma.lead.groupBy({
       by: ["status"],
