@@ -70,6 +70,12 @@ export default async function SourcingIntelligencePage() {
         <div className="flex items-center gap-2">
           <ExportSuppliersButton />
           <Link
+            href="/sourcing/cases"
+            className="inline-flex items-center gap-1 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          >
+            Cas de sourcing →
+          </Link>
+          <Link
             href="/catalog/suppliers"
             className="text-sm text-primary hover:underline"
           >

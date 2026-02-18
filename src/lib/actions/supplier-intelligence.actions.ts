@@ -117,7 +117,7 @@ export async function exportSuppliersCSV() {
     const user = await getSession();
 
     const suppliers = await prisma.supplier.findMany({
-      where: { tenantId: user.tenantId },
+      where: {},
       include: {
         financialMetrics: true,
         performanceProfile: true,

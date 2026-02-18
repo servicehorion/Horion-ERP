@@ -10,6 +10,7 @@ const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
     "contact.manage", "contact.view",
     "lead.manage",
     "catalog.manage", "catalog.view",
+    "sourcing.manage",
     "delegation.manage",
     "user.manage",
   ],

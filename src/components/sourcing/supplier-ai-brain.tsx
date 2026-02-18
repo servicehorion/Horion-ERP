@@ -412,7 +412,7 @@ export function SupplierAIBrain({ aiProfile }: SupplierAIBrainProps) {
                   <div className="text-lg font-bold text-green-600">
                     {Math.round(Number((behavioralInsights as Record<string, unknown>).supplierLTV)).toLocaleString("fr-FR")} FCFA
                   </div>
-                  {(behavioralInsights as Record<string, unknown>).expectedLifetimeMonths && (
+                  {Boolean((behavioralInsights as Record<string, unknown>).expectedLifetimeMonths) && (
                     <p className="text-xs text-muted-foreground">
                       Horizon : {String((behavioralInsights as Record<string, unknown>).expectedLifetimeMonths)} mois
                     </p>
