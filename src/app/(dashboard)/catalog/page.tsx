@@ -1,6 +1,6 @@
 import {
   Package, Users, Tag, Image, Plus, TrendingUp, Star,
-  CheckCircle2, BarChart3,
+  CheckCircle2, BarChart3, Layers,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -73,6 +73,12 @@ export default async function CatalogDashboardPage() {
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
           <ExportProductsButton />
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/catalog/analytics">
+              <BarChart3 className="mr-2 h-4 w-4" />
+              Analytics
+            </Link>
+          </Button>
           <Button variant="outline" size="sm" asChild>
             <Link href="/catalog/products">
               <Package className="mr-2 h-4 w-4" />

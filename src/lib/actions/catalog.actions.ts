@@ -5,6 +5,7 @@ import { CatalogProductService } from "@/lib/services/catalog-product.service";
 import { CatalogSupplierService } from "@/lib/services/catalog-supplier.service";
 import { CatalogOfferService } from "@/lib/services/catalog-offer.service";
 import { CatalogMediaService } from "@/lib/services/catalog-media.service";
+import { CatalogIntelligenceService } from "@/lib/services/catalog-intelligence.service";
 import { AuditService } from "@/lib/services/audit.service";
 import { checkPermission } from "@/lib/permissions";
 import {
@@ -498,6 +499,125 @@ export async function getCatalogDashboardStats() {
         mediaCounts,
         categoryStats,
         avgDemandScore,
+      },
+    };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Erreur" };
+  }
+}
+
+// ============================================================
+// CATALOG INTELLIGENCE (Analytics OS — SHEIN/TEMU/ALIBABA level)
+// ============================================================
+
+export async function getCatalogAnalytics() {
+  try {
+    const user = await getSession();
+    const tenantId = user.tenantId;
+
+    const [categoryPerformance, topByRevenue, priceSpread, healthMetrics] = await Promise.all([
+      CatalogIntelligenceService.getCategoryPerformance(tenantId),
+      CatalogIntelligenceService.getTopByRevenue(tenantId, 10),
+      CatalogIntelligenceService.getPriceSpread(tenantId, 10),
+      CatalogIntelligenceService.getCatalogHealthMetrics(tenantId),
+    ]);
+
+    return { data: { categoryPerformance, topByRevenue, priceSpread, healthMetrics } };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Erreur analytics" };
+  }
+}
+
+export async function getProductIntelligence(productId: string) {
+  try {
+    const user = await getSession();
+    const product = await CatalogProductService.getById(productId);
+    if (!product || product.tenantId !== user.tenantId) {
+      return { error: "Produit introuvable" };
+    }
+
+    const [revenue, crossModule] = await Promise.all([
+      CatalogIntelligenceService.getProductRevenue(productId),
+      CatalogIntelligenceService.getCrossModuleData(productId),
+    ]);
+
+    return { data: { revenue, crossModule } };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Erreur" };
+  }
+}
+
+export async function bulkUpdateProductStatus(productIds: string[], status: string) {
+  try {
+    const user = await getSession();
+    checkPermission(user.role, "catalog.manage");
+
+    const products = await prisma.catalogProduct.findMany({
+      where: { id: { in: productIds }, tenantId: user.tenantId },
+      select: { id: true, status: true },
+    });
+
+    if (products.length === 0) {
+      return { error: "Aucun produit trouvé" };
+    }
+
+    await prisma.catalogProduct.updateMany({
+      where: { id: { in: products.map((p) => p.id) }, tenantId: user.tenantId },
+      data: { status: status as ProductStatus },
+    });
+
+    await AuditService.log({
+      tenantId: user.tenantId,
+      userId: user.id,
+      action: "catalog.product.bulk_status_changed",
+      entityType: "product",
+      entityId: products[0].id,
+      newValue: { count: products.length, status },
+    });
+
+    revalidatePath("/catalog/products");
+    revalidatePath("/catalog");
+    return { data: { updated: products.length } };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Erreur lors de la mise à jour" };
+  }
+}
+
+export async function getProductsPageData(options: {
+  page?: number;
+  limit?: number;
+  status?: string;
+  categoryId?: string;
+  search?: string;
+}) {
+  try {
+    const user = await getSession();
+    const { page = 1, limit = 50, status, categoryId, search } = options;
+
+    const [result, statusCounts, categories] = await Promise.all([
+      CatalogProductService.list(user.tenantId, {
+        page,
+        limit,
+        status: status as ProductStatus | undefined,
+        categoryId,
+        search,
+      }),
+      CatalogProductService.getStatusCounts(user.tenantId),
+      prisma.productCategory.findMany({
+        where: { tenantId: user.tenantId },
+        select: { id: true, name: true },
+        orderBy: { name: "asc" },
+      }),
+    ]);
+
+    return {
+      data: {
+        products: result.products,
+        total: result.total,
+        page: result.page,
+        totalPages: result.totalPages,
+        statusCounts,
+        categories,
       },
     };
   } catch (error) {

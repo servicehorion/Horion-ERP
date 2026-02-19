@@ -12,7 +12,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
-import { getProductById } from "@/lib/actions/catalog.actions";
+import { getProductById, getProductIntelligence } from "@/lib/actions/catalog.actions";
 import { ProductStatusSelect } from "@/components/catalog/product-status-select";
 import { formatCurrency } from "@/config/currencies";
 
@@ -35,8 +35,12 @@ const QC_RESULT_CONFIG: Record<string, { label: string; color: string; icon: typ
 };
 
 export default async function ProductDetailPage({ params }: { params: { id: string } }) {
-  const res = await getProductById(params.id);
+  const [res, intelRes] = await Promise.all([
+    getProductById(params.id),
+    getProductIntelligence(params.id),
+  ]);
   if (!res.data) notFound();
+  const intel = intelRes.data;
 
   const p = res.data as any;
   const statusConfig = STATUS_CONFIG[p.status] || { label: p.status, color: "bg-gray-100 text-gray-800" };
@@ -145,6 +149,7 @@ export default async function ProductDetailPage({ params }: { params: { id: stri
           <TabsTrigger value="orders">Commandes ({p._count.orderItems})</TabsTrigger>
           <TabsTrigger value="qc">QC ({qcTotal})</TabsTrigger>
           <TabsTrigger value="media">Médias ({p._count.media})</TabsTrigger>
+          <TabsTrigger value="intelligence">Intelligence</TabsTrigger>
         </TabsList>
 
         {/* Tab: Overview */}
@@ -531,6 +536,124 @@ export default async function ProductDetailPage({ params }: { params: { id: stri
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Tab: Intelligence */}
+        <TabsContent value="intelligence" className="mt-4">
+          {!intel ? (
+            <Card><CardContent className="py-8 text-center text-muted-foreground">Intelligence non disponible</CardContent></Card>
+          ) : (
+            <div className="space-y-4">
+              {/* Revenue Intelligence */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <Card>
+                  <CardContent className="p-4">
+                    <p className="text-xs text-muted-foreground mb-1">CA total généré</p>
+                    <p className="text-xl font-bold text-green-600">
+                      {intel.revenue.totalRevenue > 0 ? formatCurrency(intel.revenue.totalRevenue, "XAF") : "—"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">{intel.revenue.orderCount} commande(s)</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <p className="text-xs text-muted-foreground mb-1">Quantité totale</p>
+                    <p className="text-xl font-bold">{intel.revenue.totalQty.toLocaleString("fr-FR")}</p>
+                    <p className="text-xs text-muted-foreground">unités commandées</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <p className="text-xs text-muted-foreground mb-1">Prix moyen (XAF)</p>
+                    <p className="text-xl font-bold">
+                      {intel.revenue.avgUnitPriceXAF > 0
+                        ? formatCurrency(intel.revenue.avgUnitPriceXAF, "XAF")
+                        : "—"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">par unité</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <p className="text-xs text-muted-foreground mb-1">Cas sourcing liés</p>
+                    <p className="text-xl font-bold">{intel.crossModule.sourcingCases.length}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {intel.crossModule.linkedOrders.length} commande(s) liée(s)
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Cross-Module: Orders */}
+              {intel.crossModule.linkedOrders.length > 0 && (
+                <Card>
+                  <CardHeader><CardTitle className="text-base">Commandes liées</CardTitle></CardHeader>
+                  <CardContent>
+                    <div className="flex flex-wrap gap-2">
+                      {intel.crossModule.linkedOrders.map((o: any) => (
+                        <Link
+                          key={o.id}
+                          href={`/orders/${o.id}`}
+                          className="inline-flex items-center gap-1.5 border rounded-md px-3 py-1.5 text-sm hover:bg-muted transition-colors"
+                        >
+                          <span className="font-mono font-bold text-blue-600">{o.orderNumber}</span>
+                          <Badge variant="secondary" className="text-xs">{o.status}</Badge>
+                        </Link>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Cross-Module: Sourcing Cases */}
+              {intel.crossModule.sourcingCases.length > 0 && (
+                <Card>
+                  <CardHeader><CardTitle className="text-base">Cas de sourcing liés</CardTitle></CardHeader>
+                  <CardContent>
+                    <div className="flex flex-wrap gap-2">
+                      {intel.crossModule.sourcingCases.map((sc: any) => (
+                        <Link
+                          key={sc.id}
+                          href={`/sourcing/cases/${sc.id}`}
+                          className="inline-flex items-center gap-1.5 border rounded-md px-3 py-1.5 text-sm hover:bg-muted transition-colors"
+                        >
+                          <span className="text-blue-600 font-medium">Sourcing #{sc.id.slice(-6)}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(sc.createdAt).toLocaleDateString("fr-FR")}
+                          </span>
+                        </Link>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Quick Links to Other OS */}
+              <Card>
+                <CardHeader><CardTitle className="text-base">Interconnexions OS</CardTitle></CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <Link href={`/sourcing/cases/new`} className="border rounded-lg p-3 text-center hover:bg-muted transition-colors">
+                      <p className="text-xs text-muted-foreground">Sourcing OS</p>
+                      <p className="text-sm font-medium mt-1">Créer cas</p>
+                    </Link>
+                    <Link href={`/catalog/suppliers`} className="border rounded-lg p-3 text-center hover:bg-muted transition-colors">
+                      <p className="text-xs text-muted-foreground">Supplier Intelligence</p>
+                      <p className="text-sm font-medium mt-1">Voir fournisseurs</p>
+                    </Link>
+                    <Link href={`/finance/margins`} className="border rounded-lg p-3 text-center hover:bg-muted transition-colors">
+                      <p className="text-xs text-muted-foreground">Finance OS</p>
+                      <p className="text-sm font-medium mt-1">Voir les marges</p>
+                    </Link>
+                    <Link href={`/catalog/analytics`} className="border rounded-lg p-3 text-center hover:bg-muted transition-colors">
+                      <p className="text-xs text-muted-foreground">Catalogue Analytics</p>
+                      <p className="text-sm font-medium mt-1">Vue d&apos;ensemble</p>
+                    </Link>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>
