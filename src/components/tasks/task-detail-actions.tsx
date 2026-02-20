@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, MessageSquare, Send, ShieldCheck, UserPlus } from "lucide-react";
+import { Eye, EyeOff, Loader2, Plus, Send, ShieldCheck, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -14,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { TaskStatusBadge } from "@/components/shared/status-badge";
 import {
   updateTaskStatus, assignTask, addTaskComment, approveTask,
+  createSubtask, watchTask, unwatchTask,
 } from "@/lib/actions/task.actions";
 
 // ── Status transitions ────────────────────────────────────────────────────────
@@ -35,7 +37,7 @@ const STATUS_LABELS: Record<string, string> = {
   CANCELLED: "Annuler",
 };
 
-// ── Workflow component ────────────────────────────────────────────────────────
+// ── Props ─────────────────────────────────────────────────────────────────────
 interface TaskDetailActionsProps {
   taskId: string;
   currentStatus?: string;
@@ -44,6 +46,9 @@ interface TaskDetailActionsProps {
   requiredApproval?: boolean;
   approvals?: any[];
   commentMode?: boolean;
+  subtaskMode?: boolean;
+  watchMode?: boolean;
+  isWatching?: boolean;
 }
 
 export function TaskDetailActions({
@@ -54,17 +59,34 @@ export function TaskDetailActions({
   requiredApproval,
   approvals = [],
   commentMode = false,
+  subtaskMode = false,
+  watchMode = false,
+  isWatching = false,
 }: TaskDetailActionsProps) {
   const router = useRouter();
+
+  // ── Comment mode ──────────────────────────────────────────────────────────
+  const [comment, setComment] = useState("");
+  const [submittingComment, setSubmittingComment] = useState(false);
+
+  // ── Subtask mode ──────────────────────────────────────────────────────────
+  const [showSubtaskForm, setShowSubtaskForm] = useState(false);
+  const [subtaskTitle, setSubtaskTitle] = useState("");
+  const [subtaskAssignee, setSubtaskAssignee] = useState("");
+  const [creatingSubtask, setCreatingSubtask] = useState(false);
+
+  // ── Watch mode ────────────────────────────────────────────────────────────
+  const [watching, setWatching] = useState(isWatching);
+  const [loadingWatch, setLoadingWatch] = useState(false);
+
+  // ── Workflow state ────────────────────────────────────────────────────────
   const [loadingStatus, setLoadingStatus] = useState<string | null>(null);
   const [loadingAssign, setLoadingAssign] = useState(false);
   const [selectedMember, setSelectedMember] = useState<string>("");
-  const [comment, setComment] = useState("");
-  const [submittingComment, setSubmittingComment] = useState(false);
   const [approvalComment, setApprovalComment] = useState("");
   const [loadingApproval, setLoadingApproval] = useState<string | null>(null);
 
-  // ── Comment mode ──────────────────────────────────────────────────────────
+  // ── Comment mode render ───────────────────────────────────────────────────
   if (commentMode) {
     return (
       <div className="space-y-2">
@@ -109,7 +131,137 @@ export function TaskDetailActions({
     );
   }
 
-  // ── Status transitions ────────────────────────────────────────────────────
+  // ── Subtask mode render ───────────────────────────────────────────────────
+  if (subtaskMode) {
+    return (
+      <div>
+        {!showSubtaskForm ? (
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full text-muted-foreground"
+            onClick={() => setShowSubtaskForm(true)}
+          >
+            <Plus className="mr-2 h-3.5 w-3.5" />
+            Ajouter une sous-tâche
+          </Button>
+        ) : (
+          <div className="space-y-2 border rounded-lg p-3 bg-muted/30">
+            <Input
+              value={subtaskTitle}
+              onChange={(e) => setSubtaskTitle(e.target.value)}
+              placeholder="Titre de la sous-tâche..."
+              className="h-8 text-sm"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  setShowSubtaskForm(false);
+                  setSubtaskTitle("");
+                }
+              }}
+            />
+            {teamMembers.length > 0 && (
+              <Select value={subtaskAssignee} onValueChange={setSubtaskAssignee}>
+                <SelectTrigger className="h-8 text-sm">
+                  <SelectValue placeholder="Assigner à (optionnel)..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {teamMembers.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            <div className="flex gap-2 justify-end">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setShowSubtaskForm(false);
+                  setSubtaskTitle("");
+                  setSubtaskAssignee("");
+                }}
+              >
+                Annuler
+              </Button>
+              <Button
+                size="sm"
+                disabled={!subtaskTitle.trim() || creatingSubtask}
+                onClick={async () => {
+                  if (!subtaskTitle.trim()) return;
+                  setCreatingSubtask(true);
+                  try {
+                    const res = await createSubtask(taskId, {
+                      title: subtaskTitle.trim(),
+                      assigneeId: subtaskAssignee || undefined,
+                    });
+                    if (res.error) {
+                      toast.error(res.error);
+                    } else {
+                      toast.success("Sous-tâche créée");
+                      setSubtaskTitle("");
+                      setSubtaskAssignee("");
+                      setShowSubtaskForm(false);
+                      router.refresh();
+                    }
+                  } catch {
+                    toast.error("Erreur lors de la création");
+                  } finally {
+                    setCreatingSubtask(false);
+                  }
+                }}
+              >
+                {creatingSubtask ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Plus className="mr-2 h-3.5 w-3.5" />}
+                Créer
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── Watch mode render ─────────────────────────────────────────────────────
+  if (watchMode) {
+    return (
+      <Button
+        variant={watching ? "secondary" : "outline"}
+        size="sm"
+        className="w-full"
+        disabled={loadingWatch}
+        onClick={async () => {
+          setLoadingWatch(true);
+          try {
+            const res = watching
+              ? await unwatchTask(taskId)
+              : await watchTask(taskId);
+            if (res.error) {
+              toast.error(res.error);
+            } else {
+              setWatching(!watching);
+              toast.success(watching ? "Vous ne suivez plus cette tâche" : "Vous suivez maintenant cette tâche");
+              router.refresh();
+            }
+          } catch {
+            toast.error("Erreur");
+          } finally {
+            setLoadingWatch(false);
+          }
+        }}
+      >
+        {loadingWatch ? (
+          <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+        ) : watching ? (
+          <EyeOff className="mr-2 h-3.5 w-3.5" />
+        ) : (
+          <Eye className="mr-2 h-3.5 w-3.5" />
+        )}
+        {watching ? "Ne plus suivre" : "Suivre la tâche"}
+      </Button>
+    );
+  }
+
+  // ── Default: workflow mode ────────────────────────────────────────────────
   const transitions = currentStatus ? STATUS_TRANSITIONS[currentStatus] ?? [] : [];
 
   async function handleStatusChange(newStatus: string) {
@@ -155,7 +307,11 @@ export function TaskDetailActions({
       if (res.error) {
         toast.error(res.error);
       } else {
-        toast.success(decision === "APPROVED" ? "Tâche approuvée" : decision === "REJECTED" ? "Tâche rejetée" : "Tâche escaladée");
+        toast.success(
+          decision === "APPROVED" ? "Tâche approuvée" :
+          decision === "REJECTED" ? "Tâche rejetée" :
+          "Tâche escaladée"
+        );
         setApprovalComment("");
         router.refresh();
       }

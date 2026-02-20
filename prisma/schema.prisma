@@ -35,6 +35,9 @@ model Tenant {
   catalogProducts    CatalogProduct[]
   productCategories  ProductCategory[]
   catalogMedia       CatalogMedia[]
+  taskTemplates      TaskTemplate[]
+  recurringTasks     RecurringTask[]
+  notifications      Notification[]
 
   @@map("tenants")
 }
@@ -55,6 +58,9 @@ model User {
   taskAssignments TaskAssignment[]
   approvals       Approval[]
   auditLogs       AuditLog[]
+  taskComments    TaskComment[]
+  taskWatchers    TaskWatcher[]
+  notifications   Notification[]
 
   @@index([tenantId])
   @@map("users")
@@ -868,7 +874,7 @@ model MarginReport {
 }
 
 // ============================================================
-// H. TASK ENGINE (CENTRALISE)
+// H. TASK ENGINE (CENTRALISE) — Enterprise + AI-Agent Ready
 // ============================================================
 
 model Task {
@@ -893,15 +899,43 @@ model Task {
   createdAt         DateTime   @default(now())
   updatedAt         DateTime   @updatedAt
 
-  tenant      Tenant           @relation(fields: [tenantId], references: [id])
-  order       Order?           @relation(fields: [entityId], references: [id])
-  assignments TaskAssignment[]
-  approvals   Approval[]
+  // Subtasks — self-relation
+  parentTaskId String?
+  parent       Task?  @relation("TaskSubtasks", fields: [parentTaskId], references: [id])
+  children     Task[] @relation("TaskSubtasks")
+  position     Int    @default(0) // ordering in lists/kanban
+
+  // Template & scheduling
+  templateId     String?
+  dueDate        DateTime?
+  startedAt      DateTime?
+  estimatedHours Float?
+  actualHours    Float?
+
+  // Tags (simple array)
+  tags String[] @default([])
+
+  // AI Agent fields
+  agentId   String? // which agent is executing
+  agentName String? // human-readable agent name
+
+  tenant           Tenant            @relation(fields: [tenantId], references: [id])
+  order            Order?            @relation(fields: [entityId], references: [id])
+  assignments      TaskAssignment[]
+  approvals        Approval[]
+  comments         TaskComment[]
+  watchers         TaskWatcher[]
+  agentExecutions  AgentExecution[]
+  // Dependencies
+  dependencies     TaskDependency[]  @relation("TaskDependencies")
+  dependents       TaskDependency[]  @relation("TaskDependents")
 
   @@index([tenantId, status])
   @@index([tenantId, module])
   @@index([entityType, entityId])
   @@index([slaDeadline])
+  @@index([parentTaskId])
+  @@index([ownerType, status])
   @@map("tasks")
 }
 
@@ -952,6 +986,180 @@ enum ApprovalDecision {
   APPROVED
   REJECTED
   ESCALATED
+}
+
+// ── Task Comments (dedicated model, not AuditLog) ──────────────
+
+model TaskComment {
+  id        String   @id @default(cuid())
+  taskId    String
+  userId    String
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([taskId, createdAt])
+  @@map("task_comments")
+}
+
+// ── Task Watchers ──────────────────────────────────────────────
+
+model TaskWatcher {
+  id     String @id @default(cuid())
+  taskId String
+  userId String
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([taskId, userId])
+  @@map("task_watchers")
+}
+
+// ── Task Dependencies (DAG) ────────────────────────────────────
+
+model TaskDependency {
+  id           String         @id @default(cuid())
+  taskId       String
+  dependsOnId  String
+  type         DependencyType @default(BLOCKS)
+  createdAt    DateTime       @default(now())
+
+  task      Task @relation("TaskDependencies", fields: [taskId], references: [id], onDelete: Cascade)
+  dependsOn Task @relation("TaskDependents", fields: [dependsOnId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, dependsOnId])
+  @@map("task_dependencies")
+}
+
+enum DependencyType {
+  BLOCKS   // dependsOn must complete before task can start
+  REQUIRES // dependsOn must complete before task can complete
+  RELATED  // informational link
+}
+
+// ── Task Templates ─────────────────────────────────────────────
+
+model TaskTemplate {
+  id                  String   @id @default(cuid())
+  tenantId            String
+  name                String
+  description         String?
+  module              String
+  taskType            String
+  titleTemplate       String   // e.g. "Vérifier QC pour {{orderNumber}}"
+  descriptionTemplate String?
+  defaultPriority     Priority @default(NORMAL)
+  defaultSlaHours     Int?
+  defaultTags         String[] @default([])
+  requiresApproval    Boolean  @default(false)
+  automationAllowed   Boolean  @default(false)
+  ownerType           OwnerType @default(HUMAN)
+  // Subtask definitions as JSON array: [{title, priority, slaHours, module}]
+  subtaskDefinitions  Json     @default("[]")
+  // Dependency definitions as JSON: [{fromStep, toStep, type}]
+  dependencyDefinitions Json   @default("[]")
+  isActive            Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  tenant        Tenant         @relation(fields: [tenantId], references: [id])
+  recurringTask RecurringTask?
+
+  @@index([tenantId, module])
+  @@map("task_templates")
+}
+
+// ── Recurring Tasks ────────────────────────────────────────────
+
+model RecurringTask {
+  id             String    @id @default(cuid())
+  tenantId       String
+  templateId     String    @unique
+  cronExpression String    // e.g. "0 9 * * 1" (Mon 9am)
+  timezone       String    @default("Africa/Brazzaville")
+  nextRunAt      DateTime?
+  lastRunAt      DateTime?
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  tenant   Tenant       @relation(fields: [tenantId], references: [id])
+  template TaskTemplate @relation(fields: [templateId], references: [id])
+
+  @@index([isActive, nextRunAt])
+  @@map("recurring_tasks")
+}
+
+// ── AI Agent Execution Log ─────────────────────────────────────
+
+model AgentExecution {
+  id          String               @id @default(cuid())
+  taskId      String
+  agentId     String               // unique agent identifier
+  agentName   String               // human-readable name
+  status      AgentExecutionStatus @default(QUEUED)
+  input       Json?                // context passed to agent
+  output      Json?                // result from agent
+  error       String?
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime             @default(now())
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@index([agentId, status])
+  @@map("agent_executions")
+}
+
+enum AgentExecutionStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+// ── Notifications ──────────────────────────────────────────────
+
+model Notification {
+  id         String           @id @default(cuid())
+  tenantId   String
+  userId     String
+  type       NotificationType
+  title      String
+  message    String?
+  entityType String?          // "task", "order", etc.
+  entityId   String?
+  read       Boolean          @default(false)
+  readAt     DateTime?
+  createdAt  DateTime         @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@index([userId, read, createdAt])
+  @@index([tenantId, createdAt])
+  @@map("notifications")
+}
+
+enum NotificationType {
+  TASK_ASSIGNED
+  TASK_COMPLETED
+  TASK_BLOCKED
+  SLA_WARNING
+  SLA_BREACH
+  APPROVAL_REQUIRED
+  APPROVAL_DECIDED
+  COMMENT_ADDED
+  AGENT_COMPLETED
+  AGENT_FAILED
+  SUBTASK_COMPLETED
+  DEPENDENCY_RESOLVED
 }
 
 // ============================================================

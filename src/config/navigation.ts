@@ -65,6 +65,11 @@ export const sidebarNavigation: NavItem[] = [
     title: "Taches",
     href: "/tasks",
     icon: ListTodo,
+    children: [
+      { title: "Dashboard", href: "/tasks" },
+      { title: "Kanban", href: "/tasks/board" },
+      { title: "Templates", href: "/tasks/templates" },
+    ],
   },
   {
     title: "WhatsApp",
