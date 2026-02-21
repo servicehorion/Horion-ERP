@@ -701,3 +701,369 @@ export async function getPendingTaskCount() {
     return { error: error instanceof Error ? error.message : "Erreur" };
   }
 }
+
+// ============================================================
+// TASK EDIT / UPDATE
+// ============================================================
+
+export async function updateTask(taskId: string, data: {
+  title?: string;
+  description?: string;
+  priority?: string;
+  module?: string;
+  tags?: string[];
+  estimatedHours?: number;
+  dueDate?: string;
+  riskLevel?: string;
+}) {
+  try {
+    const user = await getSession();
+    checkPermission(user.role, "task.update");
+
+    const task = await prisma.task.findUnique({ where: { id: taskId } });
+    if (!task || task.tenantId !== user.tenantId) return { error: "Tâche introuvable" };
+
+    const updated = await prisma.task.update({
+      where: { id: taskId },
+      data: {
+        ...(data.title && { title: data.title }),
+        ...(data.description !== undefined && { description: data.description }),
+        ...(data.priority && { priority: data.priority as Priority }),
+        ...(data.module && { module: data.module }),
+        ...(data.tags && { tags: data.tags }),
+        ...(data.estimatedHours !== undefined && { estimatedHours: data.estimatedHours }),
+        ...(data.dueDate && { dueDate: new Date(data.dueDate) }),
+        ...(data.riskLevel && { riskLevel: data.riskLevel as any }),
+      },
+    });
+
+    await AuditService.log({
+      tenantId: user.tenantId, userId: user.id,
+      action: "task.updated", entityType: "task", entityId: taskId,
+      oldValue: { title: task.title, priority: task.priority },
+      newValue: data,
+    });
+
+    revalidateTask(taskId);
+    return { data: updated };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Erreur" };
+  }
+}
+
+export async function deleteTask(taskId: string) {
+  try {
+    const user = await getSession();
+    checkPermission(user.role, "task.update");
+
+    const task = await prisma.task.findUnique({ where: { id: taskId } });
+    if (!task || task.tenantId !== user.tenantId) return { error: "Tâche introuvable" };
+
+    // Delete child relations first
+    await prisma.$transaction([
+      prisma.taskComment.deleteMany({ where: { taskId } }),
+      prisma.taskWatcher.deleteMany({ where: { taskId } }),
+      prisma.taskDependency.deleteMany({ where: { OR: [{ taskId }, { dependsOnId: taskId }] } }),
+      prisma.agentExecution.deleteMany({ where: { taskId } }),
+      prisma.taskAssignment.deleteMany({ where: { taskId } }),
+      prisma.approval.deleteMany({ where: { taskId } }),
+      prisma.task.deleteMany({ where: { parentTaskId: taskId } }),
+      prisma.task.delete({ where: { id: taskId } }),
+    ]);
+
+    await AuditService.log({
+      tenantId: user.tenantId, userId: user.id,
+      action: "task.deleted", entityType: "task", entityId: taskId,
+      oldValue: { title: task.title },
+    });
+
+    revalidateTask();
+    return { data: true };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Erreur" };
+  }
+}
+
+export async function duplicateTask(taskId: string) {
+  try {
+    const user = await getSession();
+    checkPermission(user.role, "task.update");
+
+    const task = await prisma.task.findUnique({
+      where: { id: taskId },
+      include: { children: true },
+    });
+    if (!task || task.tenantId !== user.tenantId) return { error: "Tâche introuvable" };
+
+    const copy = await prisma.task.create({
+      data: {
+        tenantId: task.tenantId,
+        title: `${task.title} (copie)`,
+        description: task.description,
+        module: task.module,
+        taskType: task.taskType,
+        entityType: task.entityType,
+        entityId: task.entityId,
+        priority: task.priority,
+        riskLevel: task.riskLevel,
+        ownerType: task.ownerType,
+        estimatedHours: task.estimatedHours,
+        tags: task.tags,
+        slaDeadline: task.slaDeadline ? new Date(Date.now() + (task.slaDeadline.getTime() - task.createdAt.getTime())) : null,
+        requiredApproval: task.requiredApproval,
+        automationAllowed: task.automationAllowed,
+      },
+    });
+
+    // Duplicate children
+    for (const child of task.children) {
+      await prisma.task.create({
+        data: {
+          tenantId: child.tenantId,
+          parentTaskId: copy.id,
+          title: child.title,
+          description: child.description,
+          module: child.module,
+          taskType: child.taskType,
+          entityType: child.entityType,
+          entityId: child.entityId,
+          priority: child.priority,
+          riskLevel: child.riskLevel,
+          ownerType: child.ownerType,
+          tags: child.tags,
+          position: child.position,
+        },
+      });
+    }
+
+    revalidateTask();
+    return { data: copy };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Erreur" };
+  }
+}
+
+// ============================================================
+// TIME TRACKING
+// ============================================================
+
+export async function logTaskTime(taskId: string, hours: number, note?: string) {
+  try {
+    const user = await getSession();
+    checkPermission(user.role, "task.update");
+
+    const task = await prisma.task.findUnique({ where: { id: taskId } });
+    if (!task || task.tenantId !== user.tenantId) return { error: "Tâche introuvable" };
+
+    const newActual = (task.actualHours ?? 0) + hours;
+    await prisma.task.update({
+      where: { id: taskId },
+      data: { actualHours: newActual },
+    });
+
+    await AuditService.log({
+      tenantId: user.tenantId, userId: user.id,
+      action: "task.time_logged", entityType: "task", entityId: taskId,
+      newValue: { hours, total: newActual, note },
+    });
+
+    revalidateTask(taskId);
+    return { data: { logged: hours, total: newActual } };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Erreur" };
+  }
+}
+
+// ============================================================
+// MY TASKS (PERSONALIZED)
+// ============================================================
+
+export async function getMyTasksList() {
+  try {
+    const user = await getSession();
+    const tasks = await prisma.task.findMany({
+      where: {
+        tenantId: user.tenantId,
+        assignments: { some: { userId: user.id } },
+        status: { notIn: ["COMPLETED", "CANCELLED"] },
+      },
+      include: {
+        assignments: { include: { user: { select: { id: true, name: true } } } },
+        _count: { select: { children: true, comments: true } },
+      },
+      orderBy: [
+        { priority: "desc" },
+        { slaDeadline: "asc" },
+        { createdAt: "desc" },
+      ],
+    });
+    return { data: tasks };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Erreur" };
+  }
+}
+
+// ============================================================
+// TASK TIMELINE DATA
+// ============================================================
+
+export async function getTaskTimeline() {
+  try {
+    const user = await getSession();
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 86400000);
+    const thirtyDaysFromNow = new Date(now.getTime() + 30 * 86400000);
+
+    const tasks = await prisma.task.findMany({
+      where: {
+        tenantId: user.tenantId,
+        parentTaskId: null,
+        OR: [
+          { slaDeadline: { gte: thirtyDaysAgo, lte: thirtyDaysFromNow } },
+          { createdAt: { gte: thirtyDaysAgo }, status: { notIn: ["COMPLETED", "CANCELLED"] } },
+        ],
+      },
+      include: {
+        assignments: { include: { user: { select: { name: true } } } },
+      },
+      orderBy: { slaDeadline: "asc" },
+      take: 100,
+    });
+
+    return { data: tasks };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Erreur" };
+  }
+}
+
+// ============================================================
+// ANALYTICS (ENHANCED)
+// ============================================================
+
+export async function getTaskAnalytics() {
+  try {
+    const user = await getSession();
+    const now = new Date();
+
+    // Daily counts for last 14 days
+    const dailyData: { date: string; created: number; completed: number }[] = [];
+    for (let i = 13; i >= 0; i--) {
+      const dayStart = new Date(now);
+      dayStart.setDate(dayStart.getDate() - i);
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(dayStart);
+      dayEnd.setHours(23, 59, 59, 999);
+
+      const [created, completed] = await Promise.all([
+        prisma.task.count({
+          where: { tenantId: user.tenantId, createdAt: { gte: dayStart, lte: dayEnd } },
+        }),
+        prisma.task.count({
+          where: { tenantId: user.tenantId, completedAt: { gte: dayStart, lte: dayEnd } },
+        }),
+      ]);
+
+      dailyData.push({
+        date: dayStart.toISOString().split("T")[0],
+        created,
+        completed,
+      });
+    }
+
+    // SLA compliance
+    const [totalWithSla, slaBreached] = await Promise.all([
+      prisma.task.count({
+        where: { tenantId: user.tenantId, slaDeadline: { not: null }, status: "COMPLETED" },
+      }),
+      prisma.task.count({
+        where: { tenantId: user.tenantId, slaBreach: true, status: "COMPLETED" },
+      }),
+    ]);
+    const slaCompliance = totalWithSla > 0
+      ? Math.round(((totalWithSla - slaBreached) / totalWithSla) * 100)
+      : 100;
+
+    // Average resolution time (hours) for tasks completed this month
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const completedTasks = await prisma.task.findMany({
+      where: {
+        tenantId: user.tenantId,
+        status: "COMPLETED",
+        completedAt: { gte: monthStart },
+        startedAt: { not: null },
+      },
+      select: { startedAt: true, completedAt: true },
+    });
+
+    const avgResolution = completedTasks.length > 0
+      ? Math.round(
+          completedTasks.reduce((sum, t) => {
+            const ms = (t.completedAt!.getTime() - t.startedAt!.getTime());
+            return sum + ms / 3600000;
+          }, 0) / completedTasks.length
+        )
+      : 0;
+
+    // Status breakdown
+    const statusBreakdown = await prisma.task.groupBy({
+      by: ["status"],
+      where: { tenantId: user.tenantId },
+      _count: true,
+    });
+
+    // Owner type breakdown
+    const ownerBreakdown = await prisma.task.groupBy({
+      by: ["ownerType"],
+      where: { tenantId: user.tenantId, status: { notIn: ["COMPLETED", "CANCELLED"] } },
+      _count: true,
+    });
+
+    return {
+      data: {
+        dailyData,
+        slaCompliance,
+        avgResolution,
+        statusBreakdown: statusBreakdown.map((s) => ({ status: s.status, count: s._count })),
+        ownerBreakdown: ownerBreakdown.map((o) => ({ ownerType: o.ownerType, count: o._count })),
+      },
+    };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Erreur" };
+  }
+}
+
+export async function exportTasksData(format: "csv") {
+  try {
+    const user = await getSession();
+    const tasks = await prisma.task.findMany({
+      where: { tenantId: user.tenantId, parentTaskId: null },
+      include: {
+        assignments: { include: { user: { select: { name: true } } } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 1000,
+    });
+
+    if (format === "csv") {
+      const headers = "ID,Titre,Module,Statut,Priorité,Assigné,SLA,Créé,Complété";
+      const rows = tasks.map((t) =>
+        [
+          t.id,
+          `"${t.title.replace(/"/g, '""')}"`,
+          t.module,
+          t.status,
+          t.priority,
+          t.assignments?.[0]?.user?.name ?? "",
+          t.slaDeadline?.toISOString() ?? "",
+          t.createdAt.toISOString(),
+          t.completedAt?.toISOString() ?? "",
+        ].join(",")
+      );
+      return { data: [headers, ...rows].join("\n") };
+    }
+
+    return { error: "Format non supporté" };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Erreur" };
+  }
+}

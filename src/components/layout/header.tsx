@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { LogOut, User } from "lucide-react";
+import { NotificationBell } from "@/components/tasks/notification-bell";
 
 export function Header() {
   const { data: session } = useSession();
@@ -30,6 +31,11 @@ export function Header() {
       <SidebarTrigger />
       <Separator orientation="vertical" className="h-6" />
       <div className="flex-1" />
+
+      {/* Notification Bell */}
+      <NotificationBell />
+
+      {/* User Menu */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" className="relative h-8 w-8 rounded-full">

@@ -67,7 +67,10 @@ export const sidebarNavigation: NavItem[] = [
     icon: ListTodo,
     children: [
       { title: "Dashboard", href: "/tasks" },
+      { title: "Mes Taches", href: "/tasks/my" },
       { title: "Kanban", href: "/tasks/board" },
+      { title: "Timeline", href: "/tasks/timeline" },
+      { title: "Analytics", href: "/tasks/analytics" },
       { title: "Templates", href: "/tasks/templates" },
     ],
   },

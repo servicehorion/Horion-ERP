@@ -3,7 +3,7 @@ import Link from "next/link";
 import {
   AlertTriangle, ArrowLeft, ArrowRight, Bot, CheckCircle2, Clock, ExternalLink,
   Eye, GitBranch, Layers, ListTree, MessageSquare, Plus,
-  ShieldCheck, Tag, User, Calendar,
+  ShieldCheck, Tag, User, Calendar, Copy, Trash2, Timer,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,9 @@ import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { TaskStatusBadge, PriorityBadge } from "@/components/shared/status-badge";
 import { TaskDetailActions } from "@/components/tasks/task-detail-actions";
+import { TaskEditDialog } from "@/components/tasks/task-edit-dialog";
+import { TimeTracker } from "@/components/tasks/time-tracker";
+import { TaskDeleteDuplicate } from "@/components/tasks/task-delete-duplicate";
 import { getTaskById, getTaskActivity, getTeamMembers } from "@/lib/actions/task.actions";
 import { formatDate } from "@/lib/utils";
 import { cn } from "@/lib/utils";
@@ -92,6 +95,20 @@ export default async function TaskDetailPage({ params }: PageProps) {
               ))}
             </div>
           )}
+          {/* Action buttons */}
+          <div className="flex items-center gap-2 mt-3">
+            <TaskEditDialog task={{
+              id: task.id,
+              title: task.title,
+              description: task.description,
+              priority: task.priority,
+              module: task.module,
+              tags: task.tags ?? [],
+              estimatedHours: task.estimatedHours,
+              riskLevel: task.riskLevel,
+            }} />
+            <TaskDeleteDuplicate taskId={task.id} taskTitle={task.title} />
+          </div>
         </div>
       </div>
 
@@ -435,6 +452,22 @@ export default async function TaskDetailPage({ params }: PageProps) {
                   ))}
                 </div>
               )}
+            </CardContent>
+          </Card>
+
+          {/* Time Tracking */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
+                <Timer className="h-4 w-4" />Suivi du temps
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <TimeTracker
+                taskId={task.id}
+                estimatedHours={task.estimatedHours ?? null}
+                actualHours={task.actualHours ?? null}
+              />
             </CardContent>
           </Card>
 

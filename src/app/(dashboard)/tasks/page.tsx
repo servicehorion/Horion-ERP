@@ -1,20 +1,17 @@
 import Link from "next/link";
 import {
-  AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight,
-  Clock, Kanban, ListTodo, Plus, Users, Zap,
-  TrendingUp, BarChart3, Target,
+  AlertTriangle, BarChart3, CheckCircle2, ChevronLeft, ChevronRight,
+  Clock, Calendar, Kanban, ListTodo, Target, TrendingUp, Users, Zap,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
 import { TaskStatusBadge, PriorityBadge } from "@/components/shared/status-badge";
 import { TaskCreateDialog } from "@/components/tasks/task-create-dialog";
 import { TaskFilters } from "@/components/tasks/task-filters";
+import { TaskTableClient } from "@/components/tasks/task-table-client";
 import { getTasks, getTaskDashboardData, getTeamMembers } from "@/lib/actions/task.actions";
 import { formatDate } from "@/lib/utils";
 import { cn } from "@/lib/utils";
@@ -80,12 +77,18 @@ export default async function TasksPage({ searchParams }: PageProps) {
             Opérations centralisées — priorités, urgences, collaboratif
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Button variant="outline" size="sm" asChild>
-            <Link href="/tasks/board">
-              <Kanban className="mr-2 h-4 w-4" />
-              Vue Kanban
-            </Link>
+            <Link href="/tasks/my"><Target className="mr-2 h-4 w-4" />Mes tâches</Link>
+          </Button>
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/tasks/board"><Kanban className="mr-2 h-4 w-4" />Kanban</Link>
+          </Button>
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/tasks/timeline"><Calendar className="mr-2 h-4 w-4" />Timeline</Link>
+          </Button>
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/tasks/analytics"><BarChart3 className="mr-2 h-4 w-4" />Analytics</Link>
           </Button>
           <TaskCreateDialog teamMembers={teamMembers} />
         </div>
@@ -94,7 +97,7 @@ export default async function TasksPage({ searchParams }: PageProps) {
       {/* KPI Strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
         <KpiCard label="Total actif" value={metrics.totalActive} icon={<ListTodo className="h-4 w-4 text-blue-600" />} color="blue" />
-        <KpiCard label="Mes tâches" value={metrics.myTasks} icon={<Target className="h-4 w-4 text-indigo-600" />} color="indigo" />
+        <KpiCard label="Mes tâches" value={metrics.myTasks} icon={<Target className="h-4 w-4 text-indigo-600" />} color="indigo" href="/tasks/my" />
         <KpiCard label="SLA dépassé" value={metrics.slaBreaches} icon={<AlertTriangle className="h-4 w-4 text-red-600" />} color="red" urgent={metrics.slaBreaches > 0} />
         <KpiCard label="Bloqué" value={metrics.blocked} icon={<Zap className="h-4 w-4 text-orange-600" />} color="orange" urgent={metrics.blocked > 0} />
         <KpiCard label="Approbation" value={metrics.waitingApproval} icon={<Clock className="h-4 w-4 text-yellow-600" />} color="yellow" />
@@ -108,7 +111,7 @@ export default async function TasksPage({ searchParams }: PageProps) {
           <AlertTriangle className="h-5 w-5 text-red-600 shrink-0" />
           <div className="flex-1 text-sm">
             <span className="font-semibold text-red-700 dark:text-red-400">
-              {metrics.slaBreaches} tâche{metrics.slaBreaches > 1 ? "s" : ""} en retard critique (SLA dépassé)
+              {metrics.slaBreaches} tâche{metrics.slaBreaches > 1 ? "s" : ""} en retard critique
             </span>
             <span className="text-red-600 dark:text-red-500 ml-2">— action immédiate requise</span>
           </div>
@@ -118,53 +121,41 @@ export default async function TasksPage({ searchParams }: PageProps) {
         </div>
       )}
 
-      {/* Dashboard panels — hidden when filters active */}
+      {/* Dashboard panels */}
       {!hasFilters && (
         <>
-          {/* Urgencies + My Tasks */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Urgencies */}
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-base">
                   <AlertTriangle className="h-4 w-4 text-red-500" />
                   Urgences à traiter
-                  {urgencies.length > 0 && (
-                    <Badge variant="destructive" className="ml-auto text-xs">{urgencies.length}</Badge>
-                  )}
+                  {urgencies.length > 0 && <Badge variant="destructive" className="ml-auto text-xs">{urgencies.length}</Badge>}
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-0">
                 {urgencies.length === 0 ? (
                   <div className="py-8 text-center text-sm text-muted-foreground">
                     <CheckCircle2 className="h-8 w-8 mx-auto mb-2 text-green-500" />
-                    Aucune urgence — tout est sous contrôle
+                    Aucune urgence
                   </div>
                 ) : (
                   <div className="divide-y">
                     {urgencies.slice(0, 6).map((task: any) => (
-                      <Link key={task.id} href={`/tasks/${task.id}`}
-                        className="flex items-start gap-3 p-3 hover:bg-muted/50 transition-colors">
+                      <Link key={task.id} href={`/tasks/${task.id}`} className="flex items-start gap-3 p-3 hover:bg-muted/50 transition-colors">
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-medium truncate">{task.title}</span>
-                            {task.slaBreach && (
-                              <Badge className="bg-red-100 text-red-700 text-xs shrink-0">SLA!</Badge>
-                            )}
+                            {task.slaBreach && <Badge className="bg-red-100 text-red-700 text-xs shrink-0">SLA!</Badge>}
                           </div>
                           <div className="flex items-center gap-2 mt-0.5">
                             <Badge variant="outline" className="text-xs capitalize">{task.module}</Badge>
                             <PriorityBadge priority={task.priority} />
-                            {task.slaDeadline && (
-                              <span className={cn("text-xs", task.slaBreach ? "text-red-600 font-medium" : "text-muted-foreground")}>
-                                {formatDate(task.slaDeadline, true)}
-                              </span>
-                            )}
                           </div>
                         </div>
                         {task.assignments?.[0]?.user && (
-                          <span className="text-xs text-muted-foreground shrink-0">
-                            {task.assignments[0].user.name}
-                          </span>
+                          <span className="text-xs text-muted-foreground shrink-0">{task.assignments[0].user.name}</span>
                         )}
                       </Link>
                     ))}
@@ -173,27 +164,25 @@ export default async function TasksPage({ searchParams }: PageProps) {
               </CardContent>
             </Card>
 
+            {/* My Tasks */}
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-base">
                   <Target className="h-4 w-4 text-indigo-500" />
                   Mes tâches
-                  {myTasks.length > 0 && (
-                    <Badge variant="secondary" className="ml-auto text-xs">{myTasks.length}</Badge>
-                  )}
+                  {myTasks.length > 0 && <Badge variant="secondary" className="ml-auto text-xs">{myTasks.length}</Badge>}
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-0">
                 {myTasks.length === 0 ? (
                   <div className="py-8 text-center text-sm text-muted-foreground">
                     <CheckCircle2 className="h-8 w-8 mx-auto mb-2 text-green-500" />
-                    Aucune tâche assignée — vous êtes à jour !
+                    Vous êtes à jour !
                   </div>
                 ) : (
                   <div className="divide-y">
                     {myTasks.slice(0, 6).map((task: any) => (
-                      <Link key={task.id} href={`/tasks/${task.id}`}
-                        className="flex items-start gap-3 p-3 hover:bg-muted/50 transition-colors">
+                      <Link key={task.id} href={`/tasks/${task.id}`} className="flex items-start gap-3 p-3 hover:bg-muted/50 transition-colors">
                         <div className="min-w-0 flex-1">
                           <div className="text-sm font-medium truncate">{task.title}</div>
                           <div className="flex items-center gap-2 mt-0.5">
@@ -214,13 +203,12 @@ export default async function TasksPage({ searchParams }: PageProps) {
             </Card>
           </div>
 
-          {/* Module Breakdown + Team Workload */}
+          {/* Module + Team */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <Card className="lg:col-span-2">
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-base">
-                  <BarChart3 className="h-4 w-4 text-blue-500" />
-                  Par module OS
+                  <BarChart3 className="h-4 w-4 text-blue-500" /> Par module OS
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -230,19 +218,13 @@ export default async function TasksPage({ searchParams }: PageProps) {
                     const pct = Math.round((m.total / maxTotal) * 100);
                     return (
                       <Link key={m.module} href={`/tasks?module=${m.module}`}>
-                        <div className="flex items-center gap-3 py-1.5 hover:opacity-80 transition-opacity cursor-pointer">
+                        <div className="flex items-center gap-3 py-1.5 hover:opacity-80 transition-opacity">
                           <span className="w-24 text-sm font-medium capitalize shrink-0">{m.module}</span>
-                          <div className="flex-1">
-                            <Progress value={pct} className="h-1.5" />
-                          </div>
+                          <div className="flex-1"><Progress value={pct} className="h-1.5" /></div>
                           <div className="flex items-center gap-1.5 text-xs shrink-0 min-w-[80px] justify-end">
                             <span className="font-bold">{m.total}</span>
-                            {m.slaBreaches > 0 && (
-                              <Badge className="bg-red-100 text-red-700 text-xs px-1 py-0">{m.slaBreaches}!</Badge>
-                            )}
-                            {m.blocked > 0 && (
-                              <Badge className="bg-orange-100 text-orange-700 text-xs px-1 py-0">{m.blocked} blq</Badge>
-                            )}
+                            {m.slaBreaches > 0 && <Badge className="bg-red-100 text-red-700 text-xs px-1 py-0">{m.slaBreaches}!</Badge>}
+                            {m.blocked > 0 && <Badge className="bg-orange-100 text-orange-700 text-xs px-1 py-0">{m.blocked} blq</Badge>}
                           </div>
                         </div>
                       </Link>
@@ -255,8 +237,7 @@ export default async function TasksPage({ searchParams }: PageProps) {
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-base">
-                  <Users className="h-4 w-4 text-purple-500" />
-                  Charge équipe
+                  <Users className="h-4 w-4 text-purple-500" /> Charge équipe
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -270,16 +251,12 @@ export default async function TasksPage({ searchParams }: PageProps) {
                           <span className="font-medium truncate max-w-[110px]">{member.userName}</span>
                           <div className="flex items-center gap-1 text-xs">
                             <span className="font-bold">{member.assignedCount}</span>
-                            {member.slaBreaches > 0 && (
-                              <span className="text-red-600 font-bold">⚠{member.slaBreaches}</span>
-                            )}
+                            {member.slaBreaches > 0 && <span className="text-red-600 font-bold">!{member.slaBreaches}</span>}
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
                           <Progress value={pct} className="h-1.5 flex-1" />
-                          <span className="text-xs text-muted-foreground w-8 text-right">
-                            {member.completedCount}✓
-                          </span>
+                          <span className="text-xs text-muted-foreground w-8 text-right">{member.completedCount}v</span>
                         </div>
                       </div>
                     );
@@ -299,7 +276,7 @@ export default async function TasksPage({ searchParams }: PageProps) {
                 { key: "LOW", label: "Bas", count: priorities.LOW, color: "text-gray-600", bg: "bg-gray-50 border-gray-200 dark:bg-gray-950/20" },
               ].map((p) => (
                 <Link key={p.key} href={`/tasks?priority=${p.key}`}>
-                  <Card className={cn("border cursor-pointer hover:shadow-sm transition-shadow", p.bg)}>
+                  <Card className={cn("border cursor-pointer hover:shadow-sm", p.bg)}>
                     <CardContent className="p-3 text-center">
                       <div className={cn("text-2xl font-bold", p.color)}>{p.count}</div>
                       <div className="text-xs text-muted-foreground mt-0.5">{p.label}</div>
@@ -312,7 +289,7 @@ export default async function TasksPage({ searchParams }: PageProps) {
         </>
       )}
 
-      {/* Task List with Filters */}
+      {/* Task list */}
       <div className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <h2 className="text-lg font-semibold">
@@ -328,67 +305,8 @@ export default async function TasksPage({ searchParams }: PageProps) {
           />
         </div>
 
-        <Card>
-          <CardContent className="p-0">
-            {tasks.length === 0 ? (
-              <div className="py-16 text-center">
-                <ListTodo className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-                <h3 className="text-lg font-semibold">Aucune tâche</h3>
-                <p className="text-muted-foreground text-sm mt-1">
-                  {hasFilters ? "Modifiez vos filtres" : "Les tâches sont générées automatiquement"}
-                </p>
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[38%]">Tâche</TableHead>
-                    <TableHead>Module</TableHead>
-                    <TableHead>Statut</TableHead>
-                    <TableHead>Priorité</TableHead>
-                    <TableHead>Assigné à</TableHead>
-                    <TableHead>Échéance SLA</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {tasks.map((task: any) => (
-                    <TableRow key={task.id} className="group">
-                      <TableCell>
-                        <Link href={`/tasks/${task.id}`}
-                          className="flex items-center gap-2 text-blue-600 hover:underline group-hover:underline">
-                          {task.slaBreach && <AlertTriangle className="h-3.5 w-3.5 text-red-500 shrink-0" />}
-                          <span className="font-medium line-clamp-1">{task.title}</span>
-                        </Link>
-                        {task.taskType && (
-                          <span className="text-xs text-muted-foreground ml-5">{task.taskType}</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="text-xs capitalize">{task.module}</Badge>
-                      </TableCell>
-                      <TableCell><TaskStatusBadge status={task.status} /></TableCell>
-                      <TableCell><PriorityBadge priority={task.priority} /></TableCell>
-                      <TableCell className="text-sm">
-                        {task.assignments?.[0]?.user?.name ?? <span className="text-muted-foreground">—</span>}
-                      </TableCell>
-                      <TableCell>
-                        {task.slaDeadline ? (
-                          <span className={cn("text-sm", task.slaBreach && "text-red-600 font-semibold")}>
-                            {formatDate(task.slaDeadline, true)}
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+        <TaskTableClient tasks={tasks} teamMembers={teamMembers} />
 
-        {/* Pagination */}
         {totalPages > 1 && (
           <div className="flex items-center justify-between">
             <p className="text-sm text-muted-foreground">
@@ -397,15 +315,13 @@ export default async function TasksPage({ searchParams }: PageProps) {
             <div className="flex items-center gap-2">
               {page > 1 && (
                 <Button variant="outline" size="sm" asChild>
-                  <Link href={buildUrl(searchParams, { page: page - 1 })}>
-                    <ChevronLeft className="h-4 w-4 mr-1" />Précédent
-                  </Link>
+                  <Link href={buildUrl(searchParams, { page: page - 1 })}><ChevronLeft className="h-4 w-4 mr-1" />Précédent</Link>
                 </Button>
               )}
               <div className="flex items-center gap-1">
                 {buildPageNumbers(page, totalPages).map((p, i) =>
                   p === "..." ? (
-                    <span key={`e-${i}`} className="px-2 text-muted-foreground">…</span>
+                    <span key={`e-${i}`} className="px-2 text-muted-foreground">...</span>
                   ) : (
                     <Button key={p} variant={p === page ? "default" : "outline"} size="sm" className="w-9 h-8 p-0" asChild>
                       <Link href={buildUrl(searchParams, { page: p as number })}>{p}</Link>
@@ -415,9 +331,7 @@ export default async function TasksPage({ searchParams }: PageProps) {
               </div>
               {page < totalPages && (
                 <Button variant="outline" size="sm" asChild>
-                  <Link href={buildUrl(searchParams, { page: page + 1 })}>
-                    Suivant<ChevronRight className="h-4 w-4 ml-1" />
-                  </Link>
+                  <Link href={buildUrl(searchParams, { page: page + 1 })}>Suivant<ChevronRight className="h-4 w-4 ml-1" /></Link>
                 </Button>
               )}
             </div>
@@ -428,8 +342,8 @@ export default async function TasksPage({ searchParams }: PageProps) {
   );
 }
 
-function KpiCard({ label, value, icon, color, urgent }: {
-  label: string; value: number; icon: React.ReactNode; color: string; urgent?: boolean;
+function KpiCard({ label, value, icon, color, urgent, href }: {
+  label: string; value: number; icon: React.ReactNode; color: string; urgent?: boolean; href?: string;
 }) {
   const colorMap: Record<string, string> = {
     blue: "border-blue-200 bg-blue-50/50 dark:bg-blue-950/10",
@@ -440,8 +354,8 @@ function KpiCard({ label, value, icon, color, urgent }: {
     green: "border-green-200 bg-green-50/50 dark:bg-green-950/10",
     teal: "border-teal-200 bg-teal-50/50 dark:bg-teal-950/10",
   };
-  return (
-    <Card className={cn("border", colorMap[color], urgent && "ring-2 ring-red-400 ring-offset-1")}>
+  const Inner = (
+    <Card className={cn("border", colorMap[color], urgent && "ring-2 ring-red-400 ring-offset-1", href && "cursor-pointer hover:shadow-sm transition-shadow")}>
       <CardContent className="p-3">
         <div className="flex items-center justify-between mb-1">
           {icon}
@@ -452,6 +366,7 @@ function KpiCard({ label, value, icon, color, urgent }: {
       </CardContent>
     </Card>
   );
+  return href ? <Link href={href}>{Inner}</Link> : Inner;
 }
 
 function buildUrl(current: Record<string, string | undefined>, overrides: Record<string, string | number | undefined>): string {
