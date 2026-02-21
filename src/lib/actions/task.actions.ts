@@ -101,6 +101,7 @@ export async function getTaskById(taskId: string) {
           include: { task: { select: { id: true, title: true, status: true, priority: true, module: true } } },
         },
         agentExecutions: { orderBy: { createdAt: "desc" }, take: 10 },
+        attachments: { include: { user: { select: { name: true } } }, orderBy: { createdAt: "desc" } },
         parent: { select: { id: true, title: true } },
       },
     });
@@ -302,25 +303,40 @@ export async function createManualTask(formData: {
 // COMMENTS (dedicated TaskComment model)
 // ============================================================
 
-export async function addTaskComment(taskId: string, content: string) {
+export async function addTaskComment(taskId: string, content: string, mentions: string[] = []) {
   try {
     const user = await getSession();
     const task = await prisma.task.findUnique({ where: { id: taskId } });
     if (!task || task.tenantId !== user.tenantId) return { error: "Tâche introuvable" };
 
     const comment = await prisma.taskComment.create({
-      data: { taskId, userId: user.id, content },
+      data: { taskId, userId: user.id, content, mentions },
     });
 
     // Also log in AuditLog for backward compatibility
     await AuditService.log({
       tenantId: user.tenantId, userId: user.id,
       action: "task.comment", entityType: "task", entityId: taskId,
-      newValue: { comment: content },
+      newValue: { comment: content, mentions },
     });
 
     // Notify watchers + assignees
     await NotificationService.onCommentAdded(taskId, user.tenantId, task.title, user.id, user.name);
+
+    // Notify mentioned users specifically
+    if (mentions.length > 0) {
+      await NotificationService.notifyMany(
+        mentions.filter((id) => id !== user.id),
+        {
+          tenantId: user.tenantId,
+          type: "MENTION",
+          title: `${user.name} vous a mentionné`,
+          message: content.slice(0, 200),
+          entityType: "task",
+          entityId: taskId,
+        }
+      );
+    }
 
     revalidatePath(`/tasks/${taskId}`);
     return { data: comment };
@@ -1063,6 +1079,159 @@ export async function exportTasksData(format: "csv") {
     }
 
     return { error: "Format non supporté" };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Erreur" };
+  }
+}
+
+// ============================================================
+// TASK ATTACHMENTS (links, files, documents)
+// ============================================================
+
+export async function getTaskAttachments(taskId: string) {
+  try {
+    const user = await getSession();
+    const task = await prisma.task.findUnique({ where: { id: taskId }, select: { tenantId: true } });
+    if (!task || task.tenantId !== user.tenantId) return { error: "Tâche introuvable" };
+
+    const attachments = await prisma.taskAttachment.findMany({
+      where: { taskId },
+      include: { user: { select: { name: true } } },
+      orderBy: { createdAt: "desc" },
+    });
+    return { data: attachments };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Erreur" };
+  }
+}
+
+export async function addTaskAttachment(taskId: string, data: {
+  name: string;
+  url: string;
+  type?: string;
+}) {
+  try {
+    const user = await getSession();
+    const task = await prisma.task.findUnique({ where: { id: taskId }, select: { tenantId: true, title: true } });
+    if (!task || task.tenantId !== user.tenantId) return { error: "Tâche introuvable" };
+
+    if (!data.name.trim() || !data.url.trim()) return { error: "Nom et URL requis" };
+
+    const attachment = await prisma.taskAttachment.create({
+      data: {
+        taskId,
+        userId: user.id,
+        name: data.name.trim(),
+        url: data.url.trim(),
+        type: data.type ?? "link",
+      },
+      include: { user: { select: { name: true } } },
+    });
+
+    // Notify watchers
+    await NotificationService.notifyTaskWatchers(
+      taskId,
+      {
+        tenantId: user.tenantId,
+        type: "ATTACHMENT_ADDED",
+        title: `Pièce jointe ajoutée: ${task.title}`,
+        message: `${user.name} a ajouté "${data.name}"`,
+      },
+      user.id
+    );
+
+    await AuditService.log({
+      tenantId: user.tenantId, userId: user.id,
+      action: "task.attachment_added", entityType: "task", entityId: taskId,
+      newValue: { name: data.name, url: data.url },
+    });
+
+    revalidatePath(`/tasks/${taskId}`);
+    return { data: attachment };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Erreur" };
+  }
+}
+
+export async function removeTaskAttachment(attachmentId: string) {
+  try {
+    const user = await getSession();
+    const attachment = await prisma.taskAttachment.findUnique({
+      where: { id: attachmentId },
+      include: { task: { select: { tenantId: true } } },
+    });
+    if (!attachment || attachment.task.tenantId !== user.tenantId) return { error: "Pièce jointe introuvable" };
+
+    await prisma.taskAttachment.delete({ where: { id: attachmentId } });
+
+    revalidatePath(`/tasks/${attachment.taskId}`);
+    return { data: { success: true } };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Erreur" };
+  }
+}
+
+// ============================================================
+// GANTT CHART DATA
+// ============================================================
+
+export async function getGanttData(options?: { module?: string }) {
+  try {
+    const user = await getSession();
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth() - 1, 1); // 1 month ago
+    const end = new Date(now.getFullYear(), now.getMonth() + 3, 0);   // 3 months ahead
+
+    const tasks = await prisma.task.findMany({
+      where: {
+        tenantId: user.tenantId,
+        parentTaskId: null,
+        status: { notIn: ["CANCELLED"] },
+        ...(options?.module && options.module !== "all" && { module: options.module }),
+        OR: [
+          { slaDeadline: { gte: start, lte: end } },
+          { createdAt: { gte: start } },
+        ],
+      },
+      include: {
+        assignments: { include: { user: { select: { name: true } } } },
+        _count: { select: { children: true } },
+      },
+      orderBy: [{ module: "asc" }, { createdAt: "asc" }],
+      take: 200,
+    });
+
+    // Build Gantt rows
+    const rows = tasks.map((t) => {
+      const startDate = t.startedAt ?? t.createdAt;
+      const endDate = t.slaDeadline ?? t.completedAt ?? new Date(startDate.getTime() + 7 * 86400000);
+      return {
+        id: t.id,
+        title: t.title,
+        module: t.module,
+        status: t.status,
+        priority: t.priority,
+        startDate,
+        endDate,
+        assignee: t.assignments?.[0]?.user?.name ?? null,
+        subtaskCount: t._count.children,
+        slaBreach: t.slaBreach,
+        completedAt: t.completedAt,
+      };
+    });
+
+    // Get unique modules for filter
+    const modules = [...new Set(rows.map((r) => r.module))];
+
+    return {
+      data: {
+        rows,
+        modules,
+        rangeStart: start,
+        rangeEnd: end,
+        today: now,
+      },
+    };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur" };
   }

@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import {
   AlertTriangle, ArrowLeft, ArrowRight, Bot, CheckCircle2, Clock, ExternalLink,
-  Eye, GitBranch, Layers, ListTree, MessageSquare, Plus,
+  Eye, GitBranch, Layers, ListTree, MessageSquare, Paperclip, Plus,
   ShieldCheck, Tag, User, Calendar, Copy, Trash2, Timer,
 } from "lucide-react";
 
@@ -16,6 +16,7 @@ import { TaskDetailActions } from "@/components/tasks/task-detail-actions";
 import { TaskEditDialog } from "@/components/tasks/task-edit-dialog";
 import { TimeTracker } from "@/components/tasks/time-tracker";
 import { TaskDeleteDuplicate } from "@/components/tasks/task-delete-duplicate";
+import { TaskAttachments } from "@/components/tasks/task-attachments";
 import { getTaskById, getTaskActivity, getTeamMembers } from "@/lib/actions/task.actions";
 import { formatDate } from "@/lib/utils";
 import { cn } from "@/lib/utils";
@@ -50,6 +51,7 @@ export default async function TaskDetailPage({ params }: PageProps) {
   const watchers = task.watchers ?? [];
   const agentExecs = task.agentExecutions ?? [];
   const tags = task.tags ?? [];
+  const attachments = (task as any).attachments ?? [];
 
   // Subtask progress
   const completedChildren = children.filter((c: any) => c.status === "COMPLETED" || c.status === "CANCELLED").length;
@@ -359,7 +361,12 @@ export default async function TaskDetailPage({ params }: PageProps) {
                 </div>
               )}
               <Separator />
-              <TaskDetailActions taskId={task.id} commentMode />
+              <TaskDetailActions
+                taskId={task.id}
+                commentMode
+                teamMembers={teamMembers}
+                mentionableMembers={teamMembers}
+              />
             </CardContent>
           </Card>
         </div>
@@ -471,6 +478,22 @@ export default async function TaskDetailPage({ params }: PageProps) {
             </CardContent>
           </Card>
 
+          {/* Attachments */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
+                <Paperclip className="h-4 w-4" />
+                Pièces jointes
+                {attachments.length > 0 && (
+                  <span className="ml-auto text-xs font-normal">({attachments.length})</span>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <TaskAttachments taskId={task.id} attachments={attachments} />
+            </CardContent>
+          </Card>
+
           {/* Watchers */}
           <Card>
             <CardHeader className="pb-3">
@@ -532,6 +555,7 @@ export default async function TaskDetailPage({ params }: PageProps) {
           </Card>
         </div>
       </div>
+
     </div>
   );
 }

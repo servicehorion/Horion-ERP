@@ -60,6 +60,7 @@ model User {
   auditLogs       AuditLog[]
   taskComments    TaskComment[]
   taskWatchers    TaskWatcher[]
+  taskAttachments TaskAttachment[]
   notifications   Notification[]
 
   @@index([tenantId])
@@ -926,6 +927,7 @@ model Task {
   comments         TaskComment[]
   watchers         TaskWatcher[]
   agentExecutions  AgentExecution[]
+  attachments      TaskAttachment[]
   // Dependencies
   dependencies     TaskDependency[]  @relation("TaskDependencies")
   dependents       TaskDependency[]  @relation("TaskDependents")
@@ -995,6 +997,7 @@ model TaskComment {
   taskId    String
   userId    String
   content   String
+  mentions  String[] @default([]) // user IDs mentioned with @
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1003,6 +1006,25 @@ model TaskComment {
 
   @@index([taskId, createdAt])
   @@map("task_comments")
+}
+
+// ── Task Attachments ──────────────────────────────────────────
+
+model TaskAttachment {
+  id        String   @id @default(cuid())
+  taskId    String
+  userId    String
+  name      String
+  url       String
+  type      String   @default("link") // link, file, image, document
+  size      Int?     // bytes
+  createdAt DateTime @default(now())
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([taskId])
+  @@map("task_attachments")
 }
 
 // ── Task Watchers ──────────────────────────────────────────────
@@ -1156,10 +1178,12 @@ enum NotificationType {
   APPROVAL_REQUIRED
   APPROVAL_DECIDED
   COMMENT_ADDED
+  MENTION
   AGENT_COMPLETED
   AGENT_FAILED
   SUBTASK_COMPLETED
   DEPENDENCY_RESOLVED
+  ATTACHMENT_ADDED
 }
 
 // ============================================================

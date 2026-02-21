@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { TaskStatusBadge } from "@/components/shared/status-badge";
+import { MentionInput } from "@/components/tasks/mention-input";
 import {
   updateTaskStatus, assignTask, addTaskComment, approveTask,
   createSubtask, watchTask, unwatchTask,
@@ -49,6 +50,8 @@ interface TaskDetailActionsProps {
   subtaskMode?: boolean;
   watchMode?: boolean;
   isWatching?: boolean;
+  // commentMode extras
+  mentionableMembers?: { id: string; name: string }[];
 }
 
 export function TaskDetailActions({
@@ -62,11 +65,13 @@ export function TaskDetailActions({
   subtaskMode = false,
   watchMode = false,
   isWatching = false,
+  mentionableMembers = [],
 }: TaskDetailActionsProps) {
   const router = useRouter();
 
   // ── Comment mode ──────────────────────────────────────────────────────────
   const [comment, setComment] = useState("");
+  const [commentMentions, setCommentMentions] = useState<string[]>([]);
   const [submittingComment, setSubmittingComment] = useState(false);
 
   // ── Subtask mode ──────────────────────────────────────────────────────────
@@ -88,14 +93,26 @@ export function TaskDetailActions({
 
   // ── Comment mode render ───────────────────────────────────────────────────
   if (commentMode) {
+    const members = mentionableMembers.length > 0 ? mentionableMembers : teamMembers;
     return (
       <div className="space-y-2">
-        <Textarea
-          value={comment}
-          onChange={(e) => setComment(e.target.value)}
-          placeholder="Ajouter un commentaire..."
-          rows={3}
-        />
+        {members.length > 0 ? (
+          <MentionInput
+            value={comment}
+            onChange={setComment}
+            onMentionsChange={setCommentMentions}
+            teamMembers={members}
+            placeholder="Ajouter un commentaire... (@nom pour mentionner)"
+            rows={3}
+          />
+        ) : (
+          <Textarea
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            placeholder="Ajouter un commentaire..."
+            rows={3}
+          />
+        )}
         <div className="flex justify-end">
           <Button
             size="sm"
@@ -104,12 +121,13 @@ export function TaskDetailActions({
               if (!comment.trim()) return;
               setSubmittingComment(true);
               try {
-                const res = await addTaskComment(taskId, comment.trim());
+                const res = await addTaskComment(taskId, comment.trim(), commentMentions);
                 if (res.error) {
                   toast.error(res.error);
                 } else {
                   toast.success("Commentaire ajouté");
                   setComment("");
+                  setCommentMentions([]);
                   router.refresh();
                 }
               } catch {
