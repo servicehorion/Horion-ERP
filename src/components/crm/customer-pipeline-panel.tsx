@@ -1,10 +1,9 @@
 "use client"
 
 import { CustomerPipelineIntent } from "@prisma/client"
-import { TrendingUp, Plus, Calendar, DollarSign, Target } from "lucide-react"
+import { TrendingUp, Calendar, Target, ArrowUpRight } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import {
   Table,
@@ -17,15 +16,19 @@ import {
 import { formatCurrency } from "@/config/currencies"
 import { formatDate } from "@/lib/utils"
 import { cn } from "@/lib/utils"
+import { PipelineIntentDialog } from "@/components/crm/pipeline-intent-dialog"
+import { PipelineIntentStatusSelect } from "@/components/crm/pipeline-intent-status-select"
 
 interface CustomerPipelinePanelProps {
   pipelineIntents: CustomerPipelineIntent[]
   contactId?: string
+  demoMode?: boolean
 }
 
 export function CustomerPipelinePanel({
   pipelineIntents,
   contactId,
+  demoMode,
 }: CustomerPipelinePanelProps) {
   const activeIntents = pipelineIntents.filter(
     (intent) => intent.status === "active"
@@ -45,6 +48,12 @@ export function CustomerPipelinePanel({
       return { variant: "secondary" as const, label: "Moyenne", color: "text-yellow-600" }
     }
     return { variant: "outline" as const, label: "Faible", color: "text-red-600" }
+  }
+
+  const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
+    active: { label: "Active", color: "bg-blue-100 text-blue-800" },
+    converted: { label: "Convertie", color: "bg-green-100 text-green-800" },
+    lost: { label: "Perdue", color: "bg-red-100 text-red-800" },
   }
 
   return (
@@ -72,15 +81,12 @@ export function CustomerPipelinePanel({
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Intentions de Commande</CardTitle>
-          <Button size="sm" className="gap-2">
-            <Plus className="h-4 w-4" />
-            Ajouter une intention
-          </Button>
+          {contactId && <PipelineIntentDialog contactId={contactId} demoMode={demoMode} />}
         </CardHeader>
         <CardContent>
-          {activeIntents.length === 0 ? (
+          {pipelineIntents.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              Aucune intention active
+              Aucune intention
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -91,16 +97,18 @@ export function CustomerPipelinePanel({
                     <TableHead>Date estimée</TableHead>
                     <TableHead>Montant</TableHead>
                     <TableHead>Probabilité</TableHead>
+                    <TableHead>Statut</TableHead>
                     <TableHead className="text-right">Revenu attendu</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {activeIntents.map((intent) => {
+                  {pipelineIntents.map((intent) => {
                     const probability = Number(intent.probability)
                     const probabilityPercent = probability * 100
                     const estimatedSize = Number(intent.estimatedSize || 0)
                     const expectedRevenue = Number(intent.expectedRevenue)
                     const probBadge = getProbabilityBadge(probability)
+                    const statusConfig = STATUS_CONFIG[intent.status] || { label: intent.status, color: "bg-gray-100 text-gray-800" }
 
                     return (
                       <TableRow key={intent.id}>
@@ -145,12 +153,35 @@ export function CustomerPipelinePanel({
                             />
                           </div>
                         </TableCell>
+                        <TableCell>
+                          <div className="space-y-2">
+                            <Badge className={`${statusConfig.color} text-xs`}>
+                              {statusConfig.label}
+                            </Badge>
+                            <PipelineIntentStatusSelect
+                              intentId={intent.id}
+                              currentStatus={intent.status}
+                              demoMode={demoMode}
+                            />
+                          </div>
+                        </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <div className="font-semibold">
-                              {formatCurrency(expectedRevenue, intent.currency)}
+                          <div className="flex flex-col items-end gap-1.5">
+                            <div className="flex items-center justify-end gap-2">
+                              <div className="font-semibold">
+                                {formatCurrency(expectedRevenue, intent.currency)}
+                              </div>
+                              <Target className={cn("h-4 w-4", probBadge.color)} />
                             </div>
-                            <Target className={cn("h-4 w-4", probBadge.color)} />
+                            {contactId && intent.status === "active" && !demoMode && (
+                              <a
+                                href={`/orders/new?contactId=${contactId}`}
+                                className="text-xs text-primary hover:underline inline-flex items-center gap-1"
+                              >
+                                Créer commande
+                                <ArrowUpRight className="h-3 w-3" />
+                              </a>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>

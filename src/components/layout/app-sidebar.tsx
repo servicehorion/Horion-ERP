@@ -25,10 +25,15 @@ export function AppSidebar() {
 
   return (
     <Sidebar>
-      <SidebarHeader className="border-b px-6 py-4">
-        <Link href="/dashboard" className="flex items-center gap-2">
-          <span className="text-xl font-bold">Horion</span>
-          <span className="text-xs text-muted-foreground font-medium bg-muted px-2 py-0.5 rounded">ERP</span>
+      <SidebarHeader className="border-b border-sidebar-border px-6 py-4">
+        <Link href="/dashboard" className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+            <span className="text-lg font-bold">H</span>
+          </div>
+          <div className="flex flex-col leading-tight">
+            <span className="text-sm font-semibold tracking-wide text-sidebar-foreground">HORION</span>
+            <span className="text-xs text-sidebar-foreground/60">ERP</span>
+          </div>
         </Link>
       </SidebarHeader>
       <SidebarContent>

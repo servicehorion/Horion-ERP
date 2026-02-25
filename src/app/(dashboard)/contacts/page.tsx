@@ -16,7 +16,7 @@ export const metadata = {
 
 export default async function ContactsPage() {
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Contacts</h1>
@@ -26,7 +26,7 @@ export default async function ContactsPage() {
         </div>
         <div className="flex gap-2">
           <ExportContactsButton />
-          <Button asChild>
+          <Button className="bg-accent text-accent-foreground hover:bg-accent/90" asChild>
             <Link href="/contacts/new">
               <Plus className="mr-2 h-4 w-4" />
               Nouveau contact

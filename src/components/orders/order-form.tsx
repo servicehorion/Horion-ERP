@@ -31,15 +31,17 @@ import { CURRENCIES } from "@/config/currencies";
 
 interface OrderFormProps {
   contacts: { id: string; name: string }[];
+  initialContactId?: string;
 }
 
-export function OrderForm({ contacts }: OrderFormProps) {
+export function OrderForm({ contacts, initialContactId }: OrderFormProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<CreateOrderInput>({
     resolver: zodResolver(createOrderSchema) as any,
     defaultValues: {
+      contactId: initialContactId || "",
       items: [
         {
           description: "",

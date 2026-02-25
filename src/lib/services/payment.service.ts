@@ -119,10 +119,17 @@ export class PaymentService {
       }
     }
 
-    return prisma.payment.update({
+    const payment = await prisma.payment.update({
       where: { id: paymentId },
       data: { status: "CANCELLED" },
     });
+
+    await emitEvent("payment.cancelled", "payment", payment.id, {
+      orderId: payment.orderId,
+      amount: Number(payment.amount),
+    });
+
+    return payment;
   }
 
   static async getOrderPaymentSummary(orderId: string) {

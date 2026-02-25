@@ -70,7 +70,7 @@ export function DataTable<TData, TValue>({
   });
 
   return (
-    <div className="space-y-4">
+    <div data-slot="data-table" className="space-y-4">
       <div className="flex items-center justify-between">
         {searchKey && (
           <div className="relative flex-1 max-w-sm">
@@ -111,7 +111,7 @@ export function DataTable<TData, TValue>({
         </DropdownMenu>
       </div>
 
-      <div className="rounded-md border">
+      <div data-slot="data-table-surface" className="rounded-md border bg-card">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (

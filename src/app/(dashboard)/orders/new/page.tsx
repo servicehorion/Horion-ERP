@@ -12,7 +12,11 @@ export const metadata = {
   description: "Créer une nouvelle commande d'importation",
 };
 
-export default async function NewOrderPage() {
+export default async function NewOrderPage({
+  searchParams,
+}: {
+  searchParams?: { contactId?: string };
+}) {
   const session = await auth();
 
   if (!session?.user?.tenantId) {
@@ -50,7 +54,7 @@ export default async function NewOrderPage() {
       </div>
 
       <div className="mx-auto max-w-4xl">
-        <OrderForm contacts={contacts} />
+        <OrderForm contacts={contacts} initialContactId={searchParams?.contactId} />
       </div>
     </div>
   );

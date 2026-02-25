@@ -62,6 +62,12 @@ model User {
   taskWatchers    TaskWatcher[]
   taskAttachments TaskAttachment[]
   notifications   Notification[]
+  ownedContacts   Contact[]         @relation("ContactOwner")
+  onboardedContacts Contact[]       @relation("ContactOnboardedBy")
+  contactCollaborations ContactCollaborator[]
+  ownedLeads      Lead[]            @relation("LeadOwner")
+  onboardedLeads  Lead[]            @relation("LeadOnboardedBy")
+  leadCollaborations LeadCollaborator[]
 
   @@index([tenantId])
   @@map("users")
@@ -111,14 +117,19 @@ model Contact {
   whatsapp   String?
   city       String?
   country    String      @default("CG")
-  notes      String?
-  trustScore Int         @default(50)
-  tags       Json        @default("[]")
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
+    notes      String?
+    trustScore Int         @default(50)
+    tags       Json        @default("[]")
+    ownerId    String?
+    onboardedById String?
+    createdAt  DateTime    @default(now())
+    updatedAt  DateTime    @updatedAt
 
-  tenant               Tenant                     @relation(fields: [tenantId], references: [id])
-  orders               Order[]
+    tenant               Tenant                     @relation(fields: [tenantId], references: [id])
+    owner                User?                      @relation("ContactOwner", fields: [ownerId], references: [id])
+    onboardedBy          User?                      @relation("ContactOnboardedBy", fields: [onboardedById], references: [id])
+    collaborators        ContactCollaborator[]
+    orders               Order[]
   leads                Lead[]
   conversations        Conversation[]
   communityMemberships CommunityMembership[]
@@ -131,10 +142,12 @@ model Contact {
   supplyChains         CustomerSupplyChain[]
   segmentations        CustomerSegmentation[]
 
-  @@index([tenantId])
-  @@index([tenantId, type])
-  @@map("contacts")
-}
+    @@index([tenantId])
+    @@index([tenantId, type])
+    @@index([ownerId])
+    @@index([onboardedById])
+    @@map("contacts")
+  }
 
 enum ContactType {
   CLIENT
@@ -152,18 +165,25 @@ model Lead {
   status         LeadStatus @default(NEW)
   source         String?
   description    String?
-  estimatedValue Decimal?   @db.Decimal(15, 2)
-  currency       String     @default("XAF")
-  category       String?
-  assignedTo     String?
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
+    estimatedValue Decimal?   @db.Decimal(15, 2)
+    currency       String     @default("XAF")
+    category       String?
+    assignedTo     String?
+    ownerId        String?
+    onboardedById  String?
+    createdAt      DateTime   @default(now())
+    updatedAt      DateTime   @updatedAt
 
-  contact Contact @relation(fields: [contactId], references: [id])
+    contact       Contact            @relation(fields: [contactId], references: [id])
+    owner         User?              @relation("LeadOwner", fields: [ownerId], references: [id])
+    onboardedBy   User?              @relation("LeadOnboardedBy", fields: [onboardedById], references: [id])
+    collaborators LeadCollaborator[]
 
-  @@index([contactId])
-  @@map("leads")
-}
+    @@index([contactId])
+    @@index([ownerId])
+    @@index([onboardedById])
+    @@map("leads")
+  }
 
 enum LeadStatus {
   NEW
@@ -172,6 +192,34 @@ enum LeadStatus {
   QUOTED
   WON
   LOST
+}
+
+model ContactCollaborator {
+  id        String   @id @default(cuid())
+  contactId String
+  userId    String
+  createdAt DateTime @default(now())
+
+  contact Contact @relation(fields: [contactId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@unique([contactId, userId])
+  @@index([userId])
+  @@map("contact_collaborators")
+}
+
+model LeadCollaborator {
+  id        String   @id @default(cuid())
+  leadId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  lead Lead @relation(fields: [leadId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([leadId, userId])
+  @@index([userId])
+  @@map("lead_collaborators")
 }
 
 model Conversation {
@@ -1184,6 +1232,13 @@ enum NotificationType {
   SUBTASK_COMPLETED
   DEPENDENCY_RESOLVED
   ATTACHMENT_ADDED
+  CONTACT_CREATED
+  CONTACT_UPDATED
+  CONTACT_ASSIGNED
+  LEAD_CREATED
+  LEAD_UPDATED
+  LEAD_ASSIGNED
+  LEAD_CONVERTED
 }
 
 // ============================================================

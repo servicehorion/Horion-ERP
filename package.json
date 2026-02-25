@@ -12,6 +12,7 @@
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
     "db:generate": "prisma generate",
+    "crm:recalculate": "tsx scripts/recalculate-customer-intelligence.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"

@@ -3,8 +3,58 @@ import type { Event } from "@prisma/client";
 import { TaskDependencyService } from "@/lib/services/task-dependency.service";
 import { NotificationService } from "@/lib/services/notification.service";
 import { SubtaskService } from "@/lib/services/subtask.service";
+import { CustomerIntelligenceService } from "@/lib/services/customer-intelligence.service";
 
 type EventHandler = (event: Event) => Promise<void>;
+
+async function recalcCustomerIntelligence(contactId?: string | null) {
+  if (!contactId) return;
+  await CustomerIntelligenceService.recalculateAll(contactId);
+}
+
+const handleCustomerIntelligenceFromOrder: EventHandler = async (event) => {
+  const payload = event.payload as Record<string, unknown>;
+  const contactId = payload.contactId as string | undefined;
+
+  if (contactId) {
+    await recalcCustomerIntelligence(contactId);
+    return;
+  }
+
+  const order = await prisma.order.findUnique({
+    where: { id: event.entityId },
+    select: { contactId: true },
+  });
+  await recalcCustomerIntelligence(order?.contactId);
+};
+
+const handleCustomerIntelligenceFromPayment: EventHandler = async (event) => {
+  const payload = event.payload as Record<string, unknown>;
+  const orderId = payload.orderId as string | undefined;
+
+  if (orderId) {
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      select: { contactId: true },
+    });
+    await recalcCustomerIntelligence(order?.contactId);
+    return;
+  }
+
+  const payment = await prisma.payment.findUnique({
+    where: { id: event.entityId },
+    select: { order: { select: { contactId: true } } },
+  });
+  await recalcCustomerIntelligence(payment?.order?.contactId);
+};
+
+const handleCustomerIntelligenceFromDispute: EventHandler = async (event) => {
+  const dispute = await prisma.dispute.findUnique({
+    where: { id: event.entityId },
+    select: { order: { select: { contactId: true } } },
+  });
+  await recalcCustomerIntelligence(dispute?.order?.contactId);
+};
 
 // ── Task Creation Helper ────────────────────────────────────────
 
@@ -338,8 +388,12 @@ const handleSLABreach: EventHandler = async (event) => {
 // ── Registry ────────────────────────────────────────────────────
 
 export const eventHandlerRegistry: Record<string, EventHandler[]> = {
-  "order.created": [handleOrderCreated],
-  "order.status_changed": [handleOrderStatusChanged],
+  "order.created": [handleOrderCreated, handleCustomerIntelligenceFromOrder],
+  "order.status_changed": [handleOrderStatusChanged, handleCustomerIntelligenceFromOrder],
+  "payment.confirmed": [handleCustomerIntelligenceFromPayment],
+  "payment.cancelled": [handleCustomerIntelligenceFromPayment],
+  "dispute.created": [handleCustomerIntelligenceFromDispute],
+  "dispute.resolved": [handleCustomerIntelligenceFromDispute],
   "task.completed": [handleTaskCompleted],
   "task.blocked": [handleTaskBlocked],
   "task.sla_breach": [handleSLABreach],

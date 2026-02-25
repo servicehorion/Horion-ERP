@@ -1,4 +1,4 @@
-import { ArrowLeft, Phone, Mail, MessageCircle, MapPin, RefreshCw, TrendingUp, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Phone, Mail, MessageCircle, MapPin, RefreshCw, TrendingUp, AlertTriangle, Calendar, Clock, Download, Edit, User, Users } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -13,7 +13,10 @@ import { CustomerFinancialPanel } from "@/components/crm/customer-financial-pane
 import { CustomerRiskMeter } from "@/components/crm/customer-risk-meter";
 import { CustomerPipelinePanel } from "@/components/crm/customer-pipeline-panel";
 import { CustomerAIBrain } from "@/components/crm/customer-ai-brain";
+import { SegmentManager } from "@/components/crm/segment-manager";
+import { ContactTimeline } from "@/components/crm/contact-timeline";
 import { getCustomerIntelligence, recalculateCustomerIntelligence } from "@/lib/actions/customer-intelligence.actions";
+import { getContactTimeline } from "@/lib/actions/contact.actions";
 import { formatDate } from "@/lib/utils";
 import { formatCurrency } from "@/config/currencies";
 
@@ -48,12 +51,23 @@ const SEGMENT_LABELS: Record<string, string> = {
 
 export default async function ContactDetailPage({ params }: Props) {
   const { id } = await params;
-  const result = await getCustomerIntelligence(id);
+  const [result, timelineResult] = await Promise.all([
+    getCustomerIntelligence(id),
+    getContactTimeline(id),
+  ]);
 
   if (result.error || !result.data) notFound();
 
   const contact = result.data;
+  const timelineItems = timelineResult.data || [];
   const { financialMetrics, riskProfile, pipelineIntents, aiProfile, segmentations, supplyChains } = contact;
+  const ownerName = (contact as any).owner?.name || (contact as any).owner?.email;
+  const onboardedName = (contact as any).onboardedBy?.name || (contact as any).onboardedBy?.email;
+  const collaboratorNames = Array.isArray((contact as any).collaborators)
+    ? (contact as any).collaborators
+        .map((c: any) => c.user?.name || c.user?.email || c.userId)
+        .filter(Boolean)
+    : [];
 
   // Calculate quick stats
   const totalPipelineRevenue = pipelineIntents?.reduce(
@@ -61,44 +75,91 @@ export default async function ContactDetailPage({ params }: Props) {
     0
   ) || 0;
 
+  const whatsappNumber = (contact.whatsapp || contact.phone || "").replace(/\D/g, "");
+  const whatsappHref = whatsappNumber ? `https://wa.me/${whatsappNumber}` : undefined;
+
   return (
-    <div className="space-y-6">
-      {/* Header with Customer Intelligence Badge */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
-            <Link href="/contacts">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-          </Button>
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold">{contact.name}</h1>
-              {riskProfile && riskProfile.globalRiskScore > 60 && (
-                <Badge variant="destructive" className="gap-1">
-                  <AlertTriangle className="h-3 w-3" />
-                  Risque Élevé
-                </Badge>
+    <div className="space-y-8">
+      {/* Header */}
+      <div className="-mx-6 -mt-6 border-b bg-white px-6 py-4 sticky top-0 z-20">
+        <div className="flex items-center justify-between gap-6">
+          <div className="flex items-center gap-4">
+            <Button variant="outline" size="icon" asChild>
+              <Link href="/contacts">
+                <ArrowLeft className="h-4 w-4" />
+              </Link>
+            </Button>
+            <div>
+              <div className="flex items-center gap-3">
+                <h1 className="text-2xl font-bold text-[#010150]">{contact.name}</h1>
+                {riskProfile && riskProfile.globalRiskScore > 60 && (
+                  <Badge variant="destructive" className="gap-1">
+                    <AlertTriangle className="h-3 w-3" />
+                    Risque Élevé
+                  </Badge>
+                )}
+                <Badge className="bg-[#DBA000] text-[#010150]">{contact.type}</Badge>
+              </div>
+              <div className="mt-1 flex flex-wrap items-center gap-4 text-sm text-gray-600">
+                {contact.city && (
+                  <span className="flex items-center gap-1">
+                    <MapPin className="h-4 w-4" />
+                    {contact.city}, {contact.country}
+                  </span>
+                )}
+                <span className="flex items-center gap-1">
+                  <Calendar className="h-4 w-4" />
+                  Client depuis {formatDate(contact.createdAt)}
+                </span>
+                <span className="flex items-center gap-1">
+                  <Clock className="h-4 w-4" />
+                  Dernier contact {formatDate(contact.updatedAt)}
+                </span>
+              </div>
+              {contact.company && (
+                <p className="text-sm text-muted-foreground mt-1">{contact.company}</p>
               )}
             </div>
-            {contact.company && (
-              <p className="text-lg text-muted-foreground">{contact.company}</p>
-            )}
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <form
-            action={async () => {
-              "use server";
-              await recalculateCustomerIntelligence(id);
-            }}
-          >
-            <Button variant="outline" size="sm" type="submit">
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Recalculer Intelligence
+          <div className="flex flex-wrap items-center gap-2">
+            <form
+              action={async () => {
+                "use server";
+                await recalculateCustomerIntelligence(id);
+              }}
+            >
+              <Button variant="outline" size="sm" type="submit">
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Recalculer Intelligence
+              </Button>
+            </form>
+            {whatsappHref && (
+              <Button asChild size="sm" className="bg-green-600 hover:bg-green-700 text-white">
+                <a href={whatsappHref} target="_blank" rel="noreferrer">
+                  <MessageCircle className="h-4 w-4 mr-2" />
+                  WhatsApp
+                </a>
+              </Button>
+            )}
+            {contact.email && (
+              <Button asChild size="sm" variant="outline">
+                <a href={`mailto:${contact.email}`}>
+                  <Mail className="h-4 w-4 mr-2" />
+                  Email
+                </a>
+              </Button>
+            )}
+            <Button asChild size="sm" variant="outline">
+              <Link href={`/contacts/${contact.id}/edit`}>
+                <Edit className="h-4 w-4 mr-2" />
+                Editer
+              </Link>
             </Button>
-          </form>
-          <Badge variant="secondary">{contact.type}</Badge>
+            <Button size="sm" className="bg-[#010150] text-white hover:bg-[#010150]/90">
+              <Download className="h-4 w-4 mr-2" />
+              Exporter
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -112,6 +173,16 @@ export default async function ContactDetailPage({ params }: Props) {
               className={SEGMENT_COLORS[seg.segment] || ""}
             >
               {SEGMENT_LABELS[seg.segment] || seg.segment}
+            </Badge>
+          ))}
+        </div>
+      )}
+
+      {(contact as any).tags && Array.isArray((contact as any).tags) && (contact as any).tags.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {(contact as any).tags.map((tag: string) => (
+            <Badge key={tag} variant="secondary" className="text-xs">
+              #{tag}
             </Badge>
           ))}
         </div>
@@ -160,18 +231,42 @@ export default async function ContactDetailPage({ params }: Props) {
         </Card>
       </div>
 
+      <SegmentManager
+        contactId={contact.id}
+        currentSegments={(segmentations || []).map((s) => s.segment)}
+        financialMetrics={financialMetrics as any}
+        riskProfile={riskProfile as any}
+      />
+
       <Separator />
 
       {/* Tabbed Intelligence Panels */}
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-7">
-          <TabsTrigger value="overview">Vue d'ensemble</TabsTrigger>
-          <TabsTrigger value="financial">Intelligence Financière</TabsTrigger>
-          <TabsTrigger value="risk">Risque & Exposition</TabsTrigger>
-          <TabsTrigger value="pipeline">Pipeline & Futur</TabsTrigger>
-          <TabsTrigger value="ai">IA & Stratégie</TabsTrigger>
-          <TabsTrigger value="supply">Supply Chain</TabsTrigger>
-          <TabsTrigger value="history">Historique</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-8 border border-border/80 bg-card shadow-sm">
+          <TabsTrigger className="text-xs sm:text-sm data-[state=active]:bg-accent/10 data-[state=active]:text-primary" value="overview">
+            Vue d'ensemble
+          </TabsTrigger>
+          <TabsTrigger className="text-xs sm:text-sm data-[state=active]:bg-accent/10 data-[state=active]:text-primary" value="financial">
+            Intelligence Financière
+          </TabsTrigger>
+          <TabsTrigger className="text-xs sm:text-sm data-[state=active]:bg-accent/10 data-[state=active]:text-primary" value="risk">
+            Risque & Exposition
+          </TabsTrigger>
+          <TabsTrigger className="text-xs sm:text-sm data-[state=active]:bg-accent/10 data-[state=active]:text-primary" value="pipeline">
+            Pipeline & Futur
+          </TabsTrigger>
+          <TabsTrigger className="text-xs sm:text-sm data-[state=active]:bg-accent/10 data-[state=active]:text-primary" value="ai">
+            IA & Stratégie
+          </TabsTrigger>
+          <TabsTrigger className="text-xs sm:text-sm data-[state=active]:bg-accent/10 data-[state=active]:text-primary" value="supply">
+            Supply Chain
+          </TabsTrigger>
+          <TabsTrigger className="text-xs sm:text-sm data-[state=active]:bg-accent/10 data-[state=active]:text-primary" value="timeline">
+            Timeline
+          </TabsTrigger>
+          <TabsTrigger className="text-xs sm:text-sm data-[state=active]:bg-accent/10 data-[state=active]:text-primary" value="history">
+            Historique
+          </TabsTrigger>
         </TabsList>
 
         {/* Overview Tab */}
@@ -201,13 +296,31 @@ export default async function ContactDetailPage({ params }: Props) {
                     {contact.whatsapp}
                   </div>
                 )}
-                {contact.city && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <MapPin className="h-4 w-4 text-muted-foreground" />
-                    {contact.city}, {contact.country}
-                  </div>
-                )}
-                <Separator />
+                  {contact.city && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <MapPin className="h-4 w-4 text-muted-foreground" />
+                      {contact.city}, {contact.country}
+                    </div>
+                  )}
+                  {ownerName && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <User className="h-4 w-4 text-muted-foreground" />
+                      Owner: {ownerName}
+                    </div>
+                  )}
+                  {onboardedName && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <User className="h-4 w-4 text-muted-foreground" />
+                      Onboardé par: {onboardedName}
+                    </div>
+                  )}
+                  {collaboratorNames.length > 0 && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <Users className="h-4 w-4 text-muted-foreground" />
+                      {collaboratorNames.join(", ")}
+                    </div>
+                  )}
+                  <Separator />
                 <div className="space-y-1">
                   <p className="text-xs text-muted-foreground">Score de confiance</p>
                   <div className="flex items-center gap-2">
@@ -385,6 +498,11 @@ export default async function ContactDetailPage({ params }: Props) {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Timeline Tab */}
+        <TabsContent value="timeline">
+          <ContactTimeline contactId={contact.id} items={timelineItems as any} />
         </TabsContent>
 
         {/* History Tab */}

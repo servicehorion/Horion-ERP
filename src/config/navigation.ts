@@ -36,6 +36,12 @@ export const sidebarNavigation: NavItem[] = [
     title: "CRM",
     href: "/crm",
     icon: Users,
+    children: [
+      { title: "Dashboard", href: "/crm" },
+      { title: "Intelligence", href: "/crm/intelligence" },
+      { title: "Leads", href: "/crm/leads" },
+      { title: "Contacts", href: "/contacts" },
+    ],
   },
   {
     title: "Sourcing",

@@ -390,10 +390,19 @@ export class CustomerIntelligenceService {
 
     if (!metrics) return;
 
+    const manualSegments = await prisma.customerSegmentation.findMany({
+      where: {
+        contactId,
+        notes: { contains: "[manual]" },
+      },
+    });
+
+    const manualSet = new Set(manualSegments.map((s) => s.segment));
+
     const segments: Array<{ segment: CustomerSegment; score: number; notes?: string }> = [];
 
     // CASHFLOW_DRIVER: high revenue + frequent orders
-    if (Number(metrics.lifetimeGrossRevenue) > 50000 && metrics.totalOrdersCount > 5) {
+    if (!manualSet.has("CASHFLOW_DRIVER" as CustomerSegment) && Number(metrics.lifetimeGrossRevenue) > 50000 && metrics.totalOrdersCount > 5) {
       segments.push({
         segment: "CASHFLOW_DRIVER",
         score: Number(metrics.contributionScore),
@@ -402,7 +411,7 @@ export class CustomerIntelligenceService {
     }
 
     // KEY_ACCOUNT: high contribution score
-    if (Number(metrics.contributionScore) > 70) {
+    if (!manualSet.has("KEY_ACCOUNT" as CustomerSegment) && Number(metrics.contributionScore) > 70) {
       segments.push({
         segment: "KEY_ACCOUNT",
         score: Number(metrics.contributionScore),
@@ -412,6 +421,7 @@ export class CustomerIntelligenceService {
 
     // HIGH_RISK_HIGH_REWARD: high revenue + high risk
     if (
+      !manualSet.has("HIGH_RISK_HIGH_REWARD" as CustomerSegment) &&
       Number(metrics.lifetimeGrossRevenue) > 30000 &&
       riskProfile &&
       riskProfile.globalRiskScore > 60
@@ -425,6 +435,7 @@ export class CustomerIntelligenceService {
 
     // AT_RISK: no recent orders
     if (
+      !manualSet.has("AT_RISK" as CustomerSegment) &&
       metrics.lastOrderDate &&
       Date.now() - metrics.lastOrderDate.getTime() > 90 * 24 * 60 * 60 * 1000
     ) {
@@ -436,7 +447,7 @@ export class CustomerIntelligenceService {
     }
 
     // ONE_TIME_BUYER: only 1 order
-    if (metrics.totalOrdersCount === 1) {
+    if (!manualSet.has("ONE_TIME_BUYER" as CustomerSegment) && metrics.totalOrdersCount === 1) {
       segments.push({
         segment: "ONE_TIME_BUYER",
         score: 30,
@@ -445,7 +456,7 @@ export class CustomerIntelligenceService {
     }
 
     // LOW_MARGIN_VOLUME: low margin but high volume
-    if (Number(metrics.averageMarginPercent) < 8 && metrics.totalOrdersCount > 10) {
+    if (!manualSet.has("LOW_MARGIN_VOLUME" as CustomerSegment) && Number(metrics.averageMarginPercent) < 8 && metrics.totalOrdersCount > 10) {
       segments.push({
         segment: "LOW_MARGIN_VOLUME",
         score: 50,
@@ -453,8 +464,13 @@ export class CustomerIntelligenceService {
       });
     }
 
-    // Delete existing segments
-    await prisma.customerSegmentation.deleteMany({ where: { contactId } });
+    // Delete existing non-manual segments
+    await prisma.customerSegmentation.deleteMany({
+      where: {
+        contactId,
+        NOT: { notes: { contains: "[manual]" } },
+      },
+    });
 
     // Create new segments
     if (segments.length > 0) {
@@ -491,7 +507,7 @@ export class CustomerIntelligenceService {
         financialMetrics: true,
         riskProfile: true,
         aiProfile: true,
-        pipelineIntents: { where: { status: "active" }, orderBy: { estimatedOrderDate: "asc" } },
+        pipelineIntents: { orderBy: { estimatedOrderDate: "asc" } },
         segmentations: true,
         supplyChains: {
           include: {

@@ -1,4 +1,4 @@
-import { ArrowLeft, Calendar, DollarSign, Tag, User, Building, Phone, Mail, MessageSquare } from "lucide-react";
+import { ArrowLeft, Calendar, DollarSign, Tag, User, Users, Building, Phone, Mail, MessageSquare } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -6,10 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { getLeadById } from "@/lib/actions/contact.actions";
+import { getLeadById, validateLead } from "@/lib/actions/contact.actions";
+import { getTeamMembers } from "@/lib/actions/task.actions";
 import { formatCurrency } from "@/config/currencies";
 import { formatDate } from "@/lib/utils";
 import { LeadStatusSelect } from "@/components/crm/lead-status-select";
+import { LeadAssigneeSelect } from "@/components/crm/lead-assignee-select";
 
 export const metadata = {
   title: "Détail Lead | Horion ERP",
@@ -49,7 +51,10 @@ export default async function LeadDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const result = await getLeadById(id);
+  const [result, membersResult] = await Promise.all([
+    getLeadById(id),
+    getTeamMembers(),
+  ]);
 
   if (result.error || !result.data) {
     notFound();
@@ -57,6 +62,14 @@ export default async function LeadDetailPage({
 
   const lead = result.data;
   const contact = lead.contact;
+  const teamMembers = membersResult.data || [];
+  const ownerName = (lead as any).owner?.name || (lead as any).owner?.email;
+  const onboardedName = (lead as any).onboardedBy?.name || (lead as any).onboardedBy?.email;
+  const collaboratorNames = Array.isArray((lead as any).collaborators)
+    ? (lead as any).collaborators
+        .map((c: any) => c.user?.name || c.user?.email || c.userId)
+        .filter(Boolean)
+    : [];
 
   return (
     <div className="space-y-6">
@@ -81,7 +94,24 @@ export default async function LeadDetailPage({
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {["NEW", "CONTACTED"].includes(lead.status) && (
+            <form
+              action={async () => {
+                "use server";
+                await validateLead(lead.id);
+              }}
+            >
+              <Button variant="outline" size="sm" type="submit">
+                Valider lead
+              </Button>
+            </form>
+          )}
           <LeadStatusSelect leadId={lead.id} currentStatus={lead.status} />
+          <LeadAssigneeSelect
+            leadId={lead.id}
+            currentAssignee={lead.assignedTo}
+            teamMembers={teamMembers}
+          />
         </div>
       </div>
 
@@ -249,6 +279,35 @@ export default async function LeadDetailPage({
                   Voir fiche complète
                 </Link>
               </Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Equipe CRM</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              {ownerName && (
+                <div className="flex items-center gap-2">
+                  <User className="h-4 w-4 text-muted-foreground" />
+                  Owner: {ownerName}
+                </div>
+              )}
+              {onboardedName && (
+                <div className="flex items-center gap-2">
+                  <User className="h-4 w-4 text-muted-foreground" />
+                  OnboardÃƒÂ© par: {onboardedName}
+                </div>
+              )}
+              {collaboratorNames.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                  {collaboratorNames.join(", ")}
+                </div>
+              )}
+              {!ownerName && !onboardedName && collaboratorNames.length === 0 && (
+                <p className="text-sm text-muted-foreground">Aucune information d'Ã©quipe</p>
+              )}
             </CardContent>
           </Card>
 

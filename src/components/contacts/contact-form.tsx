@@ -16,6 +16,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { createContact, updateContact } from "@/lib/actions/contact.actions";
 import { createContactSchema, type CreateContactInput } from "@/lib/validators/contact";
 
@@ -31,13 +32,19 @@ interface ContactFormProps {
     city: string | null;
     country: string;
     notes: string | null;
+    tags?: string[] | null;
+    ownerId?: string | null;
+    collaboratorIds?: string[] | null;
   };
+  teamMembers?: { id: string; name: string | null; email: string; role: string }[];
+  currentUserId?: string;
 }
 
-export function ContactForm({ contact }: ContactFormProps) {
+export function ContactForm({ contact, teamMembers = [], currentUserId }: ContactFormProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isEditing = !!contact;
+  const [tagsInput, setTagsInput] = useState((contact?.tags || []).join(", "));
 
   const form = useForm<CreateContactInput>({
     resolver: zodResolver(createContactSchema) as any,
@@ -51,6 +58,9 @@ export function ContactForm({ contact }: ContactFormProps) {
       city: contact?.city || "",
       country: contact?.country || "CG",
       notes: contact?.notes || "",
+      tags: contact?.tags || [],
+      ownerId: contact?.ownerId ?? currentUserId,
+      collaboratorIds: contact?.collaboratorIds || [],
     },
   });
 
@@ -106,6 +116,33 @@ export function ContactForm({ contact }: ContactFormProps) {
                     <SelectItem value="CUSTOMS_BROKER">Courtier douanier</SelectItem>
                     <SelectItem value="QC_PARTNER">Partenaire QC</SelectItem>
                     <SelectItem value="OTHER">Autre</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="ownerId"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Owner principal</FormLabel>
+                <Select
+                  onValueChange={(value) => field.onChange(value === "none" ? undefined : value)}
+                  defaultValue={field.value ?? "none"}
+                >
+                  <FormControl>
+                    <SelectTrigger><SelectValue placeholder="Non assigné" /></SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="none">Non assigné</SelectItem>
+                    {teamMembers.map((m) => (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.name || m.email}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 <FormMessage />
@@ -185,12 +222,72 @@ export function ContactForm({ contact }: ContactFormProps) {
           />
         </div>
 
+        <FormField
+          control={form.control}
+          name="collaboratorIds"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Collaborateurs</FormLabel>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {teamMembers.length === 0 && (
+                  <p className="text-sm text-muted-foreground">Aucun collaborateur disponible</p>
+                )}
+                {teamMembers.map((m) => {
+                  const checked = (field.value || []).includes(m.id);
+                  return (
+                    <label key={m.id} className="flex items-center gap-2 text-sm">
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={(value) => {
+                          const next = new Set(field.value || []);
+                          if (value) {
+                            next.add(m.id);
+                          } else {
+                            next.delete(m.id);
+                          }
+                          field.onChange(Array.from(next));
+                        }}
+                      />
+                      <span>{m.name || m.email}</span>
+                    </label>
+                  );
+                })}
+              </div>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
         <FormField control={form.control} name="notes"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Notes</FormLabel>
               <FormControl>
                 <Textarea {...field} placeholder="Notes internes..." rows={3} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField control={form.control} name="tags"
+          render={() => (
+            <FormItem>
+              <FormLabel>Tags</FormLabel>
+              <FormControl>
+                <Input
+                  value={tagsInput}
+                  placeholder="ex: premium, ecommerce, VIP"
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setTagsInput(value);
+                    const tags = value
+                      .split(",")
+                      .map((t) => t.trim())
+                      .filter(Boolean);
+                    form.setValue("tags", tags);
+                  }}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>

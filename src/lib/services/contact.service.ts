@@ -13,7 +13,11 @@ export class ContactService {
     country?: string;
     notes?: string;
     tags?: string[];
+    ownerId?: string;
+    onboardedById?: string;
+    collaboratorIds?: string[];
   }) {
+    const collaboratorIds = (data.collaboratorIds || []).filter(Boolean);
     return prisma.contact.create({
       data: {
         tenantId,
@@ -27,6 +31,25 @@ export class ContactService {
         country: data.country || "CG",
         notes: data.notes,
         tags: data.tags || [],
+        ownerId: data.ownerId,
+        onboardedById: data.onboardedById,
+        collaborators: collaboratorIds.length > 0
+          ? {
+              createMany: {
+                data: collaboratorIds.map((userId) => ({ userId })),
+              },
+            }
+          : undefined,
+      },
+      include: {
+        owner: { select: { id: true, name: true, email: true } },
+        onboardedBy: { select: { id: true, name: true, email: true } },
+        collaborators: {
+          select: {
+            userId: true,
+            user: { select: { id: true, name: true, email: true } },
+          },
+        },
       },
     });
   }
@@ -43,10 +66,36 @@ export class ContactService {
     notes: string;
     trustScore: number;
     tags: string[];
+    ownerId: string | null;
+    collaboratorIds: string[];
   }>) {
+    const { collaboratorIds, ...updateData } = data;
+    const payload: Prisma.ContactUpdateInput = {
+      ...updateData,
+    };
+
+    if (collaboratorIds !== undefined) {
+      payload.collaborators = {
+        deleteMany: {},
+        ...(collaboratorIds.length > 0
+          ? { createMany: { data: collaboratorIds.map((userId) => ({ userId })) } }
+          : {}),
+      };
+    }
+
     return prisma.contact.update({
       where: { id: contactId },
-      data,
+      data: payload,
+      include: {
+        owner: { select: { id: true, name: true, email: true } },
+        onboardedBy: { select: { id: true, name: true, email: true } },
+        collaborators: {
+          select: {
+            userId: true,
+            user: { select: { id: true, name: true, email: true } },
+          },
+        },
+      },
     });
   }
 
@@ -75,11 +124,20 @@ export class ContactService {
     };
 
     const [contacts, total] = await Promise.all([
-      prisma.contact.findMany({
-        where,
-        include: {
-          _count: { select: { orders: true, leads: true } },
-        },
+        prisma.contact.findMany({
+          where,
+          include: {
+            _count: { select: { orders: true, leads: true } },
+            financialMetrics: true,
+            owner: { select: { id: true, name: true, email: true } },
+            onboardedBy: { select: { id: true, name: true, email: true } },
+            collaborators: {
+              select: {
+                userId: true,
+                user: { select: { id: true, name: true, email: true } },
+              },
+            },
+          },
         orderBy: { createdAt: "desc" },
         skip: (page - 1) * limit,
         take: limit,
@@ -94,6 +152,14 @@ export class ContactService {
     return prisma.contact.findUnique({
       where: { id: contactId },
       include: {
+        owner: { select: { id: true, name: true, email: true } },
+        onboardedBy: { select: { id: true, name: true, email: true } },
+        collaborators: {
+          select: {
+            userId: true,
+            user: { select: { id: true, name: true, email: true } },
+          },
+        },
         orders: {
           select: { id: true, orderNumber: true, status: true, totalClient: true, createdAt: true },
           orderBy: { createdAt: "desc" },
