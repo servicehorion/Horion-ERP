@@ -2,7 +2,7 @@
 
 import { useDeferredValue, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { createContact, updateContact, deleteContact, updateLeadStatus, updateLead } from "@/lib/actions/contact.actions";
+import { createContact, updateContact, deleteContact, updateLeadStatus, updateLead, exportContactsCSV } from "@/lib/actions/contact.actions";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,6 +30,7 @@ import { copyToClipboard } from "@/lib/clipboard";
 export interface Customer {
   id: string;
   ownerId?: string;
+  churnRisk?: number; // 0.0–1.0 from CustomerAIProfile.predictedChurnRisk
   name: string;
   phone: string;
   email?: string;
@@ -69,6 +70,7 @@ export interface Lead {
   containerType?: "LCL" | "FCL" | "AERIEN";
   originCountry?: string;
   notes?: string;
+  updatedAtTs?: number; // Unix timestamp ms — used for SLA calculation
 }
 
 export interface Prospect {
@@ -135,6 +137,69 @@ const mapLeadStatusToDB = (status: Lead["status"]): string => {
   };
   return map[status] || "NEW";
 };
+
+// SLA deadlines in days per lead status (time allowed in that status before next action)
+const LEAD_SLA_DAYS: Record<Lead["status"], number> = {
+  New: 1,
+  Qualified: 2,
+  Quoted: 5,
+  Paid: 3,
+  Lost: 0,
+};
+
+function LeadSLABadge({ updatedAtTs, status }: { updatedAtTs?: number; status: Lead["status"] }) {
+  const slaDays = LEAD_SLA_DAYS[status] ?? 0;
+  if (!updatedAtTs || slaDays === 0) return null;
+  const ageDays = (Date.now() - updatedAtTs) / 86_400_000;
+  const ratio = ageDays / slaDays;
+  if (ratio >= 1) {
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-red-600 bg-red-50 px-1.5 py-0.5 rounded-full">
+        <Clock className="h-2.5 w-2.5" />
+        SLA {Math.floor(ageDays - slaDays)}j dépassé
+      </span>
+    );
+  }
+  if (ratio >= 0.75) {
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full">
+        <Clock className="h-2.5 w-2.5" />
+        SLA J-{Math.ceil(slaDays - ageDays)}
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 text-[10px] font-medium text-green-600 bg-green-50 px-1.5 py-0.5 rounded-full">
+      <CheckCircle className="h-2.5 w-2.5" />
+      Dans SLA
+    </span>
+  );
+}
+
+// Churn risk label + color from 0.0–1.0 value
+function ChurnRiskBadge({ churnRisk }: { churnRisk?: number }) {
+  if (churnRisk == null) return null;
+  const pct = Math.round(churnRisk * 100);
+  if (pct >= 60) {
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-red-600 bg-red-50 px-1.5 py-0.5 rounded-full">
+        Churn {pct}%
+      </span>
+    );
+  }
+  if (pct >= 30) {
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full">
+        Churn {pct}%
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 text-[10px] font-medium text-green-600 bg-green-50 px-1.5 py-0.5 rounded-full">
+      Stable {pct}%
+    </span>
+  );
+}
 
 export function CrmDashboard({ initialCustomers = customersData, initialLeads = leadsData, initialProspects = prospectsData, demoMode = false, currentUserName = "Sarah Johnson", currentUserId = "" }: CrmDashboardProps) {
   const router = useRouter();
@@ -594,31 +659,43 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
     toast.success("Note added successfully!");
   };
 
-  // Export CSV
+  // Export CSV — server action in prod, local fallback in demo
   const handleExport = () => {
+    if (!demoMode) {
+      startTransition(async () => {
+        toast.info("Préparation de l'export...");
+        const result = await exportContactsCSV();
+        if (result.error) {
+          toast.error(result.error);
+          return;
+        }
+        const blob = new Blob([result.data!], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `horion-contacts-${new Date().toISOString().split("T")[0]}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success("Export réussi !");
+      });
+      return;
+    }
+    // Demo mode: local CSV
     const csvContent = [
       ["Name", "Phone", "Email", "Country", "City", "WhatsApp", "Orders", "LTV", "Tags", "Risk Score"],
       ...sortedCustomers.map(c => [
-        c.name, 
-        c.phone, 
-        c.email || "", 
-        c.country, 
-        c.city || "", 
-        c.whatsapp, 
-        c.orders, 
-        c.ltv, 
-        c.tags.join(";"), 
-        c.riskScore
+        c.name, c.phone, c.email || "", c.country, c.city || "",
+        c.whatsapp, c.orders, c.ltv, c.tags.join(";"), c.riskScore,
       ])
     ].map(row => row.join(",")).join("\n");
-
     const blob = new Blob([csvContent], { type: "text/csv" });
-    const url = window.URL.createObjectURL(blob);
+    const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `horion-customers-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `horion-customers-${new Date().toISOString().split("T")[0]}.csv`;
     a.click();
-    toast.success(`${sortedCustomers.length} customer(s) exported!`);
+    URL.revokeObjectURL(url);
+    toast.success(`${sortedCustomers.length} contact(s) exporté(s) !`);
   };
 
   // WhatsApp Contact
@@ -1278,13 +1355,16 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
                           {customer.nextAction}
                         </TableCell>
                         <TableCell>
-                          <Badge className={
-                            customer.riskScore === "Low" ? "bg-green-100 text-green-700" :
-                            customer.riskScore === "Medium" ? "bg-yellow-100 text-yellow-700" :
-                            "bg-red-100 text-red-700"
-                          }>
-                            {customer.riskScore}
-                          </Badge>
+                          <div className="flex flex-col gap-1">
+                            <Badge className={
+                              customer.riskScore === "Low" ? "bg-green-100 text-green-700" :
+                              customer.riskScore === "Medium" ? "bg-yellow-100 text-yellow-700" :
+                              "bg-red-100 text-red-700"
+                            }>
+                              {customer.riskScore}
+                            </Badge>
+                            <ChurnRiskBadge churnRisk={customer.churnRisk} />
+                          </div>
                         </TableCell>
                         <TableCell>
                           <DropdownMenu>
@@ -1455,9 +1535,18 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
                           Source: <span className="font-medium text-gray-900">{lead.source}</span> · AI Score:{" "}
                           <span className="font-semibold text-[#5F27CD]">{lead.aiScore}/100</span>
                         </p>
+                        {(lead.containerType || lead.originCountry) && (
+                          <p className="text-gray-600 mt-1">
+                            {lead.containerType && <span className="font-medium text-[#010150] mr-2">{lead.containerType}</span>}
+                            {lead.originCountry && <span className="text-gray-500">Origine: {lead.originCountry}</span>}
+                          </p>
+                        )}
                         <p className="text-gray-600 mt-1">
                           Next action: <span className="font-medium text-[#010150]">{lead.nextAction}</span>
                         </p>
+                        <div className="mt-1.5 flex gap-1.5 flex-wrap">
+                          <LeadSLABadge updatedAtTs={lead.updatedAtTs} status={lead.status} />
+                        </div>
                       </div>
                       <div className="text-right">
                         <Select value={lead.assignedAgent} onValueChange={(value) => handleAssignLead(lead.id, value)}>

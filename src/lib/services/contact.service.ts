@@ -106,12 +106,14 @@ export class ContactService {
       search?: string;
       page?: number;
       limit?: number;
+      scopeWhere?: Prisma.ContactWhereInput;
     } = {}
   ) {
-    const { type, search, page = 1, limit = 20 } = options;
+    const { type, search, page = 1, limit = 20, scopeWhere } = options;
 
     const where: Prisma.ContactWhereInput = {
       tenantId,
+      ...(scopeWhere || {}),
       ...(type && { type }),
       ...(search && {
         OR: [
@@ -129,6 +131,7 @@ export class ContactService {
           include: {
             _count: { select: { orders: true, leads: true } },
             financialMetrics: true,
+            aiProfile: { select: { predictedChurnRisk: true, predictedLTV: true } },
             owner: { select: { id: true, name: true, email: true } },
             onboardedBy: { select: { id: true, name: true, email: true } },
             collaborators: {
@@ -148,9 +151,9 @@ export class ContactService {
     return { contacts, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
-  static async getById(contactId: string) {
-    return prisma.contact.findUnique({
-      where: { id: contactId },
+  static async getById(contactId: string, scopeWhere?: Prisma.ContactWhereInput) {
+    return prisma.contact.findFirst({
+      where: { id: contactId, ...(scopeWhere || {}) },
       include: {
         owner: { select: { id: true, name: true, email: true } },
         onboardedBy: { select: { id: true, name: true, email: true } },
@@ -174,10 +177,10 @@ export class ContactService {
     });
   }
 
-  static async getTypeCount(tenantId: string) {
+  static async getTypeCount(tenantId: string, scopeWhere?: Prisma.ContactWhereInput) {
     const counts = await prisma.contact.groupBy({
       by: ["type"],
-      where: { tenantId },
+      where: { tenantId, ...(scopeWhere || {}) },
       _count: { id: true },
     });
 

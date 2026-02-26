@@ -1,4 +1,4 @@
-﻿import { CrmDashboard, type Customer, type Lead, type Prospect } from "@/components/crm/crm-dashboard";
+import { CrmDashboard, type Customer, type Lead, type Prospect } from "@/components/crm/crm-dashboard";
 import { getContacts, getLeads } from "@/lib/actions/contact.actions";
 import { getTeamMembers } from "@/lib/actions/task.actions";
 import { auth } from "@/lib/auth";
@@ -10,7 +10,13 @@ export const metadata = {
   title: "CRM | Horion ERP",
 };
 
-function mapRiskScore(trustScore?: number): Customer["riskScore"] {
+function mapRiskScore(trustScore?: number, predictedChurnRisk?: number | null): Customer["riskScore"] {
+  // Prefer real AI churn risk over trustScore proxy
+  if (predictedChurnRisk != null) {
+    if (predictedChurnRisk >= 0.6) return "High";
+    if (predictedChurnRisk >= 0.3) return "Medium";
+    return "Low";
+  }
   if (trustScore == null) return "Medium";
   if (trustScore >= 70) return "Low";
   if (trustScore >= 40) return "Medium";
@@ -69,32 +75,39 @@ export default async function CRMPage() {
   const members = membersResult.data || [];
   const teamMap = new Map(members.map((m) => [m.id, m.name || m.email]));
 
-  const customers: Customer[] = (customersResult.data || []).map((c: any) => ({
-    id: c.id,
-    ownerId: c.ownerId || undefined,
-    name: c.name,
-    phone: c.phone || "",
-    email: c.email || undefined,
-    country: c.country || "—",
-    city: c.city || undefined,
-    whatsapp: c.whatsapp ? "Active" : "Inactive",
-    orders: c._count?.orders ?? 0,
-    ltv: c.financialMetrics?.lifetimeGrossRevenue
-      ? formatCurrency(Number(c.financialMetrics.lifetimeGrossRevenue), "XAF")
-      : "—",
-    tags: extractTags(c.tags),
-    riskScore: mapRiskScore(c.trustScore),
-    owner: c.owner?.name || c.owner?.email || teamMap.get(c.ownerId) || c.ownerName || "Non assigné",
-    onboardedBy: c.onboardedBy?.name || c.onboardedBy?.email || teamMap.get(c.onboardedById) || c.createdByName || currentUserName,
-    aiScore: typeof c.trustScore === "number" ? Math.min(100, Math.max(20, c.trustScore)) : 60,
-    nextAction: c.trustScore && c.trustScore < 40 ? "Relancer client" : "Suivi commercial",
-    collaborators: extractCollaborators(c.collaborators, teamMap),
-    lastContact: formatDate(c.updatedAt),
-    notes: c.notes || undefined,
-  }));
+  const customers: Customer[] = (customersResult.data || []).map((c: any) => {
+    const churnRisk = c.aiProfile?.predictedChurnRisk != null
+      ? Number(c.aiProfile.predictedChurnRisk)
+      : null;
+    return {
+      id: c.id,
+      ownerId: c.ownerId || undefined,
+      name: c.name,
+      phone: c.phone || "",
+      email: c.email || undefined,
+      country: c.country || "—",
+      city: c.city || undefined,
+      whatsapp: c.whatsapp ? "Active" : "Inactive",
+      orders: c._count?.orders ?? 0,
+      ltv: c.financialMetrics?.lifetimeGrossRevenue
+        ? formatCurrency(Number(c.financialMetrics.lifetimeGrossRevenue), "XAF")
+        : "—",
+      tags: extractTags(c.tags),
+      riskScore: mapRiskScore(c.trustScore, churnRisk),
+      churnRisk: churnRisk ?? undefined,
+      owner: c.owner?.name || c.owner?.email || teamMap.get(c.ownerId) || c.ownerName || "Non assigné",
+      onboardedBy: c.onboardedBy?.name || c.onboardedBy?.email || teamMap.get(c.onboardedById) || c.createdByName || currentUserName,
+      aiScore: typeof c.trustScore === "number" ? Math.min(100, Math.max(20, c.trustScore)) : 60,
+      nextAction: c.trustScore && c.trustScore < 40 ? "Relancer client" : "Suivi commercial",
+      collaborators: extractCollaborators(c.collaborators, teamMap),
+      lastContact: formatDate(c.updatedAt),
+      notes: c.notes || undefined,
+    };
+  });
 
   const prospects: Prospect[] = (prospectsResult.data || []).map((c: any) => ({
     id: c.id,
+    ownerId: c.ownerId || undefined,
     name: c.name,
     phone: c.phone || "",
     country: c.country || "—",
@@ -127,6 +140,7 @@ export default async function CRMPage() {
     nextAction: l.status === "QUOTED" ? "Relancer devis" : "Contacter",
     collaborators: extractCollaborators(l.collaborators, teamMap),
     lastContact: formatDate(l.updatedAt),
+    updatedAtTs: l.updatedAt ? new Date(l.updatedAt).getTime() : undefined,
     notes: l.notes || undefined,
     containerType: l.containerType || undefined,
     originCountry: l.originCountry || undefined,
