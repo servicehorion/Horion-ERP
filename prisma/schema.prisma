@@ -75,10 +75,19 @@ model User {
 
 enum UserRole {
   ADMIN
+  CEO
   DIRECTION
+  CTO
+  AI_ENGINEER
+  CRM_MANAGER
+  COMMERCIAL
+  COMMUNITY_MANAGER
+  LOGISTICS_MANAGER
+  LOGISTICS_ASSISTANT
+  SOURCING_ASSISTANT
+  FINANCE_MANAGER
   FINANCE
   OPS
-  COMMERCIAL
   VIEWER
 }
 
@@ -160,19 +169,22 @@ enum ContactType {
 }
 
 model Lead {
-  id             String     @id @default(cuid())
+  id             String         @id @default(cuid())
   contactId      String
-  status         LeadStatus @default(NEW)
+  status         LeadStatus     @default(NEW)
   source         String?
   description    String?
-    estimatedValue Decimal?   @db.Decimal(15, 2)
-    currency       String     @default("XAF")
+    estimatedValue Decimal?      @db.Decimal(15, 2)
+    currency       String        @default("XAF")
     category       String?
     assignedTo     String?
     ownerId        String?
     onboardedById  String?
-    createdAt      DateTime   @default(now())
-    updatedAt      DateTime   @updatedAt
+    containerType  ContainerType?
+    originCountry  String?       @default("CN")
+    notes          String?
+    createdAt      DateTime      @default(now())
+    updatedAt      DateTime      @updatedAt
 
     contact       Contact            @relation(fields: [contactId], references: [id])
     owner         User?              @relation("LeadOwner", fields: [ownerId], references: [id])
@@ -192,6 +204,12 @@ enum LeadStatus {
   QUOTED
   WON
   LOST
+}
+
+enum ContainerType {
+  LCL
+  FCL
+  AERIEN
 }
 
 model ContactCollaborator {

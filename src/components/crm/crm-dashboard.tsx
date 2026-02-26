@@ -1,6 +1,8 @@
 ﻿"use client";
 
-import { useDeferredValue, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { createContact, updateContact, deleteContact, updateLeadStatus, updateLead } from "@/lib/actions/contact.actions";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,6 +29,7 @@ import { copyToClipboard } from "@/lib/clipboard";
 
 export interface Customer {
   id: string;
+  ownerId?: string;
   name: string;
   phone: string;
   email?: string;
@@ -48,6 +51,7 @@ export interface Customer {
 
 export interface Lead {
   id: string;
+  ownerId?: string;
   name: string;
   phone: string;
   country: string;
@@ -62,6 +66,8 @@ export interface Lead {
   nextAction: string;
   collaborators: string[];
   lastContact: string;
+  containerType?: "LCL" | "FCL" | "AERIEN";
+  originCountry?: string;
   notes?: string;
 }
 
@@ -108,6 +114,7 @@ export interface CrmDashboardProps {
   initialProspects?: Prospect[];
   demoMode?: boolean;
   currentUserName?: string;
+  currentUserId?: string;
 }
 
 const whatsappTemplates = [
@@ -117,12 +124,31 @@ const whatsappTemplates = [
   { id: 4, name: "Payment Reminder", message: "Hi {name}, this is a friendly reminder about the pending payment of {amount} for order {orderId}." },
 ];
 
-export function CrmDashboard({ initialCustomers = customersData, initialLeads = leadsData, initialProspects = prospectsData, demoMode = false, currentUserName = "Sarah Johnson" }: CrmDashboardProps) {
+// Map display lead status → DB enum
+const mapLeadStatusToDB = (status: Lead["status"]): string => {
+  const map: Record<Lead["status"], string> = {
+    New: "NEW",
+    Qualified: "QUALIFIED",
+    Quoted: "QUOTED",
+    Paid: "WON",
+    Lost: "LOST",
+  };
+  return map[status] || "NEW";
+};
+
+export function CrmDashboard({ initialCustomers = customersData, initialLeads = leadsData, initialProspects = prospectsData, demoMode = false, currentUserName = "Sarah Johnson", currentUserId = "" }: CrmDashboardProps) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
   const [searchQuery, setSearchQuery] = useState("");
   const deferredSearch = useDeferredValue(searchQuery);
   const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
   const [leads, setLeads] = useState<Lead[]>(initialLeads);
   const [prospects, setProspects] = useState<Prospect[]>(initialProspects);
+
+  // Sync local state when server refreshes props
+  useEffect(() => { setCustomers(initialCustomers); }, [initialCustomers]);
+  useEffect(() => { setLeads(initialLeads); }, [initialLeads]);
+  useEffect(() => { setProspects(initialProspects); }, [initialProspects]);
   const [selectedCustomers, setSelectedCustomers] = useState<string[]>([]);
   
   // Dialogs & Sheets
@@ -213,22 +239,22 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
     return leads.filter((lead) => {
       const matchesPortfolio =
         portfolioScope === "all" ||
-        lead.owner === currentUserName ||
+        (currentUserId ? lead.ownerId === currentUserId : lead.owner === currentUserName) ||
         lead.collaborators.includes(currentUserName);
       const matchesOwner = selectedOwner === "all" || lead.owner === selectedOwner;
       return matchesPortfolio && matchesOwner;
     });
-  }, [leads, portfolioScope, currentUserName, selectedOwner]);
+  }, [leads, portfolioScope, currentUserId, currentUserName, selectedOwner]);
   const visibleProspects = useMemo(() => {
     return prospects.filter((prospect) => {
       const matchesPortfolio =
         portfolioScope === "all" ||
-        prospect.owner === currentUserName ||
+        (currentUserId ? prospect.ownerId === currentUserId : prospect.owner === currentUserName) ||
         prospect.collaborators.includes(currentUserName);
       const matchesOwner = selectedOwner === "all" || prospect.owner === selectedOwner;
       return matchesPortfolio && matchesOwner;
     });
-  }, [prospects, portfolioScope, currentUserName, selectedOwner]);
+  }, [prospects, portfolioScope, currentUserId, currentUserName, selectedOwner]);
 
   const activeLeads = useMemo(
     () => visibleLeads.filter(l => l.status !== "Lost" && l.status !== "Paid").length,
@@ -270,7 +296,7 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
       const matchesOwner = selectedOwner === "all" || customer.owner === selectedOwner;
       const matchesPortfolio =
         portfolioScope === "all" ||
-        customer.owner === currentUserName ||
+        (currentUserId ? customer.ownerId === currentUserId : customer.owner === currentUserName) ||
         customer.collaborators.includes(currentUserName);
 
       return matchesSearch && matchesCountry && matchesRisk && matchesWhatsapp && matchesTags && matchesOwner && matchesPortfolio;
@@ -379,8 +405,10 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
       return;
     }
 
+    const tempId = createId();
     const customer: Customer = {
-      id: createId(),
+      id: tempId,
+      ownerId: currentUserId || undefined,
       name: newCustomer.name,
       phone: newCustomer.phone,
       email: newCustomer.email || undefined,
@@ -388,7 +416,7 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
       city: newCustomer.city || undefined,
       whatsapp: "Active",
       orders: 0,
-      ltv: "$0",
+      ltv: "—",
       tags: ["New"],
       riskScore: "Low",
       owner: newCustomer.owner || currentUserName,
@@ -402,10 +430,34 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
       notes: newCustomer.notes || undefined,
     };
 
-    setCustomers([customer, ...customers]);
+    // Optimistic update
+    setCustomers(prev => [customer, ...prev]);
     setShowAddCustomerDialog(false);
     setNewCustomer({ name: "", phone: "", email: "", country: "", city: "", notes: "", owner: currentUserName, collaborators: "" });
-    toast.success(`${customer.name} added successfully!`);
+
+    if (!demoMode) {
+      startTransition(async () => {
+        const result = await createContact({
+          name: customer.name,
+          phone: customer.phone,
+          email: customer.email,
+          country: customer.country,
+          city: customer.city,
+          notes: customer.notes,
+          type: "CLIENT",
+          ownerId: currentUserId || undefined,
+        });
+        if (result.error) {
+          setCustomers(prev => prev.filter(c => c.id !== tempId));
+          toast.error(result.error);
+        } else {
+          toast.success(`${customer.name} ajouté avec succès !`);
+          router.refresh();
+        }
+      });
+    } else {
+      toast.success(`${customer.name} added successfully!`);
+    }
   };
 
   // Edit Customer
@@ -425,20 +477,61 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
       return;
     }
 
-    setCustomers(customers.map(c => c.id === editingCustomer.id ? editingCustomer : c));
+    // Optimistic update
+    setCustomers(prev => prev.map(c => c.id === editingCustomer.id ? editingCustomer : c));
     setShowEditCustomerDialog(false);
+    const savedCustomer = editingCustomer;
     setEditingCustomer(null);
-    toast.success("Customer updated successfully!");
+
+    if (!demoMode) {
+      startTransition(async () => {
+        const result = await updateContact(savedCustomer.id, {
+          name: savedCustomer.name,
+          phone: savedCustomer.phone,
+          email: savedCustomer.email,
+          country: savedCustomer.country,
+          city: savedCustomer.city,
+          notes: savedCustomer.notes,
+          tags: savedCustomer.tags,
+        });
+        if (result.error) {
+          toast.error(result.error);
+          router.refresh(); // Revert to server state
+        } else {
+          toast.success("Contact mis à jour !");
+          router.refresh();
+        }
+      });
+    } else {
+      toast.success("Customer updated successfully!");
+    }
   };
 
   // Delete Customer
   const handleDeleteCustomer = () => {
     if (customerToDelete) {
       const customer = customers.find(c => c.id === customerToDelete);
-      setCustomers(customers.filter(c => c.id !== customerToDelete));
+      const deletedId = customerToDelete;
+
+      // Optimistic update
+      setCustomers(prev => prev.filter(c => c.id !== deletedId));
       setShowDeleteDialog(false);
       setCustomerToDelete(null);
-      toast.success(`${customer?.name} deleted successfully`);
+
+      if (!demoMode) {
+        startTransition(async () => {
+          const result = await deleteContact(deletedId);
+          if (result.error) {
+            toast.error(result.error);
+            router.refresh(); // Revert to server state
+          } else {
+            toast.success(`${customer?.name} supprimé`);
+            router.refresh();
+          }
+        });
+      } else {
+        toast.success(`${customer?.name} deleted successfully`);
+      }
     }
   };
 
@@ -624,8 +717,24 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
       Paid: "Prepare onboarding kit",
       Lost: "Capture loss reason",
     };
-    setLeads(leads.map(l => l.id === leadId ? { ...l, status, nextAction: nextActionByStatus[status] || l.nextAction } : l));
-    toast.success("Lead status updated");
+
+    // Optimistic update
+    setLeads(prev => prev.map(l => l.id === leadId ? { ...l, status, nextAction: nextActionByStatus[status] || l.nextAction } : l));
+
+    if (!demoMode) {
+      startTransition(async () => {
+        const result = await updateLeadStatus(leadId, mapLeadStatusToDB(status));
+        if (result.error) {
+          toast.error(result.error);
+          router.refresh();
+        } else {
+          toast.success("Statut du lead mis à jour");
+          router.refresh();
+        }
+      });
+    } else {
+      toast.success("Lead status updated");
+    }
   };
 
   // Assign Lead to Agent
@@ -648,10 +757,31 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
       notes: leadNotes.trim() || undefined,
       nextAction: leadNextAction.trim() || selectedLead.nextAction,
     };
-    setLeads(leads.map(l => l.id === selectedLead.id ? updatedLead : l));
+
+    // Optimistic update
+    setLeads(prev => prev.map(l => l.id === selectedLead.id ? updatedLead : l));
     setSelectedLead(updatedLead);
     setShowLeadDetailsDialog(false);
-    toast.success("Lead updated successfully!");
+
+    if (!demoMode) {
+      const leadId = selectedLead.id;
+      startTransition(async () => {
+        const result = await updateLead(leadId, {
+          status: mapLeadStatusToDB(updatedLead.status),
+          notes: updatedLead.notes,
+          nextAction: updatedLead.nextAction,
+        });
+        if (result.error) {
+          toast.error(result.error);
+          router.refresh();
+        } else {
+          toast.success("Lead mis à jour !");
+          router.refresh();
+        }
+      });
+    } else {
+      toast.success("Lead updated successfully!");
+    }
   };
 
   const handleContactProspect = (prospect: Prospect) => {

@@ -128,6 +128,36 @@ export async function updateContact(contactId: string, formData: Record<string, 
   }
 }
 
+export async function deleteContact(contactId: string) {
+  try {
+    const user = await getSession();
+    checkPermission(user.role, "contact.manage");
+
+    const existing = await ContactService.getById(contactId);
+    if (!existing || existing.tenantId !== user.tenantId) {
+      return { error: "Contact introuvable" };
+    }
+
+    await prisma.contact.delete({ where: { id: contactId } });
+
+    await AuditService.log({
+      tenantId: user.tenantId,
+      userId: user.id,
+      action: "contact.deleted",
+      entityType: "contact",
+      entityId: contactId,
+      newValue: { name: existing.name },
+    });
+
+    revalidatePath("/contacts");
+    revalidatePath("/crm");
+    return { data: { success: true } };
+  } catch (error) {
+    console.error("Error deleting contact:", error);
+    return { error: error instanceof Error ? error.message : "Erreur lors de la suppression" };
+  }
+}
+
 export async function getContacts(options?: {
   type?: string;
   search?: string;

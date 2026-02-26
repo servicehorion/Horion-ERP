@@ -57,6 +57,7 @@ export default async function CRMPage() {
     redirect("/login");
   }
   const currentUserName = session?.user?.name || "Utilisateur";
+  const currentUserId = session?.user?.id || "";
 
   const [customersResult, prospectsResult, leadsResult, membersResult] = await Promise.all([
     getContacts({ type: "CLIENT", limit: 200 }),
@@ -70,6 +71,7 @@ export default async function CRMPage() {
 
   const customers: Customer[] = (customersResult.data || []).map((c: any) => ({
     id: c.id,
+    ownerId: c.ownerId || undefined,
     name: c.name,
     phone: c.phone || "",
     email: c.email || undefined,
@@ -108,6 +110,7 @@ export default async function CRMPage() {
 
   const leads: Lead[] = (leadsResult.data || []).map((l: any) => ({
     id: l.id,
+    ownerId: l.ownerId || undefined,
     name: l.contact?.name || "—",
     phone: l.contact?.phone || "",
     country: l.contact?.country || "—",
@@ -124,7 +127,9 @@ export default async function CRMPage() {
     nextAction: l.status === "QUOTED" ? "Relancer devis" : "Contacter",
     collaborators: extractCollaborators(l.collaborators, teamMap),
     lastContact: formatDate(l.updatedAt),
-    notes: undefined,
+    notes: l.notes || undefined,
+    containerType: l.containerType || undefined,
+    originCountry: l.originCountry || undefined,
   }));
 
   return (
@@ -133,6 +138,7 @@ export default async function CRMPage() {
       initialLeads={leads}
       initialProspects={prospects}
       currentUserName={currentUserName}
+      currentUserId={currentUserId}
     />
   );
 }

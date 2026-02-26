@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import type { LeadStatus, Prisma } from "@prisma/client";
+import type { ContainerType, LeadStatus, Prisma } from "@prisma/client";
 
 export class LeadService {
   static async create(data: {
@@ -13,6 +13,9 @@ export class LeadService {
     ownerId?: string;
     onboardedById?: string;
     collaboratorIds?: string[];
+    containerType?: ContainerType;
+    originCountry?: string;
+    notes?: string;
   }) {
     const collaboratorIds = (data.collaboratorIds || []).filter(Boolean);
     return prisma.lead.create({
@@ -26,6 +29,9 @@ export class LeadService {
         assignedTo: data.assignedTo,
         ownerId: data.ownerId,
         onboardedById: data.onboardedById,
+        containerType: data.containerType,
+        originCountry: data.originCountry,
+        notes: data.notes,
         collaborators: collaboratorIds.length > 0
           ? {
               createMany: {
@@ -147,6 +153,9 @@ export class LeadService {
       status: LeadStatus;
       ownerId: string | null;
       collaboratorIds: string[];
+      containerType: ContainerType | null;
+      originCountry: string;
+      notes: string;
     }>
   ) {
     const { collaboratorIds, ...updateData } = data;

@@ -42,6 +42,9 @@ interface LeadFormProps {
     assignedTo: string | null;
     ownerId?: string | null;
     collaboratorIds?: string[] | null;
+    containerType?: "LCL" | "FCL" | "AERIEN" | null;
+    originCountry?: string | null;
+    notes?: string | null;
   };
   contacts: { id: string; name: string }[];
   teamMembers: { id: string; name: string | null; email: string; role: string }[];
@@ -66,6 +69,9 @@ export function LeadForm({ lead, contacts, teamMembers, demoMode, currentUserId 
       assignedTo: lead?.assignedTo || undefined,
       ownerId: lead?.ownerId ?? currentUserId,
       collaboratorIds: lead?.collaboratorIds || [],
+      containerType: lead?.containerType ?? undefined,
+      originCountry: lead?.originCountry || "CN",
+      notes: lead?.notes || "",
     },
   });
 
@@ -245,7 +251,7 @@ export function LeadForm({ lead, contacts, teamMembers, demoMode, currentUserId 
 
           <FormField
             control={form.control}
-            name="currency"
+            name=”currency”
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Devise</FormLabel>
@@ -258,7 +264,7 @@ export function LeadForm({ lead, contacts, teamMembers, demoMode, currentUserId 
                   <SelectContent>
                     {Object.values(CURRENCIES).map((c) => (
                       <SelectItem key={c.code} value={c.code}>
-                        {c.code} â€” {c.name}
+                        {c.code} — {c.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -267,16 +273,71 @@ export function LeadForm({ lead, contacts, teamMembers, demoMode, currentUserId 
               </FormItem>
             )}
           />
+
+          <FormField
+            control={form.control}
+            name=”containerType”
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Type de fret</FormLabel>
+                <Select
+                  onValueChange={(value) => field.onChange(value === “none” ? undefined : value)}
+                  defaultValue={field.value ?? “none”}
+                >
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder=”Sélectionner...” />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value=”none”>Non défini</SelectItem>
+                    <SelectItem value=”LCL”>LCL — Groupage maritime</SelectItem>
+                    <SelectItem value=”FCL”>FCL — Conteneur complet</SelectItem>
+                    <SelectItem value=”AERIEN”>Aérien</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name=”originCountry”
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Pays d'origine</FormLabel>
+                <FormControl>
+                  <Input {...field} placeholder=”CN, TH, TR...” />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
         </div>
 
         <FormField
           control={form.control}
-          name="description"
+          name=”description”
           render={({ field }) => (
             <FormItem>
               <FormLabel>Description</FormLabel>
               <FormControl>
                 <Textarea {...field} rows={4} placeholder="DÃ©crivez le besoin du client..." />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="notes"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Notes internes</FormLabel>
+              <FormControl>
+                <Textarea {...field} rows={3} placeholder="Informations complémentaires sur ce lead..." />
               </FormControl>
               <FormMessage />
             </FormItem>

@@ -40,6 +40,9 @@ export const createLeadSchema = z.object({
   assignedTo: z.string().optional(),
   ownerId: z.string().optional(),
   collaboratorIds: z.array(z.string()).default([]),
+  containerType: z.enum(["LCL", "FCL", "AERIEN"]).optional(),
+  originCountry: z.string().optional(),
+  notes: z.string().optional(),
 });
 
 export type CreateContactInput = z.infer<typeof createContactSchema>;
