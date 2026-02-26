@@ -29,12 +29,12 @@ const LEAD_STATUS_LABELS: Record<string, string> = {
 };
 
 const LEAD_STATUS_COLORS: Record<string, string> = {
-  NEW: "bg-gray-100 text-gray-800",
-  CONTACTED: "bg-blue-100 text-blue-800",
-  QUALIFIED: "bg-indigo-100 text-indigo-800",
-  QUOTED: "bg-yellow-100 text-yellow-800",
+  NEW: "bg-muted text-muted-foreground",
+  CONTACTED: "bg-primary/10 text-primary",
+  QUALIFIED: "bg-secondary/10 text-secondary",
+  QUOTED: "bg-accent/10 text-accent-foreground",
   WON: "bg-green-100 text-green-800",
-  LOST: "bg-red-100 text-red-800",
+  LOST: "bg-destructive/10 text-destructive",
 };
 
 export default async function CRMPage() {
@@ -139,7 +139,7 @@ export default async function CRMPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Comptes Clés</CardTitle>
-            <Award className="h-4 w-4 text-yellow-500" />
+            <Award className="h-4 w-4 text-accent" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{intelligence?.keyAccounts?.length || 0}</div>
@@ -178,7 +178,7 @@ export default async function CRMPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Award className="h-5 w-5 text-yellow-500" />
+                <Award className="h-5 w-5 text-accent" />
                 Top 5 Contributeurs au Cashflow
               </CardTitle>
             </CardHeader>

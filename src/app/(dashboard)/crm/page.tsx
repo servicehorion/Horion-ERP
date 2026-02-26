@@ -1,4 +1,4 @@
-﻿import { CrmReplica, type Customer, type Lead, type Prospect } from "@/components/crm/crm-replica";
+﻿import { CrmDashboard, type Customer, type Lead, type Prospect } from "@/components/crm/crm-dashboard";
 import { getContacts, getLeads } from "@/lib/actions/contact.actions";
 import { getTeamMembers } from "@/lib/actions/task.actions";
 import { auth } from "@/lib/auth";
@@ -128,7 +128,7 @@ export default async function CRMPage() {
   }));
 
   return (
-    <CrmReplica
+    <CrmDashboard
       initialCustomers={customers}
       initialLeads={leads}
       initialProspects={prospects}

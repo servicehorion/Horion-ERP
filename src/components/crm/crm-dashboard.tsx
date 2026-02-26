@@ -102,7 +102,7 @@ const prospectsData: Prospect[] = [
   { id: "p3", name: "Gaborone Trading", phone: "+267 72 345 678", country: "Botswana", inquiry: "Office supplies", source: "Referral", owner: "Jean Kouamé", onboardedBy: "Jean Kouamé", intentScore: 41, collaborators: ["Awa Mbemba"], status: "New" },
 ];
 
-export interface CrmReplicaProps {
+export interface CrmDashboardProps {
   initialCustomers?: Customer[];
   initialLeads?: Lead[];
   initialProspects?: Prospect[];
@@ -117,7 +117,7 @@ const whatsappTemplates = [
   { id: 4, name: "Payment Reminder", message: "Hi {name}, this is a friendly reminder about the pending payment of {amount} for order {orderId}." },
 ];
 
-export function CrmReplica({ initialCustomers = customersData, initialLeads = leadsData, initialProspects = prospectsData, demoMode = false, currentUserName = "Sarah Johnson" }: CrmReplicaProps) {
+export function CrmDashboard({ initialCustomers = customersData, initialLeads = leadsData, initialProspects = prospectsData, demoMode = false, currentUserName = "Sarah Johnson" }: CrmDashboardProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const deferredSearch = useDeferredValue(searchQuery);
   const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
