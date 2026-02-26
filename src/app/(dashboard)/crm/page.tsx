@@ -69,7 +69,7 @@ export default async function CRMPage() {
     getContacts({ type: "CLIENT", limit: 200 }),
     getContacts({ type: "PROSPECT", limit: 200 }),
     getLeads({ limit: 200 }),
-    getTeamMembers(),
+    getTeamMembers("crm"),
   ]);
 
   const members = membersResult.data || [];

@@ -6,6 +6,7 @@ import { LeadService } from "@/lib/services/lead.service";
 import { AuditService } from "@/lib/services/audit.service";
 import { NotificationService } from "@/lib/services/notification.service";
 import { checkPermission } from "@/lib/permissions";
+import { canExportCrm, getCrmContactScope, getCrmLeadScope } from "@/lib/access-control";
 import { createContactSchema, createLeadSchema, updateContactSchema } from "@/lib/validators/contact";
 import { revalidatePath } from "next/cache";
 import type { ContactType, LeadStatus } from "@prisma/client";
@@ -77,9 +78,13 @@ export async function updateContact(contactId: string, formData: Record<string, 
     const user = await getSession();
     checkPermission(user.role, "contact.manage");
 
-    // Verify tenant ownership
-    const existing = await ContactService.getById(contactId);
-    if (!existing || existing.tenantId !== user.tenantId) {
+    const scope = getCrmContactScope(user);
+    if (!scope) {
+      return { error: "AccÃ¨s refusÃ©" };
+    }
+
+    const existing = await ContactService.getById(contactId, scope);
+    if (!existing) {
       return { error: "Contact introuvable" };
     }
 
@@ -133,8 +138,13 @@ export async function deleteContact(contactId: string) {
     const user = await getSession();
     checkPermission(user.role, "contact.manage");
 
-    const existing = await ContactService.getById(contactId);
-    if (!existing || existing.tenantId !== user.tenantId) {
+    const scope = getCrmContactScope(user);
+    if (!scope) {
+      return { error: "AccÃ¨s refusÃ©" };
+    }
+
+    const existing = await ContactService.getById(contactId, scope);
+    if (!existing) {
       return { error: "Contact introuvable" };
     }
 
@@ -166,11 +176,18 @@ export async function getContacts(options?: {
 }) {
   try {
     const user = await getSession();
+    checkPermission(user.role, "contact.view");
+
+    const scope = getCrmContactScope(user);
+    if (!scope) {
+      return { error: "AccÃ¨s refusÃ©" };
+    }
     const result = await ContactService.list(user.tenantId, {
       type: options?.type as ContactType | undefined,
       search: options?.search,
       page: options?.page,
       limit: options?.limit,
+      scopeWhere: scope,
     });
     return { data: result.contacts };
   } catch (error) {
@@ -182,8 +199,15 @@ export async function getContacts(options?: {
 export async function getContactById(contactId: string) {
   try {
     const user = await getSession();
-    const contact = await ContactService.getById(contactId);
-    if (!contact || contact.tenantId !== user.tenantId) {
+    checkPermission(user.role, "contact.view");
+
+    const scope = getCrmContactScope(user);
+    if (!scope) {
+      return { error: "AccÃ¨s refusÃ©" };
+    }
+
+    const contact = await ContactService.getById(contactId, scope);
+    if (!contact) {
       return { error: "Contact introuvable" };
     }
     return { data: contact };
@@ -196,7 +220,12 @@ export async function getContactById(contactId: string) {
 export async function getContactTypeCount() {
   try {
     const user = await getSession();
-    return { data: await ContactService.getTypeCount(user.tenantId) };
+    checkPermission(user.role, "contact.view");
+    const scope = getCrmContactScope(user);
+    if (!scope) {
+      return { error: "AccÃ¨s refusÃ©" };
+    }
+    return { data: await ContactService.getTypeCount(user.tenantId, scope) };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur lors de la récupération" };
   }
@@ -210,6 +239,14 @@ export async function createLead(formData: Record<string, unknown>) {
     checkPermission(user.role, "lead.manage");
 
     const validated = createLeadSchema.parse(formData);
+    const contactScope = getCrmContactScope(user);
+    if (!contactScope) {
+      return { error: "AccÃ¨s refusÃ©" };
+    }
+    const allowedContact = await ContactService.getById(validated.contactId, contactScope);
+    if (!allowedContact) {
+      return { error: "Contact introuvable" };
+    }
     const ownerId = validated.ownerId || validated.assignedTo || user.id;
     const collaboratorIds = normalizeCollaboratorIds(validated.collaboratorIds, ownerId);
 
@@ -250,12 +287,18 @@ export async function getLeads(options?: {
 }) {
   try {
     const user = await getSession();
+    checkPermission(user.role, "lead.view");
+    const scope = getCrmLeadScope(user);
+    if (!scope) {
+      return { error: "AccÃ¨s refusÃ©" };
+    }
     const result = await LeadService.list(user.tenantId, {
       status: options?.status as LeadStatus | undefined,
       assignedTo: options?.assignedTo,
       search: options?.search,
       page: options?.page,
       limit: options?.limit,
+      scopeWhere: scope,
     });
     return {
       data: result.leads,
@@ -274,8 +317,12 @@ export async function updateLeadStatus(leadId: string, status: string) {
     const user = await getSession();
     checkPermission(user.role, "lead.manage");
 
-    const existing = await LeadService.getById(leadId);
-    if (!existing || existing.contact.tenantId !== user.tenantId) {
+    const scope = getCrmLeadScope(user);
+    if (!scope) {
+      return { error: "AccÃ¨s refusÃ©" };
+    }
+    const existing = await LeadService.getById(leadId, scope);
+    if (!existing) {
       return { error: "Lead introuvable" };
     }
 
@@ -317,8 +364,12 @@ export async function validateLead(leadId: string) {
     const user = await getSession();
     checkPermission(user.role, "lead.manage");
 
-    const existing = await LeadService.getById(leadId);
-    if (!existing || existing.contact.tenantId !== user.tenantId) {
+    const scope = getCrmLeadScope(user);
+    if (!scope) {
+      return { error: "AccÃ¨s refusÃ©" };
+    }
+    const existing = await LeadService.getById(leadId, scope);
+    if (!existing) {
       return { error: "Lead introuvable" };
     }
 
@@ -365,8 +416,13 @@ export async function validateLead(leadId: string) {
 export async function getLeadById(leadId: string) {
   try {
     const user = await getSession();
-    const lead = await LeadService.getById(leadId);
-    if (!lead || lead.contact.tenantId !== user.tenantId) {
+    checkPermission(user.role, "lead.view");
+    const scope = getCrmLeadScope(user);
+    if (!scope) {
+      return { error: "AccÃ¨s refusÃ©" };
+    }
+    const lead = await LeadService.getById(leadId, scope);
+    if (!lead) {
       return { error: "Lead introuvable" };
     }
     return { data: lead };
@@ -381,8 +437,12 @@ export async function updateLead(leadId: string, data: Record<string, unknown>) 
     const user = await getSession();
     checkPermission(user.role, "lead.manage");
 
-    const existing = await LeadService.getById(leadId);
-    if (!existing || existing.contact.tenantId !== user.tenantId) {
+    const scope = getCrmLeadScope(user);
+    if (!scope) {
+      return { error: "AccÃ¨s refusÃ©" };
+    }
+    const existing = await LeadService.getById(leadId, scope);
+    if (!existing) {
       return { error: "Lead introuvable" };
     }
 
@@ -431,7 +491,12 @@ export async function updateLead(leadId: string, data: Record<string, unknown>) 
 export async function getLeadPipeline() {
   try {
     const user = await getSession();
-    return { data: await LeadService.getPipelineStats(user.tenantId) };
+    checkPermission(user.role, "lead.view");
+    const scope = getCrmLeadScope(user);
+    if (!scope) {
+      return { error: "AccÃ¨s refusÃ©" };
+    }
+    return { data: await LeadService.getPipelineStats(user.tenantId, scope) };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur lors de la récupération" };
   }
@@ -440,7 +505,14 @@ export async function getLeadPipeline() {
 export async function exportContactsCSV() {
   try {
     const user = await getSession();
-    const result = await ContactService.list(user.tenantId, { limit: 10000 });
+    if (!canExportCrm(user.role)) {
+      return { error: "AccÃ¨s refusÃ©" };
+    }
+    const scope = getCrmContactScope(user);
+    if (!scope) {
+      return { error: "AccÃ¨s refusÃ©" };
+    }
+    const result = await ContactService.list(user.tenantId, { limit: 10000, scopeWhere: scope });
     const contacts = result.contacts;
 
     const TYPE_LABELS: Record<string, string> = {
@@ -580,11 +652,13 @@ export async function logContactActivity(
 export async function getContactTimeline(contactId: string, limit = 100) {
   try {
     const user = await getSession();
-    const contact = await prisma.contact.findUnique({
-      where: { id: contactId },
-      select: { tenantId: true },
-    });
-    if (!contact || contact.tenantId !== user.tenantId) {
+    checkPermission(user.role, "contact.view");
+    const scope = getCrmContactScope(user);
+    if (!scope) {
+      return { error: "AccÃ¨s refusÃ©" };
+    }
+    const contact = await ContactService.getById(contactId, scope);
+    if (!contact) {
       return { error: "Contact introuvable" };
     }
 
@@ -750,9 +824,3 @@ export async function getContactTimeline(contactId: string, limit = 100) {
     return { error: error instanceof Error ? error.message : "Erreur lors du chargement" };
   }
 }
-
-
-
-
-
-

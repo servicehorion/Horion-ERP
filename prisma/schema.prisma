@@ -28,6 +28,7 @@ model Tenant {
   orders             Order[]
   contacts           Contact[]
   tasks              Task[]
+  projects           Project[]
   ledgerAccounts     LedgerAccount[]
   auditLogs          AuditLog[]
   delegationRules    DelegationRule[]
@@ -68,6 +69,12 @@ model User {
   ownedLeads      Lead[]            @relation("LeadOwner")
   onboardedLeads  Lead[]            @relation("LeadOnboardedBy")
   leadCollaborations LeadCollaborator[]
+  ownedOrders     Order[]           @relation("OrderOwner")
+  onboardedOrders Order[]           @relation("OrderOnboardedBy")
+  orderCollaborations OrderCollaborator[]
+  orderAttachments OrderAttachment[]
+  projectMembers  ProjectMember[]
+  timeEntries     TaskTimeEntry[]
 
   @@index([tenantId])
   @@map("users")
@@ -284,6 +291,8 @@ model Order {
   tenantId         String
   orderNumber      String      @unique
   contactId        String
+  ownerId          String?
+  onboardedById    String?
   status           OrderStatus @default(DEMANDE)
   priority         Priority    @default(NORMAL)
   merchandiseTotal Decimal     @db.Decimal(15, 2) @default(0)
@@ -297,13 +306,18 @@ model Order {
   destinationCity  String      @default("Brazzaville")
   estimatedDelivery DateTime?
   actualDelivery    DateTime?
+  archivedAt       DateTime?
   notes            String?
   riskLevel        RiskLevel   @default(LOW)
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
-
+  
   tenant        Tenant          @relation(fields: [tenantId], references: [id])
   contact       Contact         @relation(fields: [contactId], references: [id])
+  owner         User?           @relation("OrderOwner", fields: [ownerId], references: [id])
+  onboardedBy   User?           @relation("OrderOnboardedBy", fields: [onboardedById], references: [id])
+  collaborators OrderCollaborator[]
+  attachments   OrderAttachment[]
   items         OrderItem[]
   quotes        Quote[]
   timeline      OrderTimeline[]
@@ -314,10 +328,13 @@ model Order {
   tasks         Task[]
   disputes      Dispute[]
   marginReport  MarginReport?
-
+  
   @@index([tenantId])
   @@index([tenantId, status])
   @@index([orderNumber])
+  @@index([ownerId])
+  @@index([onboardedById])
+  @@index([archivedAt])
   @@map("orders")
 }
 
@@ -422,6 +439,37 @@ model OrderTimeline {
 
   @@index([orderId])
   @@map("order_timeline")
+}
+
+model OrderCollaborator {
+  id        String   @id @default(cuid())
+  orderId   String
+  userId    String
+  createdAt DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id])
+
+  @@unique([orderId, userId])
+  @@index([userId])
+  @@map("order_collaborators")
+}
+
+model OrderAttachment {
+  id        String   @id @default(cuid())
+  orderId   String
+  userId    String?
+  name      String
+  url       String
+  type      String   @default("link")
+  createdAt DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user  User? @relation(fields: [userId], references: [id])
+
+  @@index([orderId])
+  @@index([userId])
+  @@map("order_attachments")
 }
 
 model Dispute {
@@ -972,6 +1020,11 @@ model Task {
   children     Task[] @relation("TaskSubtasks")
   position     Int    @default(0) // ordering in lists/kanban
 
+  // Project / Sprint link
+  projectId      String?
+  sprintId       String?
+  storyPoints    Int?
+
   // Template & scheduling
   templateId     String?
   dueDate        DateTime?
@@ -988,12 +1041,15 @@ model Task {
 
   tenant           Tenant            @relation(fields: [tenantId], references: [id])
   order            Order?            @relation(fields: [entityId], references: [id])
+  project          Project?          @relation(fields: [projectId], references: [id])
+  sprint           Sprint?           @relation(fields: [sprintId], references: [id])
   assignments      TaskAssignment[]
   approvals        Approval[]
   comments         TaskComment[]
   watchers         TaskWatcher[]
   agentExecutions  AgentExecution[]
   attachments      TaskAttachment[]
+  timeEntries      TaskTimeEntry[]
   // Dependencies
   dependencies     TaskDependency[]  @relation("TaskDependencies")
   dependents       TaskDependency[]  @relation("TaskDependents")
@@ -1004,6 +1060,8 @@ model Task {
   @@index([slaDeadline])
   @@index([parentTaskId])
   @@index([ownerType, status])
+  @@index([projectId])
+  @@index([sprintId])
   @@map("tasks")
 }
 
@@ -1257,6 +1315,21 @@ enum NotificationType {
   LEAD_UPDATED
   LEAD_ASSIGNED
   LEAD_CONVERTED
+  ORDER_CREATED
+  ORDER_UPDATED
+  ORDER_TEAM_UPDATED
+  QUOTE_CREATED
+  QUOTE_SENT
+  QUOTE_ACCEPTED
+  QUOTE_REJECTED
+  QUOTE_EXPIRED
+  PAYMENT_CREATED
+  SHIPMENT_CREATED
+  SHIPMENT_UPDATED
+  QC_REQUEST_CREATED
+  QC_REPORT_ADDED
+  DISPUTE_CREATED
+  DISPUTE_RESOLVED
 }
 
 // ============================================================
@@ -1894,4 +1967,190 @@ model SupplierSegmentation {
   @@index([supplierId])
   @@index([segment])
   @@map("supplier_segmentations")
+}
+
+// ============================================================
+// M. PROJECT OS — Projects, Sprints, Milestones, Budget, Time
+// ============================================================
+
+enum ProjectStatus {
+  PLANNING
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+  ARCHIVED
+}
+
+enum MilestoneStatus {
+  PENDING
+  IN_PROGRESS
+  ACHIEVED
+  MISSED
+  CANCELLED
+}
+
+enum SprintStatus {
+  PLANNING
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum ProjectRole {
+  OWNER
+  MANAGER
+  MEMBER
+  VIEWER
+}
+
+model Project {
+  id          String        @id @default(cuid())
+  tenantId    String
+  name        String
+  description String?
+  status      ProjectStatus @default(PLANNING)
+  ownerId     String?
+  color       String        @default("#6366f1") // display color
+  icon        String?                           // emoji or icon key
+  startDate   DateTime?
+  endDate     DateTime?
+  completedAt DateTime?
+  // Budget
+  budgetTotal  Decimal? @db.Decimal(15, 2)
+  budgetCurrency String @default("XAF")
+  // Settings
+  settings    Json     @default("{}") // { velocityTarget, sprintLength, ... }
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant     Tenant          @relation(fields: [tenantId], references: [id])
+  members    ProjectMember[]
+  milestones Milestone[]
+  phases     Phase[]
+  sprints    Sprint[]
+  budgets    Budget[]
+  tasks      Task[]
+
+  @@index([tenantId, status])
+  @@index([ownerId])
+  @@map("projects")
+}
+
+model ProjectMember {
+  id        String      @id @default(cuid())
+  projectId String
+  userId    String
+  role      ProjectRole @default(MEMBER)
+  hourlyRate Decimal?   @db.Decimal(10, 2)  // XAF/h for cost calculation
+  currency   String     @default("XAF")
+  joinedAt  DateTime    @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@unique([projectId, userId])
+  @@index([userId])
+  @@map("project_members")
+}
+
+model Milestone {
+  id          String          @id @default(cuid())
+  projectId   String
+  name        String
+  description String?
+  status      MilestoneStatus @default(PENDING)
+  dueDate     DateTime?
+  achievedAt  DateTime?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@map("milestones")
+}
+
+model Phase {
+  id          String    @id @default(cuid())
+  projectId   String
+  name        String
+  description String?
+  order       Int       @default(0)
+  startDate   DateTime?
+  endDate     DateTime?
+  color       String    @default("#94a3b8")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@map("phases")
+}
+
+model Sprint {
+  id        String       @id @default(cuid())
+  projectId String
+  name      String
+  goal      String?
+  status    SprintStatus @default(PLANNING)
+  startDate DateTime?
+  endDate   DateTime?
+  velocity  Int?         // story points completed
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tasks   Task[]
+
+  @@index([projectId, status])
+  @@map("sprints")
+}
+
+model Budget {
+  id         String   @id @default(cuid())
+  projectId  String
+  category   String   // LABOR, EXTERNAL, TOOLS, TRAVEL, OTHER
+  label      String
+  planned    Decimal  @db.Decimal(15, 2)
+  actual     Decimal  @db.Decimal(15, 2) @default(0)
+  currency   String   @default("XAF")
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@map("budgets")
+}
+
+// ── Time Entries (per-task, per-user, with billing) ─────────────
+
+model TaskTimeEntry {
+  id          String    @id @default(cuid())
+  taskId      String
+  userId      String
+  description String?
+  minutes     Int       // duration in minutes
+  startedAt   DateTime
+  endedAt     DateTime?
+  hourlyRate  Decimal?  @db.Decimal(10, 2) // snapshot of rate at time of entry
+  currency    String    @default("XAF")
+  cost        Decimal?  @db.Decimal(15, 2) // computed: minutes/60 * hourlyRate
+  billable    Boolean   @default(true)
+  approved    Boolean   @default(false)
+  approvedBy  String?
+  approvedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([taskId])
+  @@index([userId, startedAt])
+  @@index([startedAt])
+  @@map("task_time_entries")
 }

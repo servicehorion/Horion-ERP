@@ -69,12 +69,14 @@ export class LeadService {
       search?: string;
       page?: number;
       limit?: number;
+      scopeWhere?: Prisma.LeadWhereInput;
     } = {}
   ) {
-    const { status, assignedTo, search, page = 1, limit = 20 } = options;
+    const { status, assignedTo, search, page = 1, limit = 20, scopeWhere } = options;
 
     const where: Prisma.LeadWhereInput = {
       contact: { tenantId },
+      ...(scopeWhere || {}),
       ...(status && { status }),
       ...(assignedTo && { assignedTo }),
       ...(search && {
@@ -111,9 +113,9 @@ export class LeadService {
     return { leads, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
-  static async getById(leadId: string) {
-    return prisma.lead.findUnique({
-      where: { id: leadId },
+  static async getById(leadId: string, scopeWhere?: Prisma.LeadWhereInput) {
+    return prisma.lead.findFirst({
+      where: { id: leadId, ...(scopeWhere || {}) },
       include: {
         owner: { select: { id: true, name: true, email: true } },
         onboardedBy: { select: { id: true, name: true, email: true } },
@@ -189,10 +191,10 @@ export class LeadService {
     });
   }
 
-  static async getPipelineStats(tenantId: string) {
+  static async getPipelineStats(tenantId: string, scopeWhere?: Prisma.LeadWhereInput) {
     const pipeline = await prisma.lead.groupBy({
       by: ["status"],
-      where: { contact: { tenantId } },
+      where: { contact: { tenantId }, ...(scopeWhere || {}) },
       _count: { id: true },
       _sum: { estimatedValue: true },
     });

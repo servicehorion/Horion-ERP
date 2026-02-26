@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, Plus, Trash2 } from "lucide-react";
@@ -25,34 +25,45 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { createOrder } from "@/lib/actions/order.actions";
+import { createOrder, updateOrder } from "@/lib/actions/order.actions";
 import { createOrderSchema, type CreateOrderInput } from "@/lib/validators/order";
 import { CURRENCIES } from "@/config/currencies";
 
 interface OrderFormProps {
   contacts: { id: string; name: string }[];
   initialContactId?: string;
+  mode?: "create" | "edit";
+  orderId?: string;
+  initialValues?: Partial<CreateOrderInput>;
 }
 
-export function OrderForm({ contacts, initialContactId }: OrderFormProps) {
+export function OrderForm({
+  contacts,
+  initialContactId,
+  mode = "create",
+  orderId,
+  initialValues,
+}: OrderFormProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<CreateOrderInput>({
     resolver: zodResolver(createOrderSchema) as any,
     defaultValues: {
-      contactId: initialContactId || "",
-      items: [
-        {
-          description: "",
-          quantity: 1,
-          unitPrice: 0,
-          currency: "XAF",
-        },
-      ],
-      priority: "NORMAL",
-      destinationCity: "Brazzaville",
-      notes: "",
+      contactId: initialValues?.contactId || initialContactId || "",
+      items: initialValues?.items && initialValues.items.length > 0
+        ? (initialValues.items as any)
+        : [
+            {
+              description: "",
+              quantity: 1,
+              unitPrice: 0,
+              currency: "XAF",
+            },
+          ],
+      priority: (initialValues?.priority as any) || "NORMAL",
+      destinationCity: initialValues?.destinationCity || "Brazzaville",
+      notes: initialValues?.notes || "",
     },
   });
 
@@ -64,15 +75,22 @@ export function OrderForm({ contacts, initialContactId }: OrderFormProps) {
   async function onSubmit(data: CreateOrderInput) {
     setIsSubmitting(true);
     try {
-      const result = await createOrder(data);
+      const result = mode === "edit" && orderId
+        ? await updateOrder(orderId, data as any)
+        : await createOrder(data);
 
       if (result.error) {
         toast.error(result.error);
         return;
       }
 
-      toast.success("Commande créée avec succès");
-      router.push(`/orders/${result.data?.id}`);
+      toast.success(mode === "edit" ? "Commande mise Ã  jour" : "Commande crÃ©Ã©e avec succÃ¨s");
+      const targetId = mode === "edit" ? orderId : result.data?.id;
+      if (targetId) {
+        router.push(`/orders/${targetId}`);
+      } else {
+        router.push("/orders");
+      }
     } catch (error) {
       toast.error("Une erreur est survenue");
       console.error(error);
@@ -94,7 +112,7 @@ export function OrderForm({ contacts, initialContactId }: OrderFormProps) {
                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                   <FormControl>
                     <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner un client" />
+                      <SelectValue placeholder="SÃ©lectionner un client" />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
@@ -115,7 +133,7 @@ export function OrderForm({ contacts, initialContactId }: OrderFormProps) {
             name="priority"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Priorité</FormLabel>
+                <FormLabel>PrioritÃ©</FormLabel>
                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                   <FormControl>
                     <SelectTrigger>
@@ -197,7 +215,7 @@ export function OrderForm({ contacts, initialContactId }: OrderFormProps) {
                   name={`items.${index}.quantity`}
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Quantité</FormLabel>
+                      <FormLabel>QuantitÃ©</FormLabel>
                       <FormControl>
                         <Input
                           {...field}
@@ -286,7 +304,7 @@ export function OrderForm({ contacts, initialContactId }: OrderFormProps) {
               <FormControl>
                 <Textarea
                   {...field}
-                  placeholder="Informations supplémentaires..."
+                  placeholder="Informations supplÃ©mentaires..."
                   rows={4}
                 />
               </FormControl>
@@ -306,10 +324,11 @@ export function OrderForm({ contacts, initialContactId }: OrderFormProps) {
           </Button>
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Créer la commande
+            {mode === "edit" ? "Mettre Ã  jour" : "CrÃ©er la commande"}
           </Button>
         </div>
       </form>
     </Form>
   );
 }
+

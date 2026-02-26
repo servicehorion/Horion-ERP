@@ -29,6 +29,18 @@ export const updateOrderStatusSchema = z.object({
   note: z.string().optional(),
 });
 
+export const updateOrderSchema = z.object({
+  orderId: z.string().min(1),
+  contactId: z.string().min(1).optional(),
+  items: z.array(orderItemSchema).min(1).optional(),
+  priority: z.enum(["LOW", "NORMAL", "HIGH", "URGENT"]).optional(),
+  destinationCity: z.string().optional(),
+  notes: z.string().optional(),
+  logisticsCost: z.number().nonnegative().optional(),
+  insuranceAmount: z.number().nonnegative().optional(),
+  commissionRate: z.number().min(0).max(1).optional(),
+});
+
 export const createQuoteSchema = z.object({
   orderId: z.string().min(1),
   merchandiseTotal: z.number().nonnegative(),
@@ -41,4 +53,5 @@ export const createQuoteSchema = z.object({
 
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;
 export type UpdateOrderStatusInput = z.infer<typeof updateOrderStatusSchema>;
+export type UpdateOrderInput = z.infer<typeof updateOrderSchema>;
 export type CreateQuoteInput = z.infer<typeof createQuoteSchema>;

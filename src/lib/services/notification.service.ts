@@ -252,7 +252,7 @@ export class NotificationService {
     const approvers = await prisma.user.findMany({
       where: {
         tenantId,
-        role: { in: ["ADMIN", "DIRECTION"] },
+        role: { in: ["ADMIN", "CEO", "DIRECTION"] },
         isActive: true,
       },
       select: { id: true },

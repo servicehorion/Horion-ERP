@@ -36,7 +36,7 @@ export default async function LeadsPage({ searchParams }: PageProps) {
       page,
       limit: 50,
     }),
-    getTeamMembers(),
+    getTeamMembers("crm"),
   ]);
 
   const leads = leadsResult.data || [];

@@ -27,7 +27,10 @@ export class OrderService {
     return `${prefix}-${year}-${nextNum}`;
   }
 
-  static async create(tenantId: string, data: CreateOrderInput) {
+  static async create(
+    tenantId: string,
+    data: CreateOrderInput & { ownerId?: string | null; onboardedById?: string | null; collaboratorIds?: string[] }
+  ) {
     const orderNumber = await this.generateOrderNumber(tenantId);
 
     // Calculate totals
@@ -53,6 +56,8 @@ export class OrderService {
         tenantId,
         orderNumber,
         contactId: data.contactId,
+        ownerId: data.ownerId ?? null,
+        onboardedById: data.onboardedById ?? null,
         priority: data.priority as Priority,
         destinationCity: data.destinationCity || "Brazzaville",
         notes: data.notes,
@@ -75,6 +80,11 @@ export class OrderService {
             notes: item.notes,
           })),
         },
+        collaborators: data.collaboratorIds?.length
+          ? {
+              create: data.collaboratorIds.map((userId) => ({ userId })),
+            }
+          : undefined,
         timeline: {
           create: {
             event: "order_created",
@@ -87,6 +97,7 @@ export class OrderService {
         items: true,
         contact: true,
         timeline: true,
+        collaborators: { include: { user: true } },
       },
     });
 
@@ -106,12 +117,14 @@ export class OrderService {
       page?: number;
       limit?: number;
       search?: string;
+      includeArchived?: boolean;
     } = {}
   ) {
-    const { status, page = 1, limit = 20, search } = options;
+    const { status, page = 1, limit = 20, search, includeArchived } = options;
 
     const where: Prisma.OrderWhereInput = {
       tenantId,
+      ...(includeArchived ? {} : { archivedAt: null }),
       ...(status && { status }),
       ...(search && {
         OR: [
@@ -148,6 +161,10 @@ export class OrderService {
       include: {
         contact: true,
         items: true,
+        owner: true,
+        onboardedBy: true,
+        collaborators: { include: { user: true } },
+        attachments: { include: { user: true }, orderBy: { createdAt: "desc" } },
         quotes: { orderBy: { version: "desc" } },
         timeline: { orderBy: { createdAt: "desc" } },
         tasks: {
@@ -157,7 +174,168 @@ export class OrderService {
         shipments: true,
         payments: true,
         disputes: true,
+        qcRequests: { include: { reports: true }, orderBy: { createdAt: "desc" } },
       },
+    });
+  }
+
+  static async update(
+    orderId: string,
+    data: Partial<CreateOrderInput> & {
+      ownerId?: string | null;
+      onboardedById?: string | null;
+      collaboratorIds?: string[];
+      logisticsCost?: number;
+      insuranceAmount?: number;
+      commissionRate?: number;
+    }
+  ) {
+    const existing = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: { items: true },
+    });
+    if (!existing) throw new Error("Commande introuvable");
+
+    let merchandiseTotal = Number(existing.merchandiseTotal);
+    let itemsPayload: Array<{
+      description: string;
+      quantity: number;
+      unitPrice: number;
+      currency?: string;
+      hsCode?: string;
+      weight?: number;
+      volume?: number;
+      notes?: string;
+      unitPriceXAF: number;
+      totalXAF: number;
+    }> = [];
+
+    if (data.items && data.items.length > 0) {
+      merchandiseTotal = 0;
+      itemsPayload = data.items.map((item) => {
+        const unitPriceXAF = convertCurrency(item.unitPrice, item.currency || "RMB", "XAF");
+        const totalXAF = unitPriceXAF * item.quantity;
+        merchandiseTotal += totalXAF;
+        return { ...item, unitPriceXAF, totalXAF };
+      });
+    }
+
+    const commissionRate = data.commissionRate ?? Number(existing.commissionRate);
+    const commissionAmount = merchandiseTotal * commissionRate;
+    const logisticsCost = data.logisticsCost ?? Number(existing.logisticsCost);
+    const insuranceAmount = data.insuranceAmount ?? Number(existing.insuranceAmount);
+    const totalClient = merchandiseTotal + commissionAmount + logisticsCost + insuranceAmount;
+
+    const updated = await prisma.$transaction(async (tx) => {
+      if (data.items && data.items.length > 0) {
+        await tx.orderItem.deleteMany({ where: { orderId } });
+        await tx.orderItem.createMany({
+          data: itemsPayload.map((item) => ({
+            orderId,
+            description: item.description,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            currency: item.currency || "RMB",
+            unitPriceXAF: item.unitPriceXAF,
+            totalXAF: item.totalXAF,
+            hsCode: item.hsCode,
+            weight: item.weight,
+            volume: item.volume,
+            notes: item.notes,
+          })),
+        });
+      }
+
+      const order = await tx.order.update({
+        where: { id: orderId },
+        data: {
+          ...(data.contactId && { contactId: data.contactId }),
+          ...(data.priority && { priority: data.priority as Priority }),
+          ...(data.destinationCity && { destinationCity: data.destinationCity }),
+          ...(data.notes !== undefined && { notes: data.notes }),
+          ...(data.ownerId !== undefined && { ownerId: data.ownerId }),
+          ...(data.onboardedById !== undefined && { onboardedById: data.onboardedById }),
+          ...(data.logisticsCost !== undefined && { logisticsCost }),
+          ...(data.insuranceAmount !== undefined && { insuranceAmount }),
+          ...(data.commissionRate !== undefined && { commissionRate }),
+          merchandiseTotal,
+          commissionAmount,
+          totalClient,
+        },
+      });
+
+      if (data.collaboratorIds) {
+        await tx.orderCollaborator.deleteMany({ where: { orderId } });
+        if (data.collaboratorIds.length > 0) {
+          await tx.orderCollaborator.createMany({
+            data: data.collaboratorIds.map((userId) => ({ orderId, userId })),
+          });
+        }
+      }
+
+      return order;
+    });
+
+    return updated;
+  }
+
+  static async duplicate(orderId: string) {
+    const existing = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: { items: true },
+    });
+    if (!existing) throw new Error("Commande introuvable");
+
+    const orderNumber = await this.generateOrderNumber(existing.tenantId);
+    const order = await prisma.order.create({
+      data: {
+        tenantId: existing.tenantId,
+        orderNumber,
+        contactId: existing.contactId,
+        ownerId: existing.ownerId,
+        onboardedById: existing.onboardedById,
+        priority: existing.priority,
+        destinationCity: existing.destinationCity,
+        notes: existing.notes,
+        merchandiseTotal: existing.merchandiseTotal,
+        logisticsCost: existing.logisticsCost,
+        commissionRate: existing.commissionRate,
+        commissionAmount: existing.commissionAmount,
+        insuranceAmount: existing.insuranceAmount,
+        totalClient: existing.totalClient,
+        currency: existing.currency,
+        originCountry: existing.originCountry,
+        riskLevel: existing.riskLevel,
+        items: {
+          create: existing.items.map((item) => ({
+            description: item.description,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            currency: item.currency,
+            unitPriceXAF: item.unitPriceXAF,
+            totalXAF: item.totalXAF,
+            hsCode: item.hsCode,
+            weight: item.weight,
+            volume: item.volume,
+            notes: item.notes,
+          })),
+        },
+        timeline: {
+          create: {
+            event: "order_created",
+            toValue: "DEMANDE",
+            note: "Commande dupliquée",
+          },
+        },
+      },
+    });
+    return order;
+  }
+
+  static async archive(orderId: string) {
+    return prisma.order.update({
+      where: { id: orderId },
+      data: { archivedAt: new Date() },
     });
   }
 
@@ -208,7 +386,7 @@ export class OrderService {
   static async getStatusCounts(tenantId: string) {
     const counts = await prisma.order.groupBy({
       by: ["status"],
-      where: { tenantId },
+      where: { tenantId, archivedAt: null },
       _count: { id: true },
     });
 

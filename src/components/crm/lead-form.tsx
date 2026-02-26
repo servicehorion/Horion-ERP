@@ -251,7 +251,7 @@ export function LeadForm({ lead, contacts, teamMembers, demoMode, currentUserId 
 
           <FormField
             control={form.control}
-            name=”currency”
+            name="currency"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Devise</FormLabel>
@@ -276,24 +276,24 @@ export function LeadForm({ lead, contacts, teamMembers, demoMode, currentUserId 
 
           <FormField
             control={form.control}
-            name=”containerType”
+            name="containerType"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Type de fret</FormLabel>
                 <Select
-                  onValueChange={(value) => field.onChange(value === “none” ? undefined : value)}
-                  defaultValue={field.value ?? “none”}
+                  onValueChange={(value) => field.onChange(value === "none" ? undefined : value)}
+                  defaultValue={field.value ?? "none"}
                 >
                   <FormControl>
                     <SelectTrigger>
-                      <SelectValue placeholder=”Sélectionner...” />
+                      <SelectValue placeholder="Sélectionner..." />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value=”none”>Non défini</SelectItem>
-                    <SelectItem value=”LCL”>LCL — Groupage maritime</SelectItem>
-                    <SelectItem value=”FCL”>FCL — Conteneur complet</SelectItem>
-                    <SelectItem value=”AERIEN”>Aérien</SelectItem>
+                    <SelectItem value="none">Non défini</SelectItem>
+                    <SelectItem value="LCL">LCL — Groupage maritime</SelectItem>
+                    <SelectItem value="FCL">FCL — Conteneur complet</SelectItem>
+                    <SelectItem value="AERIEN">Aérien</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />
@@ -303,12 +303,12 @@ export function LeadForm({ lead, contacts, teamMembers, demoMode, currentUserId 
 
           <FormField
             control={form.control}
-            name=”originCountry”
+            name="originCountry"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Pays d'origine</FormLabel>
                 <FormControl>
-                  <Input {...field} placeholder=”CN, TH, TR...” />
+                  <Input {...field} placeholder="CN, TH, TR..." />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -318,7 +318,7 @@ export function LeadForm({ lead, contacts, teamMembers, demoMode, currentUserId 
 
         <FormField
           control={form.control}
-          name=”description”
+          name="description"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Description</FormLabel>

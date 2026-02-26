@@ -28,7 +28,7 @@ const STATUS_OPTIONS = [
   { value: "PENDING", label: "En attente" },
 ];
 
-export function TaskBulkActions({ tasks, teamMembers }: TaskBulkActionsProps) {
+export function useTaskBulkActions({ tasks, teamMembers }: TaskBulkActionsProps) {
   const router = useRouter();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);

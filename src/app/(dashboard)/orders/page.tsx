@@ -1,4 +1,4 @@
-import { Plus } from "lucide-react";
+﻿import { Plus } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
 
@@ -14,7 +14,15 @@ export const metadata = {
   description: "Gestion des commandes d'importation",
 };
 
-export default async function OrdersPage() {
+interface PageProps {
+  searchParams: {
+    page?: string;
+    status?: string;
+    q?: string;
+  };
+}
+
+export default async function OrdersPage({ searchParams }: PageProps) {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -33,14 +41,23 @@ export default async function OrdersPage() {
       </div>
 
       <Suspense fallback={<TableSkeleton />}>
-        <OrdersList />
+        <OrdersList searchParams={searchParams} />
       </Suspense>
     </div>
   );
 }
 
-async function OrdersList() {
-  const result = await getOrders({});
+async function OrdersList({ searchParams }: { searchParams: PageProps["searchParams"] }) {
+  const page = Math.max(1, Number(searchParams.page) || 1);
+  const status = searchParams.status;
+  const q = searchParams.q;
+
+  const result = await getOrders({
+    status,
+    search: q,
+    page,
+    limit: 20,
+  });
 
   if (result.error) {
     return (
@@ -51,6 +68,8 @@ async function OrdersList() {
   }
 
   const orders = result.data || [];
+  const totalPages = (result as any).totalPages || 1;
+  const total = (result as any).total || orders.length;
 
   if (orders.length === 0) {
     return (
@@ -75,11 +94,47 @@ async function OrdersList() {
   }));
 
   return (
-    <DataTable
-      columns={orderColumns}
-      data={tableData}
-      searchKey="orderNumber"
-      searchPlaceholder="Rechercher par numéro..."
-    />
+    <>
+      <DataTable
+        columns={orderColumns}
+        data={tableData}
+        searchKey="orderNumber"
+        searchPlaceholder="Rechercher par numéro..."
+        paginate={false}
+      />
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            Page {page} sur {totalPages} ({total} commande{total > 1 ? "s" : ""})
+          </p>
+          <div className="flex items-center gap-2">
+            {page > 1 && (
+              <Button variant="outline" size="sm" asChild>
+                <Link href={buildUrl(searchParams, { page: page - 1 })}>
+                  Précédent
+                </Link>
+              </Button>
+            )}
+            {page < totalPages && (
+              <Button variant="outline" size="sm" asChild>
+                <Link href={buildUrl(searchParams, { page: page + 1 })}>
+                  Suivant
+                </Link>
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+    </>
   );
 }
+
+function buildUrl(current: Record<string, string | undefined>, overrides: Record<string, string | number | undefined>): string {
+  const params = new URLSearchParams();
+  const merged = { ...current, ...overrides };
+  for (const [k, v] of Object.entries(merged)) {
+    if (v != null && v !== "" && v !== "all") params.set(k, String(v));
+  }
+  return `/orders?${params.toString()}`;
+}
+

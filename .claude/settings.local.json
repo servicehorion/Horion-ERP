@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find:*)",
+      "Bash(taskkill /F /IM node.exe)",
+      "Bash(git -C \"c:/Users/jafred Parker242/Desktop/Horion service\" remote -v)"
+    ]
+  }
+}

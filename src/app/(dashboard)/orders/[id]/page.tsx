@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { OrderDetail } from "@/components/orders/order-detail";
 import { getOrderById } from "@/lib/actions/order.actions";
 import { serializeDecimals } from "@/lib/utils";
+import { auth } from "@/lib/auth";
+import { hasPermission } from "@/lib/permissions";
 
 export const metadata = {
   title: "Détail commande | Horion ERP",
@@ -17,6 +19,11 @@ interface OrderDetailPageProps {
 
 export default async function OrderDetailPage({ params }: OrderDetailPageProps) {
   const { id } = await params;
+  const session = await auth();
+  if (!session?.user?.tenantId) {
+    redirect("/login");
+  }
+
   const result = await getOrderById(id);
 
   if (result.error || !result.data) {
@@ -24,6 +31,9 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
   }
 
   const order = serializeDecimals(result.data);
+  const canUpdateStatus = hasPermission(session.user.role, "order.update_status");
+  const canEdit = hasPermission(session.user.role, "order.update");
+  const canArchive = hasPermission(session.user.role, "order.delete");
 
   return (
     <div className="space-y-6">
@@ -35,7 +45,12 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
         </Button>
       </div>
 
-      <OrderDetail order={order} />
+      <OrderDetail
+        order={order}
+        canUpdateStatus={canUpdateStatus}
+        canEdit={canEdit}
+        canArchive={canArchive}
+      />
     </div>
   );
 }

@@ -20,7 +20,7 @@ import { revalidatePath } from "next/cache";
 export async function createLedgerAccount(formData: Record<string, unknown>) {
   try {
     const user = await getSession();
-    checkPermission(user.role, "payment.create");
+    checkPermission(user.role, "finance.manage");
 
     const validated = createLedgerAccountSchema.parse(formData);
     const account = await LedgerService.createAccount({
@@ -47,6 +47,7 @@ export async function createLedgerAccount(formData: Record<string, unknown>) {
 export async function getLedgerAccounts(type?: string) {
   try {
     const user = await getSession();
+    checkPermission(user.role, "finance.view");
     const accounts = await LedgerService.listAccounts(user.tenantId, {
       type: type as "ASSET" | "LIABILITY" | "EQUITY" | "REVENUE" | "EXPENSE" | undefined,
     });
@@ -59,6 +60,7 @@ export async function getLedgerAccounts(type?: string) {
 export async function getLedgerAccountById(accountId: string) {
   try {
     const user = await getSession();
+    checkPermission(user.role, "finance.view");
     const account = await LedgerService.getAccountById(accountId);
     if (!account || account.tenantId !== user.tenantId) {
       return { error: "Compte introuvable" };
@@ -72,7 +74,7 @@ export async function getLedgerAccountById(accountId: string) {
 export async function createLedgerEntry(formData: Record<string, unknown>) {
   try {
     const user = await getSession();
-    checkPermission(user.role, "payment.create");
+    checkPermission(user.role, "finance.manage");
 
     const validated = createLedgerEntrySchema.parse(formData);
 
@@ -103,6 +105,7 @@ export async function createLedgerEntry(formData: Record<string, unknown>) {
 export async function getTrialBalance() {
   try {
     const user = await getSession();
+    checkPermission(user.role, "finance.view");
     return { data: await LedgerService.getTrialBalance(user.tenantId) };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur" };
@@ -112,7 +115,7 @@ export async function getTrialBalance() {
 export async function seedChartOfAccounts() {
   try {
     const user = await getSession();
-    checkPermission(user.role, "payment.create");
+    checkPermission(user.role, "finance.manage");
 
     const accounts = await LedgerService.seedChartOfAccounts(user.tenantId);
 
@@ -156,7 +159,8 @@ export async function createFXRate(formData: Record<string, unknown>) {
 
 export async function getLatestFXRates() {
   try {
-    await getSession();
+    const user = await getSession();
+    checkPermission(user.role, "finance.view");
     return { data: await FXRateService.getLatestRates() };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur" };
@@ -165,7 +169,8 @@ export async function getLatestFXRates() {
 
 export async function getFXHistory(fromCurrency: string, toCurrency: string) {
   try {
-    await getSession();
+    const user = await getSession();
+    checkPermission(user.role, "finance.view");
     return { data: await FXRateService.getHistory(fromCurrency, toCurrency, { limit: 30 }) };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur" };
@@ -174,7 +179,8 @@ export async function getFXHistory(fromCurrency: string, toCurrency: string) {
 
 export async function convertAmount(amount: number, from: string, to: string) {
   try {
-    await getSession();
+    const user = await getSession();
+    checkPermission(user.role, "finance.view");
     const result = await FXRateService.convert(amount, from, to);
     return { data: { amount: result, from, to } };
   } catch (error) {
@@ -189,6 +195,7 @@ export async function convertAmount(amount: number, from: string, to: string) {
 export async function getFinancialKPIs() {
   try {
     const user = await getSession();
+    checkPermission(user.role, "finance.view");
     return { data: await FinanceIntelligenceService.getFinancialKPIs(user.tenantId) };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur" };
@@ -198,6 +205,7 @@ export async function getFinancialKPIs() {
 export async function getCashflowAnalysis(months?: number) {
   try {
     const user = await getSession();
+    checkPermission(user.role, "finance.view");
     return { data: await FinanceIntelligenceService.getCashflowAnalysis(user.tenantId, months) };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur" };
@@ -207,6 +215,7 @@ export async function getCashflowAnalysis(months?: number) {
 export async function getProfitAndLoss() {
   try {
     const user = await getSession();
+    checkPermission(user.role, "finance.view");
     return { data: await FinanceIntelligenceService.getProfitAndLoss(user.tenantId) };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur" };
@@ -216,6 +225,7 @@ export async function getProfitAndLoss() {
 export async function getAgingReport() {
   try {
     const user = await getSession();
+    checkPermission(user.role, "finance.view");
     return { data: await FinanceIntelligenceService.getAgingReport(user.tenantId) };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur" };
@@ -225,6 +235,7 @@ export async function getAgingReport() {
 export async function getRevenueByClient() {
   try {
     const user = await getSession();
+    checkPermission(user.role, "finance.view");
     return { data: await FinanceIntelligenceService.getRevenueByClient(user.tenantId) };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur" };
@@ -234,6 +245,7 @@ export async function getRevenueByClient() {
 export async function getPaymentMethodStats() {
   try {
     const user = await getSession();
+    checkPermission(user.role, "finance.view");
     return { data: await FinanceIntelligenceService.getPaymentMethodStats(user.tenantId) };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur" };
@@ -247,6 +259,7 @@ export async function getPaymentMethodStats() {
 export async function exportFinanceCSV() {
   try {
     const user = await getSession();
+    checkPermission(user.role, "finance.manage");
     const { payments } = await (await import("@/lib/services/payment.service")).PaymentService.list({
       tenantId: user.tenantId,
       limit: 5000,

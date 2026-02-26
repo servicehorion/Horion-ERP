@@ -54,11 +54,12 @@ export class TaskIntelligenceService {
   /**
    * Full dashboard metrics for the Tasks OS page.
    */
-  static async getDashboardMetrics(tenantId: string, userId: string): Promise<TaskDashboardMetrics> {
+  static async getDashboardMetrics(tenantId: string, userId: string, modules?: string[] | "*"): Promise<TaskDashboardMetrics> {
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const weekStart = new Date(todayStart);
     weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+    const moduleFilter = modules && modules !== "*" ? { module: { in: modules } } : {};
 
     const [
       statusCounts,
@@ -71,25 +72,26 @@ export class TaskIntelligenceService {
     ] = await Promise.all([
       prisma.task.groupBy({
         by: ["status"],
-        where: { tenantId, status: { notIn: ["COMPLETED", "CANCELLED"] } },
+        where: { tenantId, status: { notIn: ["COMPLETED", "CANCELLED"] }, ...moduleFilter },
         _count: { id: true },
       }),
       prisma.task.count({
-        where: { tenantId, slaBreach: true, status: { notIn: ["COMPLETED", "CANCELLED"] } },
+        where: { tenantId, slaBreach: true, status: { notIn: ["COMPLETED", "CANCELLED"] }, ...moduleFilter },
       }),
       prisma.task.count({
-        where: { tenantId, status: "COMPLETED", completedAt: { gte: todayStart } },
+        where: { tenantId, status: "COMPLETED", completedAt: { gte: todayStart }, ...moduleFilter },
       }),
       prisma.task.count({
-        where: { tenantId, status: "COMPLETED", completedAt: { gte: weekStart } },
+        where: { tenantId, status: "COMPLETED", completedAt: { gte: weekStart }, ...moduleFilter },
       }),
-      prisma.task.count({ where: { tenantId, status: "COMPLETED" } }),
-      prisma.task.count({ where: { tenantId, status: "CANCELLED" } }),
+      prisma.task.count({ where: { tenantId, status: "COMPLETED", ...moduleFilter } }),
+      prisma.task.count({ where: { tenantId, status: "CANCELLED", ...moduleFilter } }),
       prisma.task.count({
         where: {
           tenantId,
           status: { notIn: ["COMPLETED", "CANCELLED"] },
           assignments: { some: { userId } },
+          ...moduleFilter,
         },
       }),
     ]);
@@ -103,7 +105,7 @@ export class TaskIntelligenceService {
 
     // Compute avg resolution time from recent completed tasks
     const recentCompleted = await prisma.task.findMany({
-      where: { tenantId, status: "COMPLETED", completedAt: { not: null } },
+      where: { tenantId, status: "COMPLETED", completedAt: { not: null }, ...moduleFilter },
       select: { createdAt: true, completedAt: true },
       orderBy: { completedAt: "desc" },
       take: 50,
@@ -137,9 +139,10 @@ export class TaskIntelligenceService {
   /**
    * Breakdown by module with status + SLA counts.
    */
-  static async getModuleBreakdown(tenantId: string): Promise<ModuleBreakdown[]> {
+  static async getModuleBreakdown(tenantId: string, modules?: string[] | "*"): Promise<ModuleBreakdown[]> {
+    const moduleFilter = modules && modules !== "*" ? { module: { in: modules } } : {};
     const active = await prisma.task.findMany({
-      where: { tenantId, status: { notIn: ["COMPLETED", "CANCELLED"] } },
+      where: { tenantId, status: { notIn: ["COMPLETED", "CANCELLED"] }, ...moduleFilter },
       select: { module: true, status: true, slaBreach: true },
     });
 
@@ -170,7 +173,8 @@ export class TaskIntelligenceService {
   /**
    * Team workload — tasks per team member.
    */
-  static async getTeamWorkload(tenantId: string): Promise<TeamMemberWorkload[]> {
+  static async getTeamWorkload(tenantId: string, modules?: string[] | "*"): Promise<TeamMemberWorkload[]> {
+    const moduleFilter = modules && modules !== "*" ? { module: { in: modules } } : {};
     const users = await prisma.user.findMany({
       where: { tenantId, isActive: true },
       select: {
@@ -180,7 +184,7 @@ export class TaskIntelligenceService {
         role: true,
         taskAssignments: {
           include: {
-            task: { select: { status: true, slaBreach: true } },
+            task: { select: { status: true, slaBreach: true, module: true } },
           },
         },
       },
@@ -188,7 +192,9 @@ export class TaskIntelligenceService {
 
     return users
       .map((u) => {
-        const tasks = u.taskAssignments.map((a) => a.task);
+        const tasks = moduleFilter.module
+          ? u.taskAssignments.map((a) => a.task).filter((t) => moduleFilter.module?.in?.includes(t.module))
+          : u.taskAssignments.map((a) => a.task);
         return {
           userId: u.id,
           name: u.name,
@@ -206,10 +212,11 @@ export class TaskIntelligenceService {
   /**
    * Priority distribution for active tasks.
    */
-  static async getPriorityDistribution(tenantId: string): Promise<PriorityDistribution> {
+  static async getPriorityDistribution(tenantId: string, modules?: string[] | "*"): Promise<PriorityDistribution> {
+    const moduleFilter = modules && modules !== "*" ? { module: { in: modules } } : {};
     const counts = await prisma.task.groupBy({
       by: ["priority"],
-      where: { tenantId, status: { notIn: ["COMPLETED", "CANCELLED"] } },
+      where: { tenantId, status: { notIn: ["COMPLETED", "CANCELLED"] }, ...moduleFilter },
       _count: { id: true },
     });
 
@@ -223,11 +230,13 @@ export class TaskIntelligenceService {
   /**
    * Get urgencies — HIGH/URGENT priority + SLA breaches.
    */
-  static async getUrgencies(tenantId: string, limit = 10) {
+  static async getUrgencies(tenantId: string, limit = 10, modules?: string[] | "*") {
+    const moduleFilter = modules && modules !== "*" ? { module: { in: modules } } : {};
     return prisma.task.findMany({
       where: {
         tenantId,
         status: { notIn: ["COMPLETED", "CANCELLED"] },
+        ...moduleFilter,
         OR: [
           { priority: { in: ["HIGH", "URGENT"] } },
           { slaBreach: true },
@@ -245,12 +254,14 @@ export class TaskIntelligenceService {
   /**
    * My tasks for a specific user.
    */
-  static async getMyTasks(tenantId: string, userId: string, limit = 20) {
+  static async getMyTasks(tenantId: string, userId: string, limit = 20, modules?: string[] | "*") {
+    const moduleFilter = modules && modules !== "*" ? { module: { in: modules } } : {};
     return prisma.task.findMany({
       where: {
         tenantId,
         status: { notIn: ["COMPLETED", "CANCELLED"] },
         assignments: { some: { userId } },
+        ...moduleFilter,
       },
       include: {
         assignments: { include: { user: { select: { name: true, id: true } } } },
@@ -305,12 +316,14 @@ export class TaskIntelligenceService {
   /**
    * Tasks for Kanban board view (grouped by status).
    */
-  static async getKanbanTasks(tenantId: string, module?: string) {
+  static async getKanbanTasks(tenantId: string, module?: string, modules?: string[] | "*") {
+    const moduleFilter = modules && modules !== "*" ? { module: { in: modules } } : {};
     return prisma.task.findMany({
       where: {
         tenantId,
         status: { notIn: ["CANCELLED"] },
         ...(module && module !== "all" && { module }),
+        ...moduleFilter,
       },
       include: {
         assignments: { include: { user: { select: { id: true, name: true } } } },

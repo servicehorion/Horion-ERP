@@ -53,7 +53,7 @@ export default async function LeadDetailPage({
   const { id } = await params;
   const [result, membersResult] = await Promise.all([
     getLeadById(id),
-    getTeamMembers(),
+    getTeamMembers("crm"),
   ]);
 
   if (result.error || !result.data) {

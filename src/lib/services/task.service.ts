@@ -70,10 +70,11 @@ export class TaskService {
     });
   }
 
-  static async getModuleCounts(tenantId: string) {
+  static async getModuleCounts(tenantId: string, modules?: string[] | "*") {
+    const moduleFilter = modules && modules !== "*" ? { module: { in: modules } } : {};
     const counts = await prisma.task.groupBy({
       by: ["module"],
-      where: { tenantId, status: { notIn: ["COMPLETED", "CANCELLED"] } },
+      where: { tenantId, status: { notIn: ["COMPLETED", "CANCELLED"] }, ...moduleFilter },
       _count: { id: true },
     });
 
@@ -86,11 +87,13 @@ export class TaskService {
     );
   }
 
-  static async getPendingCount(tenantId: string) {
+  static async getPendingCount(tenantId: string, modules?: string[] | "*") {
+    const moduleFilter = modules && modules !== "*" ? { module: { in: modules } } : {};
     return prisma.task.count({
       where: {
         tenantId,
         status: { in: ["PENDING", "IN_PROGRESS", "WAITING_APPROVAL", "BLOCKED"] },
+        ...moduleFilter,
       },
     });
   }

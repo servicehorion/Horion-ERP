@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Clock, Loader2, Pause, Play, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -26,6 +26,8 @@ export function TimeTracker({ taskId, estimatedHours, actualHours }: TimeTracker
   const [timerRunning, setTimerRunning] = useState(false);
   const [timerStart, setTimerStart] = useState<number | null>(null);
   const [elapsed, setElapsed] = useState(0);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timerStartRef = useRef<number | null>(null);
 
   const estimated = estimatedHours ?? 0;
   const actual = actualHours ?? 0;
@@ -34,23 +36,29 @@ export function TimeTracker({ taskId, estimatedHours, actualHours }: TimeTracker
 
   // Timer functions
   const startTimer = () => {
+    const now = Date.now();
+    timerStartRef.current = now;
+    setTimerStart(now);
     setTimerRunning(true);
-    setTimerStart(Date.now());
     setElapsed(0);
-    const tick = () => {
-      if (!timerRunning) return;
-      setElapsed(Date.now() - (timerStart ?? Date.now()));
-    };
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
+    intervalRef.current = setInterval(() => {
+      setElapsed(Date.now() - (timerStartRef.current ?? Date.now()));
+    }, 1000);
   };
 
   const stopTimer = async () => {
-    if (!timerStart) return;
-    const elapsedMs = Date.now() - timerStart;
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    const start = timerStartRef.current;
+    timerStartRef.current = null;
+    if (!start) return;
+    const elapsedMs = Date.now() - start;
     const elapsedHours = Math.round((elapsedMs / 3600000) * 100) / 100;
     setTimerRunning(false);
     setTimerStart(null);
+    setElapsed(0);
 
     if (elapsedHours >= 0.01) {
       setLoading(true);
@@ -124,7 +132,7 @@ export function TimeTracker({ taskId, estimatedHours, actualHours }: TimeTracker
         <div className="flex items-center gap-2 p-2 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200">
           <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
           <span className="font-mono text-sm font-medium flex-1">
-            {formatElapsed(Date.now() - (timerStart ?? Date.now()))}
+            {formatElapsed(elapsed)}
           </span>
           <Button size="sm" variant="outline" className="h-7" onClick={stopTimer} disabled={loading}>
             {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Pause className="h-3 w-3" />}

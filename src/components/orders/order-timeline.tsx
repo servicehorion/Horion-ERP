@@ -1,5 +1,6 @@
-import { formatDate } from "@/lib/utils";
+﻿import { formatDate } from "@/lib/utils";
 import { cn } from "@/lib/utils";
+import { ORDER_STATUS_LABELS } from "@/config/order-statuses";
 
 interface TimelineEntry {
   id: string;
@@ -19,7 +20,7 @@ export function OrderTimeline({ entries }: OrderTimelineProps) {
   if (entries.length === 0) {
     return (
       <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
-        Aucun événement pour le moment
+        Aucun Ã©vÃ©nement pour le moment
       </div>
     );
   }
@@ -73,33 +74,19 @@ function getActionLabel(
   toValue: string | null
 ): string {
   if (event === "order_created") {
-    return "Commande créée";
+    return "Commande crÃ©Ã©e";
   }
 
   if (event === "status_changed" && toValue) {
-    return `Statut changé vers ${getStatusLabel(toValue)}`;
+    return `Statut changÃ© vers ${getStatusLabel(toValue)}`;
   }
 
   return event;
 }
 
 function getStatusLabel(status: string): string {
-  const labels: Record<string, string> = {
-    DEMANDE: "Demande",
-    RECHERCHE_PRODUIT: "Recherche produit",
-    DEVIS: "Devis",
-    PAIEMENT_EN_COURS: "Paiement en cours",
-    SOURCING: "Sourcing",
-    COMMANDE_USINE: "Commande usine",
-    EN_PRODUCTION: "En production",
-    QC_EN_COURS: "QC en cours",
-    QC_VALIDE: "QC validé",
-    EN_TRANSIT: "En transit",
-    AU_PORT: "Au port",
-    DEDOUANEMENT: "Dédouanement",
-    LIVRE: "Livré",
-    ANNULE: "Annulé",
-  };
-
-  return labels[status] || status;
+  return (ORDER_STATUS_LABELS as Record<string, string>)[status] || status;
 }
+
+
+

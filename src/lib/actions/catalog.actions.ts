@@ -84,6 +84,7 @@ export async function getProducts(options?: {
 }) {
   try {
     const user = await getSession();
+    checkPermission(user.role, "catalog.view");
     const result = await CatalogProductService.list(user.tenantId, {
       status: options?.status as ProductStatus | undefined,
       categoryId: options?.categoryId,
@@ -100,6 +101,7 @@ export async function getProducts(options?: {
 export async function getProductById(productId: string) {
   try {
     const user = await getSession();
+    checkPermission(user.role, "catalog.view");
     const product = await CatalogProductService.getById(productId);
     if (!product || product.tenantId !== user.tenantId) {
       return { error: "Produit introuvable" };
@@ -113,6 +115,7 @@ export async function getProductById(productId: string) {
 export async function getProductStatusCounts() {
   try {
     const user = await getSession();
+    checkPermission(user.role, "catalog.view");
     return { data: await CatalogProductService.getStatusCounts(user.tenantId) };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur" };
@@ -122,6 +125,7 @@ export async function getProductStatusCounts() {
 export async function getTopProducts() {
   try {
     const user = await getSession();
+    checkPermission(user.role, "catalog.view");
     return { data: await CatalogProductService.getTopByDemand(user.tenantId) };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur" };
@@ -181,7 +185,8 @@ export async function getSuppliers(options?: {
   limit?: number;
 }) {
   try {
-    await getSession();
+    const user = await getSession();
+    checkPermission(user.role, "catalog.view");
     const result = await CatalogSupplierService.list({
       status: options?.status as SupplierStatus | undefined,
       platform: options?.platform,
@@ -197,7 +202,8 @@ export async function getSuppliers(options?: {
 
 export async function getSupplierById(supplierId: string) {
   try {
-    await getSession();
+    const user = await getSession();
+    checkPermission(user.role, "catalog.view");
     const supplier = await CatalogSupplierService.getById(supplierId);
     if (!supplier) return { error: "Fournisseur introuvable" };
     return { data: supplier };
@@ -208,7 +214,8 @@ export async function getSupplierById(supplierId: string) {
 
 export async function getSupplierStatusCounts() {
   try {
-    await getSession();
+    const user = await getSession();
+    checkPermission(user.role, "catalog.view");
     return { data: await CatalogSupplierService.getStatusCounts() };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur" };
@@ -217,7 +224,8 @@ export async function getSupplierStatusCounts() {
 
 export async function getTopSuppliers() {
   try {
-    await getSession();
+    const user = await getSession();
+    checkPermission(user.role, "catalog.view");
     return { data: await CatalogSupplierService.getTopByRating() };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur" };
@@ -278,7 +286,8 @@ export async function getOffers(options?: {
   limit?: number;
 }) {
   try {
-    await getSession();
+    const user = await getSession();
+    checkPermission(user.role, "catalog.view");
     const result = await CatalogOfferService.list(options);
     return { data: result.offers };
   } catch (error) {
@@ -288,7 +297,8 @@ export async function getOffers(options?: {
 
 export async function getPriceHistory(productId: string, supplierId?: string) {
   try {
-    await getSession();
+    const user = await getSession();
+    checkPermission(user.role, "catalog.view");
     return { data: await CatalogOfferService.getPriceHistory(productId, supplierId) };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur" };
@@ -358,6 +368,7 @@ export async function getMediaList(options?: {
 }) {
   try {
     const user = await getSession();
+    checkPermission(user.role, "catalog.view");
     return { data: (await CatalogMediaService.list(user.tenantId, options)).media };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur" };
@@ -392,6 +403,7 @@ export async function createCategory(formData: Record<string, unknown>) {
 export async function getCategories() {
   try {
     const user = await getSession();
+    checkPermission(user.role, "catalog.view");
     const categories = await prisma.productCategory.findMany({
       where: { tenantId: user.tenantId },
       include: { _count: { select: { products: true } } },
@@ -437,6 +449,7 @@ export async function updateProductStatus(productId: string, status: string) {
 export async function exportProductsCSV() {
   try {
     const user = await getSession();
+    checkPermission(user.role, "catalog.manage");
     const result = await CatalogProductService.list(user.tenantId, { limit: 1000 });
 
     const headers = ["Nom", "Catégorie", "Statut", "MOQ Min", "Prix Min", "Prix Max", "Devise", "Score Demande", "Fournisseurs", "Commandes", "QC", "Créé le"];
@@ -472,6 +485,7 @@ export async function exportProductsCSV() {
 export async function getCatalogDashboardStats() {
   try {
     const user = await getSession();
+    checkPermission(user.role, "catalog.view");
     const tenantId = user.tenantId;
 
     const [productCounts, supplierCounts, topProducts, topSuppliers, recentOffers, mediaCounts, categoryStats] = await Promise.all([
@@ -513,6 +527,7 @@ export async function getCatalogDashboardStats() {
 export async function getCatalogAnalytics() {
   try {
     const user = await getSession();
+    checkPermission(user.role, "catalog.view");
     const tenantId = user.tenantId;
 
     const [categoryPerformance, topByRevenue, priceSpread, healthMetrics] = await Promise.all([
@@ -531,6 +546,7 @@ export async function getCatalogAnalytics() {
 export async function getProductIntelligence(productId: string) {
   try {
     const user = await getSession();
+    checkPermission(user.role, "catalog.view");
     const product = await CatalogProductService.getById(productId);
     if (!product || product.tenantId !== user.tenantId) {
       return { error: "Produit introuvable" };
@@ -592,6 +608,7 @@ export async function getProductsPageData(options: {
 }) {
   try {
     const user = await getSession();
+    checkPermission(user.role, "catalog.view");
     const { page = 1, limit = 50, status, categoryId, search } = options;
 
     const [result, statusCounts, categories] = await Promise.all([

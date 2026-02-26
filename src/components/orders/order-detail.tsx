@@ -1,6 +1,7 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 
@@ -12,6 +13,17 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import {
   Select,
   SelectContent,
@@ -31,8 +43,8 @@ import {
 import { StatusBadge, PriorityBadge } from "@/components/shared/status-badge";
 import { CurrencyDisplay } from "@/components/shared/currency-display";
 import { OrderTimeline } from "./order-timeline";
-import { updateOrderStatus } from "@/lib/actions/order.actions";
-import { ORDER_STATUSES } from "@/config/order-statuses";
+import { updateOrderStatus, duplicateOrder, archiveOrder } from "@/lib/actions/order.actions";
+import { ORDER_STATUS_LABELS, ORDER_STATUS_TRANSITIONS } from "@/config/order-statuses";
 import { formatDate } from "@/lib/utils";
 import { Loader2 } from "lucide-react";
 
@@ -82,12 +94,23 @@ type OrderDetailProps = {
       createdAt: Date;
     }[];
   };
+  canUpdateStatus?: boolean;
+  canEdit?: boolean;
+  canArchive?: boolean;
 };
 
-export function OrderDetail({ order }: OrderDetailProps) {
+function buildAllowedStatuses(current: string) {
+  const transitions = (ORDER_STATUS_TRANSITIONS as Record<string, string[]>)[current] || [];
+  return Array.from(new Set([current, ...transitions]));
+}
+
+export function OrderDetail({ order, canUpdateStatus = false, canEdit = false, canArchive = false }: OrderDetailProps) {
   const router = useRouter();
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isDuplicating, setIsDuplicating] = useState(false);
+  const [isArchiving, setIsArchiving] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState(order.status);
+  const allowedStatuses = buildAllowedStatuses(order.status);
 
   async function handleStatusChange(newStatus: string) {
     if (newStatus === order.status) return;
@@ -113,58 +136,130 @@ export function OrderDetail({ order }: OrderDetailProps) {
     }
   }
 
+  async function handleDuplicate() {
+    setIsDuplicating(true);
+    try {
+      const result = await duplicateOrder(order.id);
+      if (result.error) {
+        toast.error(result.error);
+        return;
+      }
+      toast.success("Commande dupliquée");
+      router.push(`/orders/${result.data?.id}`);
+    } catch (error) {
+      toast.error("Une erreur est survenue");
+      console.error(error);
+    } finally {
+      setIsDuplicating(false);
+    }
+  }
+
+  async function handleArchive() {
+    setIsArchiving(true);
+    try {
+      const result = await archiveOrder(order.id);
+      if (result.error) {
+        toast.error(result.error);
+        return;
+      }
+      toast.success("Commande archivée");
+      router.push("/orders");
+    } catch (error) {
+      toast.error("Une erreur est survenue");
+      console.error(error);
+    } finally {
+      setIsArchiving(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-3xl font-bold">{order.orderNumber}</h1>
           <p className="text-muted-foreground">
             Créée le {formatDate(order.createdAt)}
           </p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-2">
           <StatusBadge status={order.status} />
           <PriorityBadge priority={order.priority} />
+          {canEdit && (
+            <Button variant="outline" size="sm" asChild>
+              <Link href={`/orders/${order.id}/edit`}>Modifier</Link>
+            </Button>
+          )}
+          {canEdit && (
+            <Button variant="outline" size="sm" onClick={handleDuplicate} disabled={isDuplicating}>
+              {isDuplicating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Dupliquer
+            </Button>
+          )}
+          {canArchive && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm" disabled={isArchiving}>
+                  Archiver
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Archiver la commande</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Cette action masque la commande des listes actives. Vous pourrez la restaurer plus tard.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Annuler</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleArchive} disabled={isArchiving}>
+                    Confirmer
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
         </div>
       </div>
 
       {/* Status change */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Changer le statut</CardTitle>
-          <CardDescription>
-            Mettre à jour l'état de la commande
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-4">
-            <Select
-              value={selectedStatus}
-              onValueChange={setSelectedStatus}
-              disabled={isUpdating}
-            >
-              <SelectTrigger className="w-[280px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {ORDER_STATUSES.map((status) => (
-                  <SelectItem key={status.value} value={status.value}>
-                    {status.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button
-              onClick={() => handleStatusChange(selectedStatus)}
-              disabled={isUpdating || selectedStatus === order.status}
-            >
-              {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Mettre à jour
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      {canUpdateStatus && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Changer le statut</CardTitle>
+            <CardDescription>
+              Mettre à jour l'état de la commande
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-4">
+              <Select
+                value={selectedStatus}
+                onValueChange={setSelectedStatus}
+                disabled={isUpdating}
+              >
+                <SelectTrigger className="w-[280px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {allowedStatuses.map((value) => (
+                    <SelectItem key={value} value={value}>
+                      {ORDER_STATUS_LABELS[value as keyof typeof ORDER_STATUS_LABELS] ?? value}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                onClick={() => handleStatusChange(selectedStatus)}
+                disabled={isUpdating || selectedStatus === order.status}
+              >
+                {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Mettre à jour
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Tabs */}
       <Tabs defaultValue="resume" className="space-y-6">
@@ -370,3 +465,4 @@ export function OrderDetail({ order }: OrderDetailProps) {
     </div>
   );
 }
+

@@ -63,6 +63,7 @@ export async function getSourcingCases(options?: {
 }) {
   try {
     const user = await getSession();
+    checkPermission(user.role, "sourcing.view");
     const result = await SourcingCaseService.list(user.tenantId, {
       status: options?.status as SourcingStatus | undefined,
       search: options?.search,
@@ -78,6 +79,7 @@ export async function getSourcingCases(options?: {
 export async function getSourcingCaseById(id: string) {
   try {
     const user = await getSession();
+    checkPermission(user.role, "sourcing.view");
     const sc = await SourcingCaseService.getById(id);
     if (!sc || sc.order.tenantId !== user.tenantId) {
       return { error: "Cas de sourcing introuvable" };
@@ -245,6 +247,7 @@ export async function addNegotiationLog(formData: Record<string, unknown>) {
 export async function getSourcingPipeline() {
   try {
     const user = await getSession();
+    checkPermission(user.role, "sourcing.view");
     return { data: await SourcingCaseService.getPipelineStats(user.tenantId) };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur" };
@@ -254,6 +257,7 @@ export async function getSourcingPipeline() {
 export async function getSourcingKanban() {
   try {
     const user = await getSession();
+    checkPermission(user.role, "sourcing.view");
     const cases = await SourcingCaseService.getKanbanData(user.tenantId);
     return { data: cases };
   } catch (error) {
@@ -268,6 +272,7 @@ export async function getSourcingKanban() {
 export async function exportSourcingCasesCSV() {
   try {
     const user = await getSession();
+    checkPermission(user.role, "sourcing.manage");
     const { cases } = await SourcingCaseService.list(user.tenantId, { limit: 5000 });
 
     const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
@@ -313,6 +318,7 @@ export async function exportSourcingCasesCSV() {
 export async function getOrdersForSourcing() {
   try {
     const user = await getSession();
+    checkPermission(user.role, "sourcing.view");
     const orders = await prisma.order.findMany({
       where: {
         tenantId: user.tenantId,
@@ -336,7 +342,8 @@ export async function getOrdersForSourcing() {
 
 export async function getSuppliersForSourcing() {
   try {
-    await getSession();
+    const user = await getSession();
+    checkPermission(user.role, "sourcing.view");
     const suppliers = await prisma.supplier.findMany({
       where: { status: "ACTIVE" },
       select: {

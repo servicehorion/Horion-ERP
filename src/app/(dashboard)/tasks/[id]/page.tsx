@@ -17,7 +17,11 @@ import { TaskEditDialog } from "@/components/tasks/task-edit-dialog";
 import { TimeTracker } from "@/components/tasks/time-tracker";
 import { TaskDeleteDuplicate } from "@/components/tasks/task-delete-duplicate";
 import { TaskAttachments } from "@/components/tasks/task-attachments";
+import { TaskTimeEntriesPanel } from "@/components/tasks/task-time-entries-panel";
+import { TaskDependencyManager } from "@/components/tasks/task-dependency-manager";
 import { getTaskById, getTaskActivity, getTeamMembers } from "@/lib/actions/task.actions";
+import { getTimeEntries } from "@/lib/actions/project.actions";
+import { auth } from "@/lib/auth";
 import { formatDate } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
@@ -31,10 +35,16 @@ export async function generateMetadata({ params }: PageProps) {
 }
 
 export default async function TaskDetailPage({ params }: PageProps) {
-  const [taskResult, activityResult, membersResult] = await Promise.all([
+  const session = await auth();
+  const currentUserId = session?.user?.id ?? "";
+  const currentUserRole = (session?.user as any)?.role ?? "OPS";
+  const canApproveTime = ["ADMIN", "CEO", "DIRECTION", "FINANCE_MANAGER"].includes(currentUserRole);
+
+  const [taskResult, activityResult, membersResult, timeResult] = await Promise.all([
     getTaskById(params.id),
     getTaskActivity(params.id),
     getTeamMembers(),
+    getTimeEntries({ taskId: params.id }),
   ]);
 
   if (taskResult.error || !taskResult.data) notFound();
@@ -42,6 +52,7 @@ export default async function TaskDetailPage({ params }: PageProps) {
   const task = taskResult.data;
   const activity = activityResult.data ?? [];
   const teamMembers = membersResult.data ?? [];
+  const timeEntries = timeResult.data?.entries ?? [];
 
   const assignees = task.assignments?.map((a: any) => a.user) ?? [];
   const approvals = task.approvals ?? [];
@@ -191,8 +202,30 @@ export default async function TaskDetailPage({ params }: PageProps) {
             </Card>
           )}
 
-          {/* Dependencies */}
-          {(dependencies.length > 0 || dependents.length > 0) && (
+          {/* Dependencies — interactive manager */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <GitBranch className="h-4 w-4 text-orange-500" />
+                Dépendances
+                {(dependencies.length + dependents.length) > 0 && (
+                  <Badge variant="secondary" className="ml-auto text-xs">
+                    {dependencies.length + dependents.length}
+                  </Badge>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <TaskDependencyManager
+                taskId={task.id}
+                dependencies={dependencies}
+                dependents={dependents}
+              />
+            </CardContent>
+          </Card>
+
+          {/* Legacy placeholder kept for search — remove block below */}
+          {false && (dependencies.length > 0 || dependents.length > 0) && (
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
@@ -467,14 +500,37 @@ export default async function TaskDetailPage({ params }: PageProps) {
             <CardHeader className="pb-3">
               <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
                 <Timer className="h-4 w-4" />Suivi du temps
+                {timeEntries.length > 0 && (
+                  <span className="ml-auto text-xs font-normal">({timeEntries.length})</span>
+                )}
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-3">
               <TimeTracker
                 taskId={task.id}
                 estimatedHours={task.estimatedHours ?? null}
                 actualHours={task.actualHours ?? null}
               />
+              {timeEntries.length > 0 && (
+                <>
+                  <div className="border-t pt-3">
+                    <TaskTimeEntriesPanel
+                      entries={timeEntries.map((e: any) => ({
+                        id: e.id,
+                        minutes: e.minutes,
+                        description: e.description,
+                        startedAt: e.startedAt,
+                        billable: e.billable,
+                        approved: e.approved,
+                        cost: e.cost ? Number(e.cost) : null,
+                        user: { id: e.user.id, name: e.user.name },
+                      }))}
+                      currentUserId={currentUserId}
+                      canApprove={canApproveTime}
+                    />
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
 

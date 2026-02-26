@@ -1,4 +1,4 @@
-"use server";
+﻿"use server";
 
 import { getSession } from "@/lib/session";
 import { TaskService } from "@/lib/services/task.service";
@@ -10,6 +10,12 @@ import { AgentTaskService } from "@/lib/services/agent-task.service";
 import { NotificationService } from "@/lib/services/notification.service";
 import { AuditService } from "@/lib/services/audit.service";
 import { checkPermission } from "@/lib/permissions";
+import {
+  canAccessTaskModule,
+  getTaskAllowedModules,
+  getTaskRolesForModule,
+  getTaskRolesForModules,
+} from "@/lib/access-control";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import type { TaskStatus, Priority, DependencyType } from "@prisma/client";
@@ -39,11 +45,21 @@ export async function getTasks(options?: {
 }) {
   try {
     const user = await getSession();
+    checkPermission(user.role, "task.view");
     const { module, status, priority, search, assigneeId, slaBreach, tags, parentTaskId, page = 1, limit = 50 } = options || {};
+
+    const allowedModules = getTaskAllowedModules(user.role);
+    if (allowedModules !== "*" && allowedModules.length === 0) {
+      return { data: [], total: 0, page, totalPages: 1 };
+    }
+    if (module && module !== "all" && allowedModules !== "*" && !allowedModules.includes(module)) {
+      return { data: [], total: 0, page, totalPages: 1 };
+    }
 
     const where: any = {
       tenantId: user.tenantId,
       parentTaskId: parentTaskId ?? null, // only root tasks by default
+      ...(allowedModules !== "*" ? { module: { in: allowedModules } } : {}),
       ...(module && module !== "all" && { module }),
       ...(status && status !== "all" && { status }),
       ...(priority && priority !== "all" && { priority }),
@@ -82,8 +98,14 @@ export async function getTasks(options?: {
 export async function getTaskById(taskId: string) {
   try {
     const user = await getSession();
-    const task = await prisma.task.findUnique({
-      where: { id: taskId },
+    checkPermission(user.role, "task.view");
+    const allowedModules = getTaskAllowedModules(user.role);
+    const task = await prisma.task.findFirst({
+      where: {
+        id: taskId,
+        tenantId: user.tenantId,
+        ...(allowedModules !== "*" ? { module: { in: allowedModules } } : {}),
+      },
       include: {
         assignments: { include: { user: { select: { id: true, name: true, role: true } } } },
         approvals: { include: { user: { select: { name: true } } }, orderBy: { decidedAt: "desc" } },
@@ -105,7 +127,8 @@ export async function getTaskById(taskId: string) {
         parent: { select: { id: true, title: true } },
       },
     });
-    if (!task || task.tenantId !== user.tenantId) return { error: "Tâche introuvable" };
+    if (!task || task.tenantId !== user.tenantId) return { error: "TÃ¢che introuvable" };
+    if (!canAccessTaskModule(user.role, task.module)) return { error: "AccÃ¨s refusÃ©" };
     return { data: task };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur" };
@@ -114,7 +137,18 @@ export async function getTaskById(taskId: string) {
 
 export async function getTaskActivity(taskId: string) {
   try {
-    await getSession();
+    const user = await getSession();
+    checkPermission(user.role, "task.view");
+    const allowedModules = getTaskAllowedModules(user.role);
+    const task = await prisma.task.findFirst({
+      where: {
+        id: taskId,
+        tenantId: user.tenantId,
+        ...(allowedModules !== "*" ? { module: { in: allowedModules } } : {}),
+      },
+      select: { id: true },
+    });
+    if (!task) return { error: "TÃƒÂ¢che introuvable" };
     // Combine AuditLog + TaskComment for unified activity
     const [auditLogs, comments] = await Promise.all([
       prisma.auditLog.findMany({
@@ -157,15 +191,17 @@ export async function getTaskActivity(taskId: string) {
 export async function getTaskDashboardData() {
   try {
     const user = await getSession();
+    checkPermission(user.role, "task.view");
+    const allowedModules = getTaskAllowedModules(user.role);
     await TaskService.checkSLABreaches(user.tenantId);
 
     const [metrics, moduleBreakdown, priorities, urgencies, myTasks, teamWorkload] = await Promise.all([
-      TaskIntelligenceService.getDashboardMetrics(user.tenantId, user.id),
-      TaskIntelligenceService.getModuleBreakdown(user.tenantId),
-      TaskIntelligenceService.getPriorityDistribution(user.tenantId),
-      TaskIntelligenceService.getUrgencies(user.tenantId, 10),
-      TaskIntelligenceService.getMyTasks(user.tenantId, user.id, 15),
-      TaskIntelligenceService.getTeamWorkload(user.tenantId),
+      TaskIntelligenceService.getDashboardMetrics(user.tenantId, user.id, allowedModules),
+      TaskIntelligenceService.getModuleBreakdown(user.tenantId, allowedModules),
+      TaskIntelligenceService.getPriorityDistribution(user.tenantId, allowedModules),
+      TaskIntelligenceService.getUrgencies(user.tenantId, 10, allowedModules),
+      TaskIntelligenceService.getMyTasks(user.tenantId, user.id, 15, allowedModules),
+      TaskIntelligenceService.getTeamWorkload(user.tenantId, allowedModules),
     ]);
 
     return { data: { metrics, moduleBreakdown, priorities, urgencies, myTasks, teamWorkload, currentUserId: user.id } };
@@ -182,9 +218,22 @@ export async function updateTaskStatus(taskId: string, newStatus: string) {
   try {
     const user = await getSession();
     checkPermission(user.role, "task.update");
+    if (!canAccessTaskModule(user.role, formData.module)) return { error: "Accès refusé" };
+
+    if (formData.assigneeId) {
+      const assignee = await prisma.user.findUnique({
+        where: { id: formData.assigneeId },
+        select: { id: true, name: true, role: true, tenantId: true },
+      });
+      if (!assignee || assignee.tenantId !== user.tenantId) return { error: "Utilisateur introuvable" };
+      if (!canAccessTaskModule(assignee.role, formData.module)) {
+        return { error: "Assignation impossible: rôle non autorisé" };
+      }
+    }
 
     const existing = await prisma.task.findUnique({ where: { id: taskId } });
-    if (!existing || existing.tenantId !== user.tenantId) return { error: "Tâche introuvable" };
+    if (!existing || existing.tenantId !== user.tenantId) return { error: "TÃ¢che introuvable" };
+    if (!canAccessTaskModule(user.role, existing.module)) return { error: "AccÃ¨s refusÃ©" };
 
     const task = await TaskService.updateStatus(taskId, newStatus as TaskStatus);
 
@@ -222,9 +271,18 @@ export async function assignTask(taskId: string, userId: string) {
 
     const task = await prisma.task.findUnique({ where: { id: taskId } });
     if (!task || task.tenantId !== user.tenantId) return { error: "Tâche introuvable" };
+    if (!canAccessTaskModule(user.role, task.module)) return { error: "Accès refusé" };
+
+    const assignee = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, name: true, role: true, tenantId: true },
+    });
+    if (!assignee || assignee.tenantId !== user.tenantId) return { error: "Utilisateur introuvable" };
+    if (!canAccessTaskModule(assignee.role, task.module)) {
+      return { error: "Assignation impossible: rôle non autorisé" };
+    }
 
     const assignment = await TaskService.assignTask(taskId, userId);
-    const assignee = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
 
     // Notify assignee
     await NotificationService.onTaskAssigned(taskId, user.tenantId, userId, task.title, user.name);
@@ -241,7 +299,6 @@ export async function assignTask(taskId: string, userId: string) {
     return { error: error instanceof Error ? error.message : "Erreur" };
   }
 }
-
 export async function createManualTask(formData: {
   title: string;
   description?: string;
@@ -295,7 +352,7 @@ export async function createManualTask(formData: {
     revalidateTask();
     return { data: task };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Erreur création" };
+    return { error: error instanceof Error ? error.message : "Erreur crÃ©ation" };
   }
 }
 
@@ -306,8 +363,22 @@ export async function createManualTask(formData: {
 export async function addTaskComment(taskId: string, content: string, mentions: string[] = []) {
   try {
     const user = await getSession();
+    checkPermission(user.role, "task.update");
     const task = await prisma.task.findUnique({ where: { id: taskId } });
-    if (!task || task.tenantId !== user.tenantId) return { error: "Tâche introuvable" };
+    if (!task || task.tenantId !== user.tenantId) return { error: "TÃ¢che introuvable" };
+    if (!canAccessTaskModule(user.role, task.module)) return { error: "Accès refusé" };
+    if (!canAccessTaskModule(user.role, task.module)) return { error: "Accès refusé" };
+    if (!canAccessTaskModule(user.role, task.module)) return { error: "Accès refusé" };
+    if (data.module && !canAccessTaskModule(user.role, data.module)) return { error: "Accès refusé" };
+    if (!canAccessTaskModule(user.role, task.module)) return { error: "Accès refusé" };
+
+    const dependsOn = await prisma.task.findUnique({
+      where: { id: dependsOnId },
+      select: { tenantId: true, module: true },
+    });
+    if (!dependsOn || dependsOn.tenantId !== user.tenantId) return { error: "Tâche dépendance introuvable" };
+    if (!canAccessTaskModule(user.role, dependsOn.module)) return { error: "Accès refusé" };
+    if (!canAccessTaskModule(user.role, task.module)) return { error: "Accès refusé" };
 
     const comment = await prisma.taskComment.create({
       data: { taskId, userId: user.id, content, mentions },
@@ -330,7 +401,7 @@ export async function addTaskComment(taskId: string, content: string, mentions: 
         {
           tenantId: user.tenantId,
           type: "MENTION",
-          title: `${user.name} vous a mentionné`,
+          title: `${user.name} vous a mentionnÃ©`,
           message: content.slice(0, 200),
           entityType: "task",
           entityId: taskId,
@@ -355,7 +426,8 @@ export async function approveTask(taskId: string, decision: string, comment?: st
     checkPermission(user.role, "task.update");
 
     const task = await prisma.task.findUnique({ where: { id: taskId } });
-    if (!task || task.tenantId !== user.tenantId) return { error: "Tâche introuvable" };
+    if (!task || task.tenantId !== user.tenantId) return { error: "TÃ¢che introuvable" };
+    if (!canAccessTaskModule(user.role, task.module)) return { error: "Accès refusé" };
 
     const approval = await prisma.approval.create({
       data: { taskId, userId: user.id, decision: decision as any, comment },
@@ -374,7 +446,7 @@ export async function approveTask(taskId: string, decision: string, comment?: st
     await NotificationService.notifyTaskWatchers(taskId, {
       tenantId: user.tenantId,
       type: "APPROVAL_DECIDED",
-      title: `Tâche ${decision.toLowerCase()}: ${task.title}`,
+      title: `TÃ¢che ${decision.toLowerCase()}: ${task.title}`,
       message: comment,
     }, user.id);
 
@@ -408,7 +480,21 @@ export async function createSubtask(parentTaskId: string, data: {
     checkPermission(user.role, "task.update");
 
     const parent = await prisma.task.findUnique({ where: { id: parentTaskId } });
-    if (!parent || parent.tenantId !== user.tenantId) return { error: "Tâche parent introuvable" };
+    if (!parent || parent.tenantId !== user.tenantId) return { error: "TÃ¢che parent introuvable" };
+    if (!canAccessTaskModule(user.role, parent.module)) return { error: "AccÃ¨s refusÃ©" };
+    const targetModule = data.module ?? parent.module;
+    if (!canAccessTaskModule(user.role, targetModule)) return { error: "Accès refusé" };
+
+    if (data.assigneeId) {
+      const assignee = await prisma.user.findUnique({
+        where: { id: data.assigneeId },
+        select: { id: true, role: true, tenantId: true },
+      });
+      if (!assignee || assignee.tenantId !== user.tenantId) return { error: "Utilisateur introuvable" };
+      if (!canAccessTaskModule(assignee.role, targetModule)) {
+        return { error: "Assignation impossible: rôle non autorisé" };
+      }
+    }
 
     const subtask = await SubtaskService.createSubtask({
       parentTaskId,
@@ -435,7 +521,14 @@ export async function createSubtask(parentTaskId: string, data: {
 
 export async function getSubtaskProgress(parentTaskId: string) {
   try {
-    await getSession();
+    const user = await getSession();
+    checkPermission(user.role, "task.view");
+    const parent = await prisma.task.findUnique({
+      where: { id: parentTaskId },
+      select: { tenantId: true, module: true },
+    });
+    if (!parent || parent.tenantId !== user.tenantId) return { error: "Tâche introuvable" };
+    if (!canAccessTaskModule(user.role, parent.module)) return { error: "Accès refusé" };
     return { data: await SubtaskService.getProgress(parentTaskId) };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur" };
@@ -452,7 +545,7 @@ export async function addTaskDependency(taskId: string, dependsOnId: string, typ
     checkPermission(user.role, "task.update");
 
     const task = await prisma.task.findUnique({ where: { id: taskId } });
-    if (!task || task.tenantId !== user.tenantId) return { error: "Tâche introuvable" };
+    if (!task || task.tenantId !== user.tenantId) return { error: "TÃ¢che introuvable" };
 
     const dep = await TaskDependencyService.addDependency(
       taskId, dependsOnId, (type as DependencyType) ?? "BLOCKS"
@@ -476,6 +569,10 @@ export async function removeTaskDependency(taskId: string, dependsOnId: string) 
     const user = await getSession();
     checkPermission(user.role, "task.update");
 
+    const task = await prisma.task.findUnique({ where: { id: taskId } });
+    if (!task || task.tenantId !== user.tenantId) return { error: "TÃ¢che introuvable" };
+    if (!canAccessTaskModule(user.role, task.module)) return { error: "AccÃ¨s refusÃ©" };
+
     await TaskDependencyService.removeDependency(taskId, dependsOnId);
 
     revalidateTask(taskId);
@@ -492,6 +589,10 @@ export async function removeTaskDependency(taskId: string, dependsOnId: string) 
 export async function watchTask(taskId: string) {
   try {
     const user = await getSession();
+    checkPermission(user.role, "task.view");
+    const task = await prisma.task.findUnique({ where: { id: taskId } });
+    if (!task || task.tenantId !== user.tenantId) return { error: "TÃ¢che introuvable" };
+    if (!canAccessTaskModule(user.role, task.module)) return { error: "AccÃ¨s refusÃ©" };
     await prisma.taskWatcher.upsert({
       where: { taskId_userId: { taskId, userId: user.id } },
       update: {},
@@ -507,6 +608,10 @@ export async function watchTask(taskId: string) {
 export async function unwatchTask(taskId: string) {
   try {
     const user = await getSession();
+    checkPermission(user.role, "task.view");
+    const task = await prisma.task.findUnique({ where: { id: taskId } });
+    if (!task || task.tenantId !== user.tenantId) return { error: "TÃ¢che introuvable" };
+    if (!canAccessTaskModule(user.role, task.module)) return { error: "AccÃ¨s refusÃ©" };
     await prisma.taskWatcher.deleteMany({ where: { taskId, userId: user.id } });
     revalidatePath(`/tasks/${taskId}`);
     return { data: true };
@@ -522,7 +627,16 @@ export async function unwatchTask(taskId: string) {
 export async function getTaskTemplates(module?: string) {
   try {
     const user = await getSession();
-    return { data: await TaskTemplateService.listTemplates(user.tenantId, { module, isActive: true }) };
+    checkPermission(user.role, "task.view");
+    const allowedModules = getTaskAllowedModules(user.role);
+    if (module && module !== "all" && allowedModules !== "*" && !allowedModules.includes(module)) {
+      return { data: [] };
+    }
+    const templates = await TaskTemplateService.listTemplates(user.tenantId, { module, isActive: true });
+    const filtered = allowedModules === "*"
+      ? templates
+      : templates.filter((t) => allowedModules.includes(t.module));
+    return { data: filtered };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur" };
   }
@@ -545,6 +659,7 @@ export async function createTaskTemplate(formData: {
   try {
     const user = await getSession();
     checkPermission(user.role, "task.update");
+    if (!canAccessTaskModule(user.role, formData.module)) return { error: "Accès refusé" };
 
     const template = await TaskTemplateService.createTemplate({
       tenantId: user.tenantId,
@@ -574,6 +689,10 @@ export async function instantiateTemplate(templateId: string, vars?: Record<stri
     const user = await getSession();
     checkPermission(user.role, "task.update");
 
+    const template = await TaskTemplateService.getTemplate(templateId);
+    if (!template || template.tenantId !== user.tenantId) return { error: "Modèle introuvable" };
+    if (!canAccessTaskModule(user.role, template.module)) return { error: "Accès refusé" };
+
     const result = await TaskTemplateService.instantiate(templateId, {
       tenantId: user.tenantId,
       variables: vars,
@@ -581,6 +700,42 @@ export async function instantiateTemplate(templateId: string, vars?: Record<stri
 
     revalidateTask();
     return { data: result };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Erreur" };
+  }
+}
+
+export async function duplicateTaskTemplate(templateId: string) {
+  try {
+    const user = await getSession();
+    checkPermission(user.role, "task.update");
+
+    const original = await TaskTemplateService.getTemplate(templateId);
+    if (!original || original.tenantId !== user.tenantId) return { error: "Modèle introuvable" };
+
+    const copy = await prisma.taskTemplate.create({
+      data: {
+        tenantId: user.tenantId,
+        name: `${original.name} (copie)`,
+        description: original.description ?? undefined,
+        module: original.module,
+        taskType: original.taskType,
+        titleTemplate: original.titleTemplate,
+        descriptionTemplate: original.descriptionTemplate ?? undefined,
+        defaultPriority: original.defaultPriority,
+        defaultSlaHours: original.defaultSlaHours ?? undefined,
+        defaultTags: original.defaultTags,
+        requiresApproval: original.requiresApproval,
+        automationAllowed: original.automationAllowed,
+        ownerType: original.ownerType,
+        subtaskDefinitions: original.subtaskDefinitions,
+        dependencyDefinitions: original.dependencyDefinitions,
+        isActive: original.isActive,
+      },
+    });
+
+    revalidatePath("/tasks/templates");
+    return { data: copy };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur" };
   }
@@ -676,11 +831,28 @@ export async function bulkAssignTasks(taskIds: string[], userId: string) {
 // HELPERS
 // ============================================================
 
-export async function getTeamMembers() {
+export async function getTeamMembers(module?: string) {
   try {
     const user = await getSession();
+    checkPermission(user.role, "task.view");
+    const allowedModules = getTaskAllowedModules(user.role);
+    if (allowedModules !== "*" && allowedModules.length === 0) {
+      return { data: [] };
+    }
+    const normalizedModule = module && module !== "all" ? module : undefined;
+    if (normalizedModule && allowedModules !== "*" && !allowedModules.includes(normalizedModule)) {
+      return { data: [] };
+    }
+    const roleFilter = normalizedModule
+      ? getTaskRolesForModule(normalizedModule)
+      : (allowedModules === "*" ? "*" : getTaskRolesForModules(allowedModules));
+
     const members = await prisma.user.findMany({
-      where: { tenantId: user.tenantId, isActive: true },
+      where: {
+        tenantId: user.tenantId,
+        isActive: true,
+        ...(roleFilter !== "*" ? { role: { in: roleFilter } } : {}),
+      },
       select: { id: true, name: true, email: true, role: true },
       orderBy: { name: "asc" },
     });
@@ -693,7 +865,12 @@ export async function getTeamMembers() {
 export async function getKanbanTasks(module?: string) {
   try {
     const user = await getSession();
-    const tasks = await TaskIntelligenceService.getKanbanTasks(user.tenantId, module);
+    checkPermission(user.role, "task.view");
+    const allowedModules = getTaskAllowedModules(user.role);
+    if (module && module !== "all" && allowedModules !== "*" && !allowedModules.includes(module)) {
+      return { data: [] };
+    }
+    const tasks = await TaskIntelligenceService.getKanbanTasks(user.tenantId, module, allowedModules);
     return { data: tasks };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur" };
@@ -703,7 +880,9 @@ export async function getKanbanTasks(module?: string) {
 export async function getTaskModuleCounts() {
   try {
     const user = await getSession();
-    return { data: await TaskService.getModuleCounts(user.tenantId) };
+    checkPermission(user.role, "task.view");
+    const allowedModules = getTaskAllowedModules(user.role);
+    return { data: await TaskService.getModuleCounts(user.tenantId, allowedModules) };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur" };
   }
@@ -712,7 +891,9 @@ export async function getTaskModuleCounts() {
 export async function getPendingTaskCount() {
   try {
     const user = await getSession();
-    return { data: await TaskService.getPendingCount(user.tenantId) };
+    checkPermission(user.role, "task.view");
+    const allowedModules = getTaskAllowedModules(user.role);
+    return { data: await TaskService.getPendingCount(user.tenantId, allowedModules) };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur" };
   }
@@ -737,7 +918,7 @@ export async function updateTask(taskId: string, data: {
     checkPermission(user.role, "task.update");
 
     const task = await prisma.task.findUnique({ where: { id: taskId } });
-    if (!task || task.tenantId !== user.tenantId) return { error: "Tâche introuvable" };
+    if (!task || task.tenantId !== user.tenantId) return { error: "TÃ¢che introuvable" };
 
     const updated = await prisma.task.update({
       where: { id: taskId },
@@ -773,7 +954,7 @@ export async function deleteTask(taskId: string) {
     checkPermission(user.role, "task.update");
 
     const task = await prisma.task.findUnique({ where: { id: taskId } });
-    if (!task || task.tenantId !== user.tenantId) return { error: "Tâche introuvable" };
+    if (!task || task.tenantId !== user.tenantId) return { error: "TÃ¢che introuvable" };
 
     // Delete child relations first
     await prisma.$transaction([
@@ -809,7 +990,8 @@ export async function duplicateTask(taskId: string) {
       where: { id: taskId },
       include: { children: true },
     });
-    if (!task || task.tenantId !== user.tenantId) return { error: "Tâche introuvable" };
+    if (!task || task.tenantId !== user.tenantId) return { error: "TÃ¢che introuvable" };
+    if (!canAccessTaskModule(user.role, task.module)) return { error: "AccÃ¨s refusÃ©" };
 
     const copy = await prisma.task.create({
       data: {
@@ -869,7 +1051,7 @@ export async function logTaskTime(taskId: string, hours: number, note?: string) 
     checkPermission(user.role, "task.update");
 
     const task = await prisma.task.findUnique({ where: { id: taskId } });
-    if (!task || task.tenantId !== user.tenantId) return { error: "Tâche introuvable" };
+    if (!task || task.tenantId !== user.tenantId) return { error: "TÃ¢che introuvable" };
 
     const newActual = (task.actualHours ?? 0) + hours;
     await prisma.task.update({
@@ -897,11 +1079,17 @@ export async function logTaskTime(taskId: string, hours: number, note?: string) 
 export async function getMyTasksList() {
   try {
     const user = await getSession();
+    checkPermission(user.role, "task.view");
+    const allowedModules = getTaskAllowedModules(user.role);
+    if (allowedModules !== "*" && allowedModules.length === 0) {
+      return { data: [] };
+    }
     const tasks = await prisma.task.findMany({
       where: {
         tenantId: user.tenantId,
         assignments: { some: { userId: user.id } },
         status: { notIn: ["COMPLETED", "CANCELLED"] },
+        ...(allowedModules !== "*" ? { module: { in: allowedModules } } : {}),
       },
       include: {
         assignments: { include: { user: { select: { id: true, name: true } } } },
@@ -926,6 +1114,11 @@ export async function getMyTasksList() {
 export async function getTaskTimeline() {
   try {
     const user = await getSession();
+    checkPermission(user.role, "task.view");
+    const allowedModules = getTaskAllowedModules(user.role);
+    if (allowedModules !== "*" && allowedModules.length === 0) {
+      return { data: [] };
+    }
     const now = new Date();
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 86400000);
     const thirtyDaysFromNow = new Date(now.getTime() + 30 * 86400000);
@@ -934,6 +1127,7 @@ export async function getTaskTimeline() {
       where: {
         tenantId: user.tenantId,
         parentTaskId: null,
+        ...(allowedModules !== "*" ? { module: { in: allowedModules } } : {}),
         OR: [
           { slaDeadline: { gte: thirtyDaysAgo, lte: thirtyDaysFromNow } },
           { createdAt: { gte: thirtyDaysAgo }, status: { notIn: ["COMPLETED", "CANCELLED"] } },
@@ -959,6 +1153,20 @@ export async function getTaskTimeline() {
 export async function getTaskAnalytics() {
   try {
     const user = await getSession();
+    checkPermission(user.role, "task.view");
+    const allowedModules = getTaskAllowedModules(user.role);
+    if (allowedModules !== "*" && allowedModules.length === 0) {
+      return {
+        data: {
+          dailyData: [],
+          slaCompliance: 100,
+          avgResolution: 0,
+          statusBreakdown: [],
+          ownerBreakdown: [],
+        },
+      };
+    }
+    const moduleFilter = allowedModules !== "*" ? { module: { in: allowedModules } } : {};
     const now = new Date();
 
     // Daily counts for last 14 days
@@ -972,10 +1180,10 @@ export async function getTaskAnalytics() {
 
       const [created, completed] = await Promise.all([
         prisma.task.count({
-          where: { tenantId: user.tenantId, createdAt: { gte: dayStart, lte: dayEnd } },
+          where: { tenantId: user.tenantId, createdAt: { gte: dayStart, lte: dayEnd }, ...moduleFilter },
         }),
         prisma.task.count({
-          where: { tenantId: user.tenantId, completedAt: { gte: dayStart, lte: dayEnd } },
+          where: { tenantId: user.tenantId, completedAt: { gte: dayStart, lte: dayEnd }, ...moduleFilter },
         }),
       ]);
 
@@ -989,10 +1197,10 @@ export async function getTaskAnalytics() {
     // SLA compliance
     const [totalWithSla, slaBreached] = await Promise.all([
       prisma.task.count({
-        where: { tenantId: user.tenantId, slaDeadline: { not: null }, status: "COMPLETED" },
+        where: { tenantId: user.tenantId, slaDeadline: { not: null }, status: "COMPLETED", ...moduleFilter },
       }),
       prisma.task.count({
-        where: { tenantId: user.tenantId, slaBreach: true, status: "COMPLETED" },
+        where: { tenantId: user.tenantId, slaBreach: true, status: "COMPLETED", ...moduleFilter },
       }),
     ]);
     const slaCompliance = totalWithSla > 0
@@ -1007,6 +1215,7 @@ export async function getTaskAnalytics() {
         status: "COMPLETED",
         completedAt: { gte: monthStart },
         startedAt: { not: null },
+        ...moduleFilter,
       },
       select: { startedAt: true, completedAt: true },
     });
@@ -1023,14 +1232,14 @@ export async function getTaskAnalytics() {
     // Status breakdown
     const statusBreakdown = await prisma.task.groupBy({
       by: ["status"],
-      where: { tenantId: user.tenantId },
+      where: { tenantId: user.tenantId, ...moduleFilter },
       _count: true,
     });
 
     // Owner type breakdown
     const ownerBreakdown = await prisma.task.groupBy({
       by: ["ownerType"],
-      where: { tenantId: user.tenantId, status: { notIn: ["COMPLETED", "CANCELLED"] } },
+      where: { tenantId: user.tenantId, status: { notIn: ["COMPLETED", "CANCELLED"] }, ...moduleFilter },
       _count: true,
     });
 
@@ -1051,8 +1260,17 @@ export async function getTaskAnalytics() {
 export async function exportTasksData(format: "csv") {
   try {
     const user = await getSession();
+    checkPermission(user.role, "task.view");
+    const allowedModules = getTaskAllowedModules(user.role);
+    if (allowedModules !== "*" && allowedModules.length === 0) {
+      return { error: "Accès refusé" };
+    }
     const tasks = await prisma.task.findMany({
-      where: { tenantId: user.tenantId, parentTaskId: null },
+      where: {
+        tenantId: user.tenantId,
+        parentTaskId: null,
+        ...(allowedModules !== "*" ? { module: { in: allowedModules } } : {}),
+      },
       include: {
         assignments: { include: { user: { select: { name: true } } } },
       },
@@ -1061,7 +1279,7 @@ export async function exportTasksData(format: "csv") {
     });
 
     if (format === "csv") {
-      const headers = "ID,Titre,Module,Statut,Priorité,Assigné,SLA,Créé,Complété";
+      const headers = "ID,Titre,Module,Statut,PrioritÃ©,AssignÃ©,SLA,CrÃ©Ã©,ComplÃ©tÃ©";
       const rows = tasks.map((t) =>
         [
           t.id,
@@ -1078,7 +1296,7 @@ export async function exportTasksData(format: "csv") {
       return { data: [headers, ...rows].join("\n") };
     }
 
-    return { error: "Format non supporté" };
+    return { error: "Format non supportÃ©" };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur" };
   }
@@ -1091,8 +1309,10 @@ export async function exportTasksData(format: "csv") {
 export async function getTaskAttachments(taskId: string) {
   try {
     const user = await getSession();
-    const task = await prisma.task.findUnique({ where: { id: taskId }, select: { tenantId: true } });
-    if (!task || task.tenantId !== user.tenantId) return { error: "Tâche introuvable" };
+    checkPermission(user.role, "task.view");
+    const task = await prisma.task.findUnique({ where: { id: taskId }, select: { tenantId: true, module: true } });
+    if (!task || task.tenantId !== user.tenantId) return { error: "TÃ¢che introuvable" };
+    if (!canAccessTaskModule(user.role, task.module)) return { error: "AccÃ¨s refusÃ©" };
 
     const attachments = await prisma.taskAttachment.findMany({
       where: { taskId },
@@ -1112,8 +1332,10 @@ export async function addTaskAttachment(taskId: string, data: {
 }) {
   try {
     const user = await getSession();
-    const task = await prisma.task.findUnique({ where: { id: taskId }, select: { tenantId: true, title: true } });
-    if (!task || task.tenantId !== user.tenantId) return { error: "Tâche introuvable" };
+    checkPermission(user.role, "task.update");
+    const task = await prisma.task.findUnique({ where: { id: taskId }, select: { tenantId: true, title: true, module: true } });
+    if (!task || task.tenantId !== user.tenantId) return { error: "TÃ¢che introuvable" };
+    if (!canAccessTaskModule(user.role, task.module)) return { error: "AccÃ¨s refusÃ©" };
 
     if (!data.name.trim() || !data.url.trim()) return { error: "Nom et URL requis" };
 
@@ -1134,8 +1356,8 @@ export async function addTaskAttachment(taskId: string, data: {
       {
         tenantId: user.tenantId,
         type: "ATTACHMENT_ADDED",
-        title: `Pièce jointe ajoutée: ${task.title}`,
-        message: `${user.name} a ajouté "${data.name}"`,
+        title: `PiÃ¨ce jointe ajoutÃ©e: ${task.title}`,
+        message: `${user.name} a ajoutÃ© "${data.name}"`,
       },
       user.id
     );
@@ -1156,11 +1378,13 @@ export async function addTaskAttachment(taskId: string, data: {
 export async function removeTaskAttachment(attachmentId: string) {
   try {
     const user = await getSession();
+    checkPermission(user.role, "task.update");
     const attachment = await prisma.taskAttachment.findUnique({
       where: { id: attachmentId },
-      include: { task: { select: { tenantId: true } } },
+      include: { task: { select: { tenantId: true, module: true } } },
     });
-    if (!attachment || attachment.task.tenantId !== user.tenantId) return { error: "Pièce jointe introuvable" };
+    if (!attachment || attachment.task.tenantId !== user.tenantId) return { error: "PiÃ¨ce jointe introuvable" };
+    if (!canAccessTaskModule(user.role, attachment.task.module)) return { error: "AccÃ¨s refusÃ©" };
 
     await prisma.taskAttachment.delete({ where: { id: attachmentId } });
 
@@ -1178,15 +1402,24 @@ export async function removeTaskAttachment(attachmentId: string) {
 export async function getGanttData(options?: { module?: string }) {
   try {
     const user = await getSession();
+    checkPermission(user.role, "task.view");
     const now = new Date();
     const start = new Date(now.getFullYear(), now.getMonth() - 1, 1); // 1 month ago
     const end = new Date(now.getFullYear(), now.getMonth() + 3, 0);   // 3 months ahead
+    const allowedModules = getTaskAllowedModules(user.role);
+    if (allowedModules !== "*" && allowedModules.length === 0) {
+      return { data: { rows: [], modules: [], rangeStart: start, rangeEnd: end, today: now } };
+    }
+    if (options?.module && options.module !== "all" && allowedModules !== "*" && !allowedModules.includes(options.module)) {
+      return { data: { rows: [], modules: [], rangeStart: start, rangeEnd: end, today: now } };
+    }
 
     const tasks = await prisma.task.findMany({
       where: {
         tenantId: user.tenantId,
         parentTaskId: null,
         status: { notIn: ["CANCELLED"] },
+        ...(allowedModules !== "*" ? { module: { in: allowedModules } } : {}),
         ...(options?.module && options.module !== "all" && { module: options.module }),
         OR: [
           { slaDeadline: { gte: start, lte: end } },
@@ -1236,3 +1469,4 @@ export async function getGanttData(options?: { module?: string }) {
     return { error: error instanceof Error ? error.message : "Erreur" };
   }
 }
+

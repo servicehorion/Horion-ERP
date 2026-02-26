@@ -6,6 +6,7 @@ import {
   CheckSquare,
   Truck,
   DollarSign,
+  FolderOpen,
   ListTodo,
   MessageCircle,
   Megaphone,
@@ -66,6 +67,11 @@ export const sidebarNavigation: NavItem[] = [
       { title: "Paiements", href: "/finance/payments" },
       { title: "Marges", href: "/finance/margins" },
     ],
+  },
+  {
+    title: "Projets",
+    href: "/projects",
+    icon: FolderOpen,
   },
   {
     title: "Taches",

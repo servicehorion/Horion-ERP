@@ -162,15 +162,15 @@ async function createTaskFromEvent(
 // Map modules to relevant user roles
 function getModuleRoles(module: string): string[] {
   const map: Record<string, string[]> = {
-    orders: ["ADMIN", "DIRECTION", "COMMERCIAL", "OPS"],
-    sourcing: ["ADMIN", "OPS"],
-    logistics: ["ADMIN", "OPS"],
-    finance: ["ADMIN", "FINANCE"],
-    qc: ["ADMIN", "OPS"],
-    crm: ["ADMIN", "COMMERCIAL"],
-    catalog: ["ADMIN", "OPS", "COMMERCIAL"],
+    orders: ["ADMIN", "CEO", "DIRECTION", "CRM_MANAGER", "COMMERCIAL", "OPS"],
+    sourcing: ["ADMIN", "CEO", "DIRECTION", "LOGISTICS_MANAGER", "SOURCING_ASSISTANT", "OPS"],
+    logistics: ["ADMIN", "CEO", "DIRECTION", "LOGISTICS_MANAGER", "LOGISTICS_ASSISTANT", "OPS"],
+    finance: ["ADMIN", "CEO", "DIRECTION", "FINANCE_MANAGER", "FINANCE"],
+    qc: ["ADMIN", "CEO", "DIRECTION", "LOGISTICS_MANAGER", "LOGISTICS_ASSISTANT", "OPS"],
+    crm: ["ADMIN", "CEO", "DIRECTION", "CRM_MANAGER", "COMMERCIAL"],
+    catalog: ["ADMIN", "CEO", "DIRECTION", "OPS", "COMMERCIAL"],
   };
-  return map[module] ?? ["ADMIN"];
+  return map[module] ?? ["ADMIN", "CEO", "DIRECTION"];
 }
 
 // ── Order Handlers ──────────────────────────────────────────────

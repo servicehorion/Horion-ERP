@@ -16,7 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { instantiateTemplate, createTaskTemplate } from "@/lib/actions/task.actions";
+import { instantiateTemplate, createTaskTemplate, duplicateTaskTemplate } from "@/lib/actions/task.actions";
 import { cn } from "@/lib/utils";
 
 const MODULES = [
@@ -87,9 +87,24 @@ export function TemplateActions({ mode, templateId, templateName, className }: T
         variant="outline"
         className={cn("", className)}
         disabled={loading}
-        onClick={() => toast.info("Duplication à venir")}
+        onClick={async () => {
+          setLoading(true);
+          try {
+            const res = await duplicateTaskTemplate(templateId!);
+            if (res.error) {
+              toast.error(res.error);
+            } else {
+              toast.success(`"${templateName}" dupliqué`);
+              router.refresh();
+            }
+          } catch {
+            toast.error("Erreur lors de la duplication");
+          } finally {
+            setLoading(false);
+          }
+        }}
       >
-        <Copy className="h-3.5 w-3.5" />
+        {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Copy className="h-3.5 w-3.5" />}
       </Button>
     );
   }

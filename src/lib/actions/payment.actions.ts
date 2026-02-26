@@ -49,6 +49,7 @@ export async function getPayments(options?: {
 }) {
   try {
     const user = await getSession();
+    checkPermission(user.role, "finance.view");
     const result = await PaymentService.list({
       tenantId: user.tenantId,
       orderId: options?.orderId,
@@ -104,7 +105,8 @@ export async function cancelPayment(paymentId: string) {
 
 export async function getPaymentSummary(orderId: string) {
   try {
-    await getSession();
+    const user = await getSession();
+    checkPermission(user.role, "finance.view");
     return { data: await PaymentService.getOrderPaymentSummary(orderId) };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur lors de la récupération" };
@@ -114,6 +116,7 @@ export async function getPaymentSummary(orderId: string) {
 export async function getMonthlyPaymentStats() {
   try {
     const user = await getSession();
+    checkPermission(user.role, "finance.view");
     return { data: await PaymentService.getMonthlyStats(user.tenantId) };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur lors de la récupération" };
@@ -124,7 +127,8 @@ export async function getMonthlyPaymentStats() {
 
 export async function calculateMargin(orderId: string) {
   try {
-    await getSession();
+    const user = await getSession();
+    checkPermission(user.role, "finance.manage");
     const report = await MarginService.calculateForOrder(orderId);
 
     revalidatePath("/finance/margins");
@@ -139,6 +143,7 @@ export async function calculateMargin(orderId: string) {
 export async function getMargins(options?: { page?: number; limit?: number }) {
   try {
     const user = await getSession();
+    checkPermission(user.role, "finance.view");
     const result = await MarginService.list(user.tenantId, options);
     return { data: result.reports };
   } catch (error) {
@@ -149,6 +154,7 @@ export async function getMargins(options?: { page?: number; limit?: number }) {
 export async function getAverageMargin() {
   try {
     const user = await getSession();
+    checkPermission(user.role, "finance.view");
     return { data: await MarginService.getAverageMargin(user.tenantId) };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur lors de la récupération" };
