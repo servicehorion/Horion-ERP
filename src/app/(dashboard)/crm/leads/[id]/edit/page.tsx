@@ -7,6 +7,7 @@ import { LeadForm } from "@/components/crm/lead-form";
 import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { getLeadById } from "@/lib/actions/contact.actions";
+import { serializeDecimals } from "@/lib/utils";
 
 export const metadata = {
   title: "Modifier lead | Horion ERP",
@@ -28,7 +29,7 @@ export default async function EditLeadPage({
     notFound();
   }
 
-  const lead = leadResult.data;
+  const lead = serializeDecimals(leadResult.data);
 
   const [contacts, members] = await Promise.all([
     prisma.contact.findMany({

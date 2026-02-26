@@ -17,7 +17,7 @@ import { SegmentManager } from "@/components/crm/segment-manager";
 import { ContactTimeline } from "@/components/crm/contact-timeline";
 import { getCustomerIntelligence, recalculateCustomerIntelligence } from "@/lib/actions/customer-intelligence.actions";
 import { getContactTimeline } from "@/lib/actions/contact.actions";
-import { formatDate } from "@/lib/utils";
+import { formatDate, serializeDecimals } from "@/lib/utils";
 import { formatCurrency } from "@/config/currencies";
 
 export const metadata = { title: "Customer Intelligence | Horion ERP" };
@@ -58,7 +58,7 @@ export default async function ContactDetailPage({ params }: Props) {
 
   if (result.error || !result.data) notFound();
 
-  const contact = result.data;
+  const contact = serializeDecimals(result.data);
   const timelineItems = timelineResult.data || [];
   const { financialMetrics, riskProfile, pipelineIntents, aiProfile, segmentations, supplyChains } = contact;
   const ownerName = (contact as any).owner?.name || (contact as any).owner?.email;

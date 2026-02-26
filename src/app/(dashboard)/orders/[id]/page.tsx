@@ -5,6 +5,7 @@ import { notFound, redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { OrderDetail } from "@/components/orders/order-detail";
 import { getOrderById } from "@/lib/actions/order.actions";
+import { serializeDecimals } from "@/lib/utils";
 
 export const metadata = {
   title: "Détail commande | Horion ERP",
@@ -22,7 +23,7 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
     notFound();
   }
 
-  const order = result.data;
+  const order = serializeDecimals(result.data);
 
   return (
     <div className="space-y-6">

@@ -9,7 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { getLeadById, validateLead } from "@/lib/actions/contact.actions";
 import { getTeamMembers } from "@/lib/actions/task.actions";
 import { formatCurrency } from "@/config/currencies";
-import { formatDate } from "@/lib/utils";
+import { formatDate, serializeDecimals } from "@/lib/utils";
 import { LeadStatusSelect } from "@/components/crm/lead-status-select";
 import { LeadAssigneeSelect } from "@/components/crm/lead-assignee-select";
 
@@ -60,7 +60,7 @@ export default async function LeadDetailPage({
     notFound();
   }
 
-  const lead = result.data;
+  const lead = serializeDecimals(result.data);
   const contact = lead.contact;
   const teamMembers = membersResult.data || [];
   const ownerName = (lead as any).owner?.name || (lead as any).owner?.email;
