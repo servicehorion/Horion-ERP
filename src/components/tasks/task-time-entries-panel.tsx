@@ -140,7 +140,9 @@ export function TaskTimeEntriesPanel({
             </div>
 
             {entry.approved && (
-              <Check className="h-3 w-3 text-green-600 flex-shrink-0" title="Approuvé" />
+              <span title="Approuvé">
+                <Check className="h-3 w-3 text-green-600 flex-shrink-0" />
+              </span>
             )}
           </div>
         ))}

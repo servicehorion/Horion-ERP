@@ -75,6 +75,7 @@ export interface Lead {
 
 export interface Prospect {
   id: string;
+  ownerId?: string;
   name: string;
   phone: string;
   country: string;

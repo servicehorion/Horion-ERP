@@ -1,4 +1,4 @@
-"use server";
+﻿"use server";
 
 import { getSession } from "@/lib/session";
 import { OrderService } from "@/lib/services/order.service";
@@ -79,7 +79,7 @@ export async function createOrder(formData: {
       tenantId: user.tenantId,
       type: "ORDER_CREATED",
       title: `Nouvelle commande ${order.orderNumber}`,
-      message: `${user.name || user.email} a créé une commande`,
+      message: `${user.name || user.email} a crÃ©Ã© une commande`,
       entityType: "order",
       entityId: order.id,
     });
@@ -91,7 +91,7 @@ export async function createOrder(formData: {
     return { data: order };
   } catch (error) {
     console.error("Error creating order:", error);
-    return { error: error instanceof Error ? error.message : "Erreur lors de la création de la commande" };
+    return { error: error instanceof Error ? error.message : "Erreur lors de la crÃ©ation de la commande" };
   }
 }
 
@@ -121,7 +121,7 @@ export async function getOrders(options?: {
     };
   } catch (error) {
     console.error("Error fetching orders:", error);
-    return { error: error instanceof Error ? error.message : "Erreur lors de la récupération des commandes" };
+    return { error: error instanceof Error ? error.message : "Erreur lors de la rÃ©cupÃ©ration des commandes" };
   }
 }
 
@@ -138,7 +138,7 @@ export async function getOrderById(orderId: string) {
     return { data: order };
   } catch (error) {
     console.error("Error fetching order:", error);
-    return { error: error instanceof Error ? error.message : "Erreur lors de la récupération de la commande" };
+    return { error: error instanceof Error ? error.message : "Erreur lors de la rÃ©cupÃ©ration de la commande" };
   }
 }
 
@@ -176,15 +176,13 @@ export async function updateOrderStatus(orderId: string, newStatus: string, note
     const teamIds = await getOrderTeamUserIds(validated.orderId);
     await NotificationService.notifyMany(teamIds, {
       tenantId: user.tenantId,
-      type: "QUOTE_CREATED",
-      title: "Nouveau devis",
-      message: `${user.name || user.email} a cr�� un devis`,
-      entityType: "quote",
-      entityId: quote.id,
+      type: "ORDER_UPDATED",
+      title: "Statut commande mis a jour",
+      message: `${user.name || user.email} a change le statut en ${validated.newStatus}`,
+      entityType: "order",
+      entityId: validated.orderId,
     });
-
-
-    revalidatePath(`/orders/${validated.orderId}`);
+revalidatePath(`/orders/${validated.orderId}`);
     revalidatePath("/orders");
     revalidatePath("/dashboard");
     revalidatePath("/tasks");
@@ -192,7 +190,7 @@ export async function updateOrderStatus(orderId: string, newStatus: string, note
     return { data: order };
   } catch (error) {
     console.error("Error updating order status:", error);
-    return { error: error instanceof Error ? error.message : "Erreur lors de la mise à jour du statut" };
+    return { error: error instanceof Error ? error.message : "Erreur lors de la mise Ã  jour du statut" };
   }
 }
 
@@ -232,8 +230,8 @@ export async function updateOrder(orderId: string, formData: Record<string, unkn
     await NotificationService.notifyMany(teamIds, {
       tenantId: user.tenantId,
       type: "ORDER_UPDATED",
-      title: `Commande mise à jour`,
-      message: `${user.name || user.email} a mis à jour la commande`,
+      title: `Commande mise Ã  jour`,
+      message: `${user.name || user.email} a mis Ã  jour la commande`,
       entityType: "order",
       entityId: orderId,
     });
@@ -243,7 +241,7 @@ export async function updateOrder(orderId: string, formData: Record<string, unkn
     return { data: order };
   } catch (error) {
     console.error("Error updating order:", error);
-    return { error: error instanceof Error ? error.message : "Erreur lors de la mise Ã  jour" };
+    return { error: error instanceof Error ? error.message : "Erreur lors de la mise ÃƒÂ  jour" };
   }
 }
 
@@ -333,8 +331,8 @@ export async function updateOrderTeam(orderId: string, data: { ownerId?: string 
     await NotificationService.notifyMany(teamIds, {
       tenantId: user.tenantId,
       type: "ORDER_TEAM_UPDATED",
-      title: `Equipe commande mise à jour`,
-      message: `${user.name || user.email} a modifié l'équipe de la commande`,
+      title: `Equipe commande mise Ã  jour`,
+      message: `${user.name || user.email} a modifiÃ© l'Ã©quipe de la commande`,
       entityType: "order",
       entityId: orderId,
     });
@@ -342,7 +340,7 @@ export async function updateOrderTeam(orderId: string, data: { ownerId?: string 
     revalidatePath(`/orders/${orderId}`);
     return { data: order };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Erreur lors de la mise à jour de l'équipe" };
+    return { error: error instanceof Error ? error.message : "Erreur lors de la mise Ã  jour de l'Ã©quipe" };
   }
 }
 
@@ -352,7 +350,7 @@ export async function getOrderStatusCounts() {
     checkPermission(user.role, "order.view");
     return { data: await OrderService.getStatusCounts(user.tenantId) };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Erreur lors de la récupération des compteurs" };
+    return { error: error instanceof Error ? error.message : "Erreur lors de la rÃ©cupÃ©ration des compteurs" };
   }
 }
 
@@ -408,19 +406,17 @@ export async function createQuote(data: {
     const teamIds = await getOrderTeamUserIds(validated.orderId);
     await NotificationService.notifyMany(teamIds, {
       tenantId: user.tenantId,
-      type: "QUOTE_CREATED",
-      title: "Nouveau devis",
-      message: `${user.name || user.email} a cr�� un devis`,
-      entityType: "quote",
-      entityId: quote.id,
+      type: "ORDER_UPDATED",
+      title: "Statut commande mis a jour",
+      message: `${user.name || user.email} a change le statut en ${validated.newStatus}`,
+      entityType: "order",
+      entityId: validated.orderId,
     });
-
-
-    revalidatePath(`/orders/${validated.orderId}`);
+revalidatePath(`/orders/${validated.orderId}`);
     return { data: quote };
   } catch (error) {
     console.error("Error creating quote:", error);
-    return { error: error instanceof Error ? error.message : "Erreur lors de la création du devis" };
+    return { error: error instanceof Error ? error.message : "Erreur lors de la crÃ©ation du devis" };
   }
 }
 
@@ -455,8 +451,8 @@ export async function sendQuote(quoteId: string) {
     await NotificationService.notifyMany(teamIds, {
       tenantId: user.tenantId,
       type: "QUOTE_SENT",
-      title: "Devis envoy�",
-      message: `${user.name || user.email} a envoy� un devis`,
+      title: "Devis envoyï¿½",
+      message: `${user.name || user.email} a envoyï¿½ un devis`,
       entityType: "quote",
       entityId: quoteId,
     });
@@ -487,8 +483,8 @@ export async function acceptQuote(quoteId: string) {
     await NotificationService.notifyMany(teamIds, {
       tenantId: user.tenantId,
       type: "QUOTE_ACCEPTED",
-      title: "Devis accept�",
-      message: `${user.name || user.email} a accept� un devis`,
+      title: "Devis acceptï¿½",
+      message: `${user.name || user.email} a acceptï¿½ un devis`,
       entityType: "quote",
       entityId: quoteId,
     });
@@ -519,8 +515,8 @@ export async function rejectQuote(quoteId: string) {
     await NotificationService.notifyMany(teamIds, {
       tenantId: user.tenantId,
       type: "QUOTE_REJECTED",
-      title: "Devis refus�",
-      message: `${user.name || user.email} a refus� un devis`,
+      title: "Devis refusï¿½",
+      message: `${user.name || user.email} a refusï¿½ un devis`,
       entityType: "quote",
       entityId: quoteId,
     });
@@ -551,8 +547,8 @@ export async function expireQuote(quoteId: string) {
     await NotificationService.notifyMany(teamIds, {
       tenantId: user.tenantId,
       type: "QUOTE_EXPIRED",
-      title: "Devis expir�",
-      message: `${user.name || user.email} a expir� un devis`,
+      title: "Devis expirï¿½",
+      message: `${user.name || user.email} a expirï¿½ un devis`,
       entityType: "quote",
       entityId: quoteId,
     });
@@ -587,8 +583,8 @@ export async function addOrderAttachment(orderId: string, data: { name: string; 
     await NotificationService.notifyMany(teamIds, {
       tenantId: user.tenantId,
       type: "ATTACHMENT_ADDED",
-      title: "Document ajout�",
-      message: `${user.name || user.email} a ajout� un document`,
+      title: "Document ajoutï¿½",
+      message: `${user.name || user.email} a ajoutï¿½ un document`,
       entityType: "order",
       entityId: orderId,
     });
@@ -658,8 +654,8 @@ export async function createShipment(orderId: string, data: {
     await NotificationService.notifyMany(teamIds, {
       tenantId: user.tenantId,
       type: "SHIPMENT_CREATED",
-      title: "Exp�dition cr��e",
-      message: `Nouvelle exp�dition pour commande ${order.orderNumber}`,
+      title: "Expï¿½dition crï¿½ï¿½e",
+      message: `Nouvelle expï¿½dition pour commande ${order.orderNumber}`,
       entityType: "shipment",
       entityId: shipment.id,
     });
@@ -667,7 +663,7 @@ export async function createShipment(orderId: string, data: {
     revalidatePath(`/orders/${orderId}`);
     return { data: shipment };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Erreur cr�ation exp�dition" };
+    return { error: error instanceof Error ? error.message : "Erreur crï¿½ation expï¿½dition" };
   }
 }
 
@@ -681,7 +677,7 @@ export async function updateShipmentStatus(shipmentId: string, status: string) {
       include: { order: { select: { id: true, tenantId: true } } },
     });
     if (!shipment || shipment.order.tenantId !== user.tenantId) {
-      return { error: "Exp�dition introuvable" };
+      return { error: "Expï¿½dition introuvable" };
     }
 
     const updated = await prisma.shipment.update({
@@ -693,8 +689,8 @@ export async function updateShipmentStatus(shipmentId: string, status: string) {
     await NotificationService.notifyMany(teamIds, {
       tenantId: user.tenantId,
       type: "SHIPMENT_UPDATED",
-      title: "Exp�dition mise � jour",
-      message: `Statut exp�dition: ${status}`,
+      title: "Expï¿½dition mise ï¿½ jour",
+      message: `Statut expï¿½dition: ${status}`,
       entityType: "shipment",
       entityId: shipmentId,
     });
@@ -702,7 +698,7 @@ export async function updateShipmentStatus(shipmentId: string, status: string) {
     revalidatePath(`/orders/${shipment.order.id}`);
     return { data: updated };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Erreur mise � jour exp�dition" };
+    return { error: error instanceof Error ? error.message : "Erreur mise ï¿½ jour expï¿½dition" };
   }
 }
 
@@ -716,7 +712,7 @@ export async function addTrackingEvent(shipmentId: string, data: { event: string
       include: { order: { select: { id: true, tenantId: true } } },
     });
     if (!shipment || shipment.order.tenantId !== user.tenantId) {
-      return { error: "Exp�dition introuvable" };
+      return { error: "Expï¿½dition introuvable" };
     }
 
     const event = await prisma.trackingEvent.create({
@@ -759,7 +755,7 @@ export async function createQcRequest(orderId: string, data: { type: string; ins
     await NotificationService.notifyMany(teamIds, {
       tenantId: user.tenantId,
       type: "QC_REQUEST_CREATED",
-      title: "QC cr��e",
+      title: "QC crï¿½ï¿½e",
       message: `Nouvelle demande QC pour commande ${order.orderNumber}`,
       entityType: "qc_request",
       entityId: request.id,
@@ -768,7 +764,7 @@ export async function createQcRequest(orderId: string, data: { type: string; ins
     revalidatePath(`/orders/${orderId}`);
     return { data: request };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Erreur cr�ation QC" };
+    return { error: error instanceof Error ? error.message : "Erreur crï¿½ation QC" };
   }
 }
 
@@ -826,7 +822,7 @@ export async function addQcReport(requestId: string, data: { overallResult: stri
       tenantId: user.tenantId,
       type: "QC_REPORT_ADDED",
       title: "Rapport QC",
-      message: `Rapport QC ajout� pour commande ${request.order.id}`,
+      message: `Rapport QC ajoutï¿½ pour commande ${request.order.id}`,
       entityType: "qc_report",
       entityId: report.id,
     });
@@ -869,7 +865,7 @@ export async function createDispute(orderId: string, data: { type: string; descr
     revalidatePath(`/orders/${orderId}`);
     return { data: dispute };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Erreur cr�ation litige" };
+    return { error: error instanceof Error ? error.message : "Erreur crï¿½ation litige" };
   }
 }
 
@@ -893,8 +889,8 @@ export async function resolveDispute(disputeId: string, resolution: string) {
     await NotificationService.notifyMany(teamIds, {
       tenantId: user.tenantId,
       type: "DISPUTE_RESOLVED",
-      title: "Litige r�solu",
-      message: `Litige r�solu pour commande ${dispute.order.orderNumber}`,
+      title: "Litige rï¿½solu",
+      message: `Litige rï¿½solu pour commande ${dispute.order.orderNumber}`,
       entityType: "dispute",
       entityId: disputeId,
     });
@@ -902,7 +898,7 @@ export async function resolveDispute(disputeId: string, resolution: string) {
     revalidatePath(`/orders/${dispute.order.id}`);
     return { data: updated };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Erreur r�solution litige" };
+    return { error: error instanceof Error ? error.message : "Erreur rï¿½solution litige" };
   }
 }
 
@@ -918,7 +914,7 @@ export async function exportOrdersCSV() {
       take: 5000,
     });
 
-    const headers = "ID,Num�ro,Statut,Priorit�,Client,Montant,XAF,Cr��e le";
+    const headers = "ID,Numï¿½ro,Statut,Prioritï¿½,Client,Montant,XAF,Crï¿½ï¿½e le";
     const rows = orders.map((o) =>
       [
         o.id,
@@ -937,3 +933,4 @@ export async function exportOrdersCSV() {
     return { error: error instanceof Error ? error.message : "Erreur export" };
   }
 }
+

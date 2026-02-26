@@ -62,7 +62,7 @@ export function TaskDependencyManager({
     setSearching(true);
     try {
       const res = await getTasks({ search: q, limit: 10 });
-      const tasks = (res.data?.tasks ?? [])
+      const tasks = (Array.isArray(res.data) ? res.data : [])
         .filter((t: any) => t.id !== taskId)
         .map((t: any) => ({ id: t.id, title: t.title, status: t.status }));
       setSearchResults(tasks);
