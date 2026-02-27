@@ -8,6 +8,7 @@ import { getOrderById } from "@/lib/actions/order.actions";
 import { serializeDecimals } from "@/lib/utils";
 import { auth } from "@/lib/auth";
 import { hasPermission } from "@/lib/permissions";
+import { getTeamMembers } from "@/lib/actions/task.actions";
 
 export const metadata = {
   title: "Détail commande | Horion ERP",
@@ -34,6 +35,15 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
   const canUpdateStatus = hasPermission(session.user.role, "order.update_status");
   const canEdit = hasPermission(session.user.role, "order.update");
   const canArchive = hasPermission(session.user.role, "order.delete");
+  const canCreateQuote = hasPermission(session.user.role, "quote.create");
+  const canSendQuote = hasPermission(session.user.role, "quote.send");
+  const canViewPayments = hasPermission(session.user.role, "finance.view");
+  const canCreatePayment = hasPermission(session.user.role, "payment.create");
+  const canManageLogistics = hasPermission(session.user.role, "logistics.manage");
+  const canManageQc = hasPermission(session.user.role, "qc.manage");
+
+  const teamMembersResult = await getTeamMembers("orders");
+  const teamMembers = teamMembersResult.data || [];
 
   return (
     <div className="space-y-6">
@@ -50,6 +60,13 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
         canUpdateStatus={canUpdateStatus}
         canEdit={canEdit}
         canArchive={canArchive}
+        canCreateQuote={canCreateQuote}
+        canSendQuote={canSendQuote}
+        canViewPayments={canViewPayments}
+        canCreatePayment={canCreatePayment}
+        canManageLogistics={canManageLogistics}
+        canManageQc={canManageQc}
+        teamMembers={teamMembers}
       />
     </div>
   );

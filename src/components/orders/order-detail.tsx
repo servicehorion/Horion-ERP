@@ -51,6 +51,9 @@ import { OrderQuotes } from "@/components/orders/order-quotes";
 import { OrderPayments } from "@/components/orders/order-payments";
 import { OrderAttachments } from "@/components/orders/order-attachments";
 import { OrderTeam } from "@/components/orders/order-team";
+import { OrderShipments, type Shipment } from "@/components/orders/order-shipments";
+import { OrderQc, type QcRequest } from "@/components/orders/order-qc";
+import { OrderDisputes, type Dispute } from "@/components/orders/order-disputes";
 
 type OrderDetailProps = {
   order: {
@@ -134,6 +137,9 @@ type OrderDetailProps = {
     owner?: { id: string; name: string | null; email: string };
     onboardedBy?: { id: string; name: string | null; email: string };
     collaborators: { userId: string; user: { name: string | null; email: string } }[];
+    shipments?: Shipment[];
+    qcRequests?: QcRequest[];
+    disputes?: Dispute[];
   };
   canUpdateStatus?: boolean;
   canEdit?: boolean;
@@ -142,6 +148,8 @@ type OrderDetailProps = {
   canSendQuote?: boolean;
   canViewPayments?: boolean;
   canCreatePayment?: boolean;
+  canManageLogistics?: boolean;
+  canManageQc?: boolean;
   teamMembers?: { id: string; name: string | null; email: string; role: string }[];
 };
 
@@ -159,6 +167,8 @@ export function OrderDetail({
   canSendQuote = false,
   canViewPayments = false,
   canCreatePayment = false,
+  canManageLogistics = false,
+  canManageQc = false,
   teamMembers = [],
 }: OrderDetailProps) {
   const router = useRouter();
@@ -319,11 +329,25 @@ export function OrderDetail({
 
       {/* Tabs */}
       <Tabs defaultValue="resume" className="space-y-6">
-        <TabsList>
+        <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="resume">Résumé</TabsTrigger>
           <TabsTrigger value="items">Articles ({order.items.length})</TabsTrigger>
           <TabsTrigger value="quotes">Devis ({order.quotes.length})</TabsTrigger>
           <TabsTrigger value="payments">Paiements ({order.payments.length})</TabsTrigger>
+          <TabsTrigger value="shipments">
+            Expéditions ({(order.shipments ?? []).length})
+          </TabsTrigger>
+          <TabsTrigger value="qc">
+            QC ({(order.qcRequests ?? []).length})
+          </TabsTrigger>
+          <TabsTrigger value="disputes">
+            {(order.disputes ?? []).filter((d) => !["RESOLVED","CLOSED"].includes(d.status)).length > 0 && (
+              <span className="mr-1 inline-flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] text-white font-bold">
+                {(order.disputes ?? []).filter((d) => !["RESOLVED","CLOSED"].includes(d.status)).length}
+              </span>
+            )}
+            Litiges ({(order.disputes ?? []).length})
+          </TabsTrigger>
           <TabsTrigger value="documents">Documents ({order.attachments.length})</TabsTrigger>
           <TabsTrigger value="team">Equipe</TabsTrigger>
           <TabsTrigger value="timeline">Timeline ({order.timeline.length})</TabsTrigger>
@@ -456,6 +480,51 @@ export function OrderDetail({
             canCreate={canCreatePayment}
             canView={canViewPayments}
           />
+        </TabsContent>
+
+        <TabsContent value="shipments">
+          <Card>
+            <CardHeader>
+              <CardTitle>Expéditions &amp; Tracking</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <OrderShipments
+                orderId={order.id}
+                shipments={order.shipments ?? []}
+                canManage={canManageLogistics}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="qc">
+          <Card>
+            <CardHeader>
+              <CardTitle>Contrôle Qualité</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <OrderQc
+                orderId={order.id}
+                qcRequests={order.qcRequests ?? []}
+                canManage={canManageQc}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="disputes">
+          <Card>
+            <CardHeader>
+              <CardTitle>Litiges</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <OrderDisputes
+                orderId={order.id}
+                disputes={order.disputes ?? []}
+                canManage={canManageQc || canEdit}
+              />
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="documents">
