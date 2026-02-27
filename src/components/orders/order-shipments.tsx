@@ -39,15 +39,16 @@ export type Shipment = {
   destination?: string | null;
   containerNumber?: string | null;
   blNumber?: string | null;
-  weight?: number | null;
-  volume?: number | null;
+  weight?: any;
+  volume?: any;
   estimatedDeparture?: Date | null;
   estimatedArrival?: Date | null;
   actualDeparture?: Date | null;
   actualArrival?: Date | null;
-  cost?: number | null;
+  cost?: any;
   currency?: string | null;
   trackingEvents?: TrackingEvent[];
+  customsClearance?: any;
 };
 
 const MODE_ICONS: Record<string, React.ReactNode> = {

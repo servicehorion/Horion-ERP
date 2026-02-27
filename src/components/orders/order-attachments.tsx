@@ -17,7 +17,7 @@ interface Attachment {
   url: string;
   type: string;
   createdAt: Date;
-  user?: { name: string | null };
+  user?: { name: string | null } | null;
 }
 
 interface OrderAttachmentsProps {

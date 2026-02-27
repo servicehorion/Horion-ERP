@@ -25,7 +25,7 @@ export type Dispute = {
   status: string;
   description: string;
   resolution?: string | null;
-  amount?: number | null;
+  amount?: any;
   currency?: string | null;
   createdAt: Date;
   resolvedAt?: Date | null;

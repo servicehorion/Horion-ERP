@@ -161,20 +161,37 @@ export class OrderService {
       include: {
         contact: true,
         items: true,
-        owner: true,
-        onboardedBy: true,
-        collaborators: { include: { user: true } },
-        attachments: { include: { user: true }, orderBy: { createdAt: "desc" } },
+        owner: { select: { id: true, name: true, email: true } },
+        onboardedBy: { select: { id: true, name: true, email: true } },
+        collaborators: { include: { user: { select: { id: true, name: true, email: true } } } },
+        attachments: { include: { user: { select: { id: true, name: true, email: true } } }, orderBy: { createdAt: "desc" } },
         quotes: { orderBy: { version: "desc" } },
         timeline: { orderBy: { createdAt: "desc" } },
         tasks: {
           include: { assignments: { include: { user: true } } },
           orderBy: { createdAt: "desc" },
         },
-        shipments: true,
-        payments: true,
-        disputes: true,
-        qcRequests: { include: { reports: true }, orderBy: { createdAt: "desc" } },
+        shipments: {
+          include: {
+            trackingEvents: { orderBy: { occurredAt: "asc" } },
+            customsClearance: true,
+          },
+          orderBy: { createdAt: "asc" },
+        },
+        payments: { orderBy: { createdAt: "desc" } },
+        disputes: { orderBy: { createdAt: "desc" } },
+        qcRequests: {
+          include: { reports: { include: { nonConformities: true } } },
+          orderBy: { createdAt: "desc" },
+        },
+        sourcingCases: {
+          include: {
+            supplier: { select: { id: true, name: true, country: true } },
+            offers: { orderBy: { createdAt: "desc" } },
+          },
+          orderBy: { createdAt: "desc" },
+        },
+        marginReport: true,
       },
     });
   }

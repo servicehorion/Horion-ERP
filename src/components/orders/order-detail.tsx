@@ -55,19 +55,45 @@ import { OrderShipments, type Shipment } from "@/components/orders/order-shipmen
 import { OrderQc, type QcRequest } from "@/components/orders/order-qc";
 import { OrderDisputes, type Dispute } from "@/components/orders/order-disputes";
 
+type SourcingCase = {
+  id: string;
+  status: string;
+  requirement: string;
+  budget?: any;
+  currency: string;
+  createdAt: Date;
+  supplier?: { id: string; name: string; country: string } | null;
+  offers: { id: string; unitPrice: any; currency: string; isSelected: boolean; moq?: number | null; leadTimeDays?: number | null }[];
+};
+
+type MarginReport = {
+  revenue: any;
+  cogs: any;
+  commission: any;
+  grossMargin: any;
+  marginPercent: any;
+  currency: string;
+  calculatedAt: Date;
+};
+
 type OrderDetailProps = {
   order: {
     id: string;
     orderNumber: string;
     status: string;
     priority: string;
+    riskLevel?: string;
+    originCountry?: string;
     destinationCity: string;
     notes: string | null;
     merchandiseTotal?: any;
     logisticsCost?: any;
+    commissionRate?: any;
     commissionAmount?: any;
     insuranceAmount?: any;
     totalClient: any;
+    estimatedDelivery?: Date | null;
+    actualDelivery?: Date | null;
     createdAt: Date;
     contact: {
       name: string;
@@ -119,7 +145,7 @@ type OrderDetailProps = {
       url: string;
       type: string;
       createdAt: Date;
-      user?: { name: string | null };
+      user?: { name: string | null } | null;
     }[];
     payments: {
       id: string;
@@ -134,12 +160,14 @@ type OrderDetailProps = {
       dueAt?: Date | null;
       createdAt: Date;
     }[];
-    owner?: { id: string; name: string | null; email: string };
-    onboardedBy?: { id: string; name: string | null; email: string };
+    owner?: { id: string; name: string | null; email: string } | null;
+    onboardedBy?: { id: string; name: string | null; email: string } | null;
     collaborators: { userId: string; user: { name: string | null; email: string } }[];
     shipments?: Shipment[];
     qcRequests?: QcRequest[];
     disputes?: Dispute[];
+    sourcingCases?: SourcingCase[];
+    marginReport?: MarginReport | null;
   };
   canUpdateStatus?: boolean;
   canEdit?: boolean;
@@ -332,6 +360,7 @@ export function OrderDetail({
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="resume">Résumé</TabsTrigger>
           <TabsTrigger value="items">Articles ({order.items.length})</TabsTrigger>
+          <TabsTrigger value="sourcing">Sourcing ({(order.sourcingCases ?? []).length})</TabsTrigger>
           <TabsTrigger value="quotes">Devis ({order.quotes.length})</TabsTrigger>
           <TabsTrigger value="payments">Paiements ({order.payments.length})</TabsTrigger>
           <TabsTrigger value="shipments">
@@ -354,65 +383,158 @@ export function OrderDetail({
           <TabsTrigger value="tasks">Tâches ({order.tasks.length})</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="resume" className="space-y-6">
-          <div className="grid gap-6 md:grid-cols-2">
+        <TabsContent value="resume" className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {/* Client */}
             <Card>
-              <CardHeader>
-                <CardTitle>Informations client</CardTitle>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Client</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2">
+              <CardContent className="space-y-2 text-sm">
                 <div>
-                  <p className="text-sm font-medium">Nom</p>
-                  <p className="text-sm text-muted-foreground">{order.contact.name}</p>
+                  <p className="font-medium">{order.contact.name}</p>
                 </div>
                 {order.contact.email && (
-                  <div>
-                    <p className="text-sm font-medium">Email</p>
-                    <p className="text-sm text-muted-foreground">
-                      {order.contact.email}
-                    </p>
-                  </div>
+                  <p className="text-muted-foreground">{order.contact.email}</p>
                 )}
                 {order.contact.phone && (
-                  <div>
-                    <p className="text-sm font-medium">Téléphone</p>
-                    <p className="text-sm text-muted-foreground">
-                      {order.contact.phone}
-                    </p>
+                  <p className="text-muted-foreground">{order.contact.phone}</p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Logistique */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Logistique</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Origine</span>
+                  <span className="font-medium">{order.originCountry ?? "CN"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Destination</span>
+                  <span className="font-medium">{order.destinationCity}</span>
+                </div>
+                {order.estimatedDelivery && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Livraison prévue</span>
+                    <span className="font-medium">{formatDate(order.estimatedDelivery)}</span>
+                  </div>
+                )}
+                {order.actualDelivery && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Livraison réelle</span>
+                    <span className="font-medium text-green-600">{formatDate(order.actualDelivery)}</span>
+                  </div>
+                )}
+                {order.riskLevel && order.riskLevel !== "LOW" && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Niveau de risque</span>
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                      order.riskLevel === "CRITICAL" ? "bg-red-100 text-red-700" :
+                      order.riskLevel === "HIGH" ? "bg-orange-100 text-orange-700" :
+                      "bg-yellow-100 text-yellow-700"
+                    }`}>{order.riskLevel}</span>
                   </div>
                 )}
               </CardContent>
             </Card>
 
+            {/* Finances */}
             <Card>
-              <CardHeader>
-                <CardTitle>Détails commande</CardTitle>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Détail financier</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2">
-                <div>
-                  <p className="text-sm font-medium">Montant total</p>
-                  <p className="text-2xl font-bold">
-                    <CurrencyDisplay
-                      amount={Number(order.totalClient)}
-                      currency="XAF"
-                    />
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium">Ville de destination</p>
-                  <p className="text-sm text-muted-foreground">
-                    {order.destinationCity}
-                  </p>
-                </div>
-                {order.notes && (
-                  <div>
-                    <p className="text-sm font-medium">Notes</p>
-                    <p className="text-sm text-muted-foreground">{order.notes}</p>
+              <CardContent className="space-y-1.5 text-sm">
+                {order.merchandiseTotal != null && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Marchandises</span>
+                    <CurrencyDisplay amount={Number(order.merchandiseTotal)} currency="XAF" />
                   </div>
                 )}
+                {order.logisticsCost != null && Number(order.logisticsCost) > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Logistique</span>
+                    <CurrencyDisplay amount={Number(order.logisticsCost)} currency="XAF" />
+                  </div>
+                )}
+                {order.commissionAmount != null && Number(order.commissionAmount) > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">
+                      Commission ({order.commissionRate != null ? `${(Number(order.commissionRate) * 100).toFixed(0)}%` : ""})
+                    </span>
+                    <CurrencyDisplay amount={Number(order.commissionAmount)} currency="XAF" />
+                  </div>
+                )}
+                {order.insuranceAmount != null && Number(order.insuranceAmount) > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Assurance</span>
+                    <CurrencyDisplay amount={Number(order.insuranceAmount)} currency="XAF" />
+                  </div>
+                )}
+                <div className="flex justify-between border-t pt-1.5 mt-1.5">
+                  <span className="font-semibold">Total client</span>
+                  <span className="font-bold text-base">
+                    <CurrencyDisplay amount={Number(order.totalClient)} currency="XAF" />
+                  </span>
+                </div>
               </CardContent>
             </Card>
           </div>
+
+          {/* Margin report (if calculated) */}
+          {order.marginReport && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Marge opérationnelle</CardTitle>
+                <CardDescription className="text-xs">
+                  Calculée le {formatDate(order.marginReport.calculatedAt)}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+                  <div>
+                    <p className="text-muted-foreground text-xs mb-0.5">Revenus</p>
+                    <p className="font-semibold">
+                      <CurrencyDisplay amount={Number(order.marginReport.revenue)} currency={order.marginReport.currency} />
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs mb-0.5">Coût (COGS)</p>
+                    <p className="font-semibold">
+                      <CurrencyDisplay amount={Number(order.marginReport.cogs)} currency={order.marginReport.currency} />
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs mb-0.5">Marge brute</p>
+                    <p className="font-semibold text-green-600">
+                      <CurrencyDisplay amount={Number(order.marginReport.grossMargin)} currency={order.marginReport.currency} />
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs mb-0.5">Taux marge</p>
+                    <p className="font-bold text-lg text-green-600">
+                      {Number(order.marginReport.marginPercent).toFixed(1)}%
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Notes */}
+          {order.notes && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Notes</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap">{order.notes}</p>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="items">
@@ -453,6 +575,67 @@ export function OrderDetail({
                   ))}
                 </TableBody>
               </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="sourcing">
+          <Card>
+            <CardHeader>
+              <CardTitle>Cas de sourcing</CardTitle>
+              <CardDescription>Recherche fournisseurs & négociations liées à cette commande</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {(order.sourcingCases ?? []).length === 0 ? (
+                <p className="text-sm text-muted-foreground">Aucun cas de sourcing pour le moment.</p>
+              ) : (
+                <div className="space-y-4">
+                  {(order.sourcingCases ?? []).map((sc) => (
+                    <div key={sc.id} className="rounded-lg border p-4 space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="font-medium text-sm">{sc.requirement}</p>
+                          {sc.supplier && (
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              Fournisseur: {sc.supplier.name} ({sc.supplier.country})
+                            </p>
+                          )}
+                        </div>
+                        <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium shrink-0 ${
+                          sc.status === "CONFIRMED" || sc.status === "SELECTED" ? "bg-green-100 text-green-700" :
+                          sc.status === "CANCELLED" ? "bg-red-100 text-red-700" :
+                          sc.status === "NEGOTIATING" ? "bg-blue-100 text-blue-700" :
+                          "bg-gray-100 text-gray-700"
+                        }`}>
+                          {sc.status.replace("_", " ")}
+                        </span>
+                      </div>
+                      {sc.budget && (
+                        <p className="text-xs text-muted-foreground">
+                          Budget: <span className="font-medium"><CurrencyDisplay amount={Number(sc.budget)} currency={sc.currency} /></span>
+                        </p>
+                      )}
+                      {sc.offers.length > 0 && (
+                        <div>
+                          <p className="text-xs font-medium mb-1.5">Offres ({sc.offers.length})</p>
+                          <div className="space-y-1">
+                            {sc.offers.map((offer) => (
+                              <div key={offer.id} className={`flex items-center justify-between text-xs px-2 py-1 rounded ${offer.isSelected ? "bg-green-50 border border-green-200" : "bg-muted/40"}`}>
+                                <span>
+                                  {offer.isSelected && <span className="mr-1 text-green-600 font-bold">✓</span>}
+                                  <CurrencyDisplay amount={Number(offer.unitPrice)} currency={offer.currency} />
+                                  {offer.moq && ` · MOQ: ${offer.moq}`}
+                                  {offer.leadTimeDays && ` · ${offer.leadTimeDays}j`}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

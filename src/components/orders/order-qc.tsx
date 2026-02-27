@@ -21,7 +21,7 @@ import { formatDate } from "@/lib/utils";
 export type QcReport = {
   id: string;
   overallResult: string;
-  defectRate?: number | null;
+  defectRate?: any;
   recommendation?: string | null;
   createdAt: Date;
 };
@@ -33,7 +33,7 @@ export type QcRequest = {
   inspector?: string | null;
   scheduledAt?: Date | null;
   completedAt?: Date | null;
-  cost?: number | null;
+  cost?: any;
   currency?: string | null;
   reports?: QcReport[];
 };
