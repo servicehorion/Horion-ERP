@@ -47,6 +47,10 @@ import { updateOrderStatus, duplicateOrder, archiveOrder } from "@/lib/actions/o
 import { ORDER_STATUS_LABELS, ORDER_STATUS_TRANSITIONS } from "@/config/order-statuses";
 import { formatDate } from "@/lib/utils";
 import { Loader2 } from "lucide-react";
+import { OrderQuotes } from "@/components/orders/order-quotes";
+import { OrderPayments } from "@/components/orders/order-payments";
+import { OrderAttachments } from "@/components/orders/order-attachments";
+import { OrderTeam } from "@/components/orders/order-team";
 
 type OrderDetailProps = {
   order: {
@@ -56,6 +60,10 @@ type OrderDetailProps = {
     priority: string;
     destinationCity: string;
     notes: string | null;
+    merchandiseTotal?: any;
+    logisticsCost?: any;
+    commissionAmount?: any;
+    insuranceAmount?: any;
     totalClient: any;
     createdAt: Date;
     contact: {
@@ -89,14 +97,52 @@ type OrderDetailProps = {
     }[];
     quotes: {
       id: string;
+      version: number;
+      status: string;
       merchandiseTotal: any;
+      logisticsCost: any;
+      commission: any;
+      insuranceCost: any;
+      total: any;
       currency: string;
+      validUntil?: Date | null;
+      sentAt?: Date | null;
+      acceptedAt?: Date | null;
       createdAt: Date;
     }[];
+    attachments: {
+      id: string;
+      name: string;
+      url: string;
+      type: string;
+      createdAt: Date;
+      user?: { name: string | null };
+    }[];
+    payments: {
+      id: string;
+      direction: "INBOUND" | "OUTBOUND";
+      type: string;
+      status: string;
+      amount: any;
+      amountXAF: any;
+      currency: string;
+      method?: string | null;
+      reference?: string | null;
+      dueAt?: Date | null;
+      createdAt: Date;
+    }[];
+    owner?: { id: string; name: string | null; email: string };
+    onboardedBy?: { id: string; name: string | null; email: string };
+    collaborators: { userId: string; user: { name: string | null; email: string } }[];
   };
   canUpdateStatus?: boolean;
   canEdit?: boolean;
   canArchive?: boolean;
+  canCreateQuote?: boolean;
+  canSendQuote?: boolean;
+  canViewPayments?: boolean;
+  canCreatePayment?: boolean;
+  teamMembers?: { id: string; name: string | null; email: string; role: string }[];
 };
 
 function buildAllowedStatuses(current: string) {
@@ -104,7 +150,17 @@ function buildAllowedStatuses(current: string) {
   return Array.from(new Set([current, ...transitions]));
 }
 
-export function OrderDetail({ order, canUpdateStatus = false, canEdit = false, canArchive = false }: OrderDetailProps) {
+export function OrderDetail({
+  order,
+  canUpdateStatus = false,
+  canEdit = false,
+  canArchive = false,
+  canCreateQuote = false,
+  canSendQuote = false,
+  canViewPayments = false,
+  canCreatePayment = false,
+  teamMembers = [],
+}: OrderDetailProps) {
   const router = useRouter();
   const [isUpdating, setIsUpdating] = useState(false);
   const [isDuplicating, setIsDuplicating] = useState(false);
@@ -267,6 +323,9 @@ export function OrderDetail({ order, canUpdateStatus = false, canEdit = false, c
           <TabsTrigger value="resume">Résumé</TabsTrigger>
           <TabsTrigger value="items">Articles ({order.items.length})</TabsTrigger>
           <TabsTrigger value="quotes">Devis ({order.quotes.length})</TabsTrigger>
+          <TabsTrigger value="payments">Paiements ({order.payments.length})</TabsTrigger>
+          <TabsTrigger value="documents">Documents ({order.attachments.length})</TabsTrigger>
+          <TabsTrigger value="team">Equipe</TabsTrigger>
           <TabsTrigger value="timeline">Timeline ({order.timeline.length})</TabsTrigger>
           <TabsTrigger value="tasks">Tâches ({order.tasks.length})</TabsTrigger>
         </TabsList>
@@ -375,40 +434,50 @@ export function OrderDetail({ order, canUpdateStatus = false, canEdit = false, c
         </TabsContent>
 
         <TabsContent value="quotes">
+          <OrderQuotes
+            orderId={order.id}
+            quotes={order.quotes}
+            defaults={{
+              merchandiseTotal: Number(order.merchandiseTotal || 0),
+              logisticsCost: Number(order.logisticsCost || 0),
+              commission: Number(order.commissionAmount || 0),
+              insuranceCost: Number(order.insuranceAmount || 0),
+            }}
+            canCreate={canCreateQuote}
+            canSend={canSendQuote}
+          />
+        </TabsContent>
+
+        <TabsContent value="payments">
+          <OrderPayments
+            orderId={order.id}
+            totalClient={Number(order.totalClient)}
+            payments={order.payments}
+            canCreate={canCreatePayment}
+            canView={canViewPayments}
+          />
+        </TabsContent>
+
+        <TabsContent value="documents">
           <Card>
             <CardHeader>
-              <CardTitle>Devis</CardTitle>
+              <CardTitle>Documents et pièces jointes</CardTitle>
             </CardHeader>
             <CardContent>
-              {order.quotes.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Aucun devis pour le moment</p>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Montant marchandise</TableHead>
-                      <TableHead>Devise</TableHead>
-                      <TableHead>Date</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {order.quotes.map((quote) => (
-                      <TableRow key={quote.id}>
-                        <TableCell>
-                          <CurrencyDisplay
-                            amount={Number(quote.merchandiseTotal)}
-                            currency={quote.currency}
-                          />
-                        </TableCell>
-                        <TableCell>{quote.currency}</TableCell>
-                        <TableCell>{formatDate(quote.createdAt)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
+              <OrderAttachments orderId={order.id} attachments={order.attachments} canEdit={canEdit} />
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="team">
+          <OrderTeam
+            orderId={order.id}
+            ownerId={order.owner?.id}
+            onboardedBy={order.onboardedBy}
+            collaborators={order.collaborators || []}
+            teamMembers={teamMembers}
+            canEdit={canEdit}
+          />
         </TabsContent>
 
         <TabsContent value="timeline">
@@ -465,4 +534,5 @@ export function OrderDetail({ order, canUpdateStatus = false, canEdit = false, c
     </div>
   );
 }
+
 
