@@ -9,10 +9,13 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { TaskStatusBadge, PriorityBadge } from "@/components/shared/status-badge";
+import { PageHeader } from "@/components/shared/page-header";
+import { KpiCard, KpiGrid } from "@/components/shared/kpi-card";
 import { TaskCreateDialog } from "@/components/tasks/task-create-dialog";
 import { TaskFilters } from "@/components/tasks/task-filters";
 import { TaskTableClient } from "@/components/tasks/task-table-client";
 import { getTasks, getTaskDashboardData, getTeamMembers } from "@/lib/actions/task.actions";
+import { getProjects } from "@/lib/actions/project.actions";
 import { formatDate } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
@@ -22,35 +25,44 @@ export const metadata = {
 };
 
 interface PageProps {
-  searchParams: {
+  searchParams: Promise<{
     page?: string;
     module?: string;
     status?: string;
     priority?: string;
     assignee?: string;
+    project?: string;
     q?: string;
-  };
+    sortBy?: string;
+    sortDir?: string;
+  }>;
 }
 
 export default async function TasksPage({ searchParams }: PageProps) {
-  const page = Math.max(1, Number(searchParams.page) || 1);
+  const sp = await searchParams;
+  const page = Math.max(1, Number(sp.page) || 1);
 
-  const [dashResult, tasksResult, membersResult] = await Promise.all([
+  const [dashResult, tasksResult, membersResult, projectsResult] = await Promise.all([
     getTaskDashboardData(),
     getTasks({
-      module: searchParams.module,
-      status: searchParams.status,
-      priority: searchParams.priority,
-      assigneeId: searchParams.assignee,
-      search: searchParams.q,
+      module: sp.module,
+      status: sp.status,
+      priority: sp.priority,
+      assigneeId: sp.assignee,
+      projectId: sp.project,
+      search: sp.q,
+      sortBy: sp.sortBy,
+      sortDir: sp.sortDir,
       page,
       limit: 25,
     }),
     getTeamMembers(),
+    getProjects({ limit: 200 }),
   ]);
 
   const dashboard = dashResult.data;
   const teamMembers = membersResult.data ?? [];
+  const projects = (projectsResult as any).data?.map((p: any) => ({ id: p.id, name: p.name })) ?? [];
 
   if (!dashboard) {
     return (
@@ -65,45 +77,57 @@ export default async function TasksPage({ searchParams }: PageProps) {
   const total = (tasksResult as any).total ?? 0;
   const totalPages = (tasksResult as any).totalPages ?? 1;
 
-  const hasFilters = !!(searchParams.module || searchParams.status || searchParams.priority || searchParams.assignee || searchParams.q);
+  const hasFilters = !!(
+    sp.module
+    || sp.status
+    || sp.priority
+    || sp.assignee
+    || sp.project
+    || sp.q
+  );
 
   return (
     <div className="space-y-5">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold">Tasks OS</h1>
-          <p className="text-muted-foreground">
-            Opérations centralisées — priorités, urgences, collaboratif
-          </p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/tasks/my"><Target className="mr-2 h-4 w-4" />Mes tâches</Link>
-          </Button>
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/tasks/board"><Kanban className="mr-2 h-4 w-4" />Kanban</Link>
-          </Button>
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/tasks/timeline"><Calendar className="mr-2 h-4 w-4" />Timeline</Link>
-          </Button>
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/tasks/analytics"><BarChart3 className="mr-2 h-4 w-4" />Analytics</Link>
-          </Button>
-          <TaskCreateDialog teamMembers={teamMembers} />
-        </div>
-      </div>
+      <PageHeader
+        title="Tâches & Projets"
+        description="Opérations centralisées — priorités, urgences, collaboratif"
+      >
+        <Button variant="outline" size="sm" asChild>
+          <Link href="/tasks/my"><Target className="mr-2 h-4 w-4" />Mes tâches</Link>
+        </Button>
+        <Button variant="outline" size="sm" asChild>
+          <Link href="/tasks/board"><Kanban className="mr-2 h-4 w-4" />Kanban</Link>
+        </Button>
+        <Button variant="outline" size="sm" asChild>
+          <Link href="/tasks/timeline"><Calendar className="mr-2 h-4 w-4" />Timeline</Link>
+        </Button>
+        <Button variant="outline" size="sm" asChild>
+          <Link href="/tasks/analytics"><BarChart3 className="mr-2 h-4 w-4" />Analytics</Link>
+        </Button>
+        <TaskCreateDialog teamMembers={teamMembers} projects={projects} />
+      </PageHeader>
 
       {/* KPI Strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-        <KpiCard label="Total actif" value={metrics.totalActive} icon={<ListTodo className="h-4 w-4 text-blue-600" />} color="blue" />
-        <KpiCard label="Mes tâches" value={metrics.myTasks} icon={<Target className="h-4 w-4 text-indigo-600" />} color="indigo" href="/tasks/my" />
-        <KpiCard label="SLA dépassé" value={metrics.slaBreaches} icon={<AlertTriangle className="h-4 w-4 text-red-600" />} color="red" urgent={metrics.slaBreaches > 0} />
-        <KpiCard label="Bloqué" value={metrics.blocked} icon={<Zap className="h-4 w-4 text-orange-600" />} color="orange" urgent={metrics.blocked > 0} />
-        <KpiCard label="Approbation" value={metrics.waitingApproval} icon={<Clock className="h-4 w-4 text-yellow-600" />} color="yellow" />
-        <KpiCard label="Terminé auj." value={metrics.completedToday} icon={<CheckCircle2 className="h-4 w-4 text-green-600" />} color="green" />
-        <KpiCard label="Terminé sem." value={metrics.completedThisWeek} icon={<TrendingUp className="h-4 w-4 text-teal-600" />} color="teal" />
-      </div>
+      <KpiGrid cols={7}>
+        <KpiCard label="Total actif" value={metrics.totalActive}
+          icon={<ListTodo className="h-4 w-4 text-muted-foreground" />} />
+        <KpiCard label="Mes tâches" value={metrics.myTasks}
+          icon={<Target className="h-4 w-4 text-muted-foreground" />} href="/tasks/my" />
+        <KpiCard label="SLA dépassé" value={metrics.slaBreaches}
+          icon={<AlertTriangle className="h-4 w-4 text-muted-foreground" />}
+          variant={metrics.slaBreaches > 0 ? "danger" : "default"}
+          urgent={metrics.slaBreaches > 0} />
+        <KpiCard label="Bloqué" value={metrics.blocked}
+          icon={<Zap className="h-4 w-4 text-muted-foreground" />}
+          variant={metrics.blocked > 0 ? "warning" : "default"}
+          urgent={metrics.blocked > 0} />
+        <KpiCard label="Approbation" value={metrics.waitingApproval}
+          icon={<Clock className="h-4 w-4 text-muted-foreground" />} />
+        <KpiCard label="Terminé auj." value={metrics.completedToday}
+          icon={<CheckCircle2 className="h-4 w-4 text-muted-foreground" />} />
+        <KpiCard label="Terminé sem." value={metrics.completedThisWeek}
+          icon={<TrendingUp className="h-4 w-4 text-muted-foreground" />} />
+      </KpiGrid>
 
       {/* SLA Alert Banner */}
       {metrics.slaBreaches > 0 && (
@@ -296,12 +320,16 @@ export default async function TasksPage({ searchParams }: PageProps) {
             {hasFilters ? `Résultats (${total})` : `Toutes les tâches (${total})`}
           </h2>
           <TaskFilters
-            currentModule={searchParams.module}
-            currentStatus={searchParams.status}
-            currentPriority={searchParams.priority}
-            currentAssignee={searchParams.assignee}
-            currentSearch={searchParams.q}
+            currentModule={sp.module}
+            currentStatus={sp.status}
+            currentPriority={sp.priority}
+            currentAssignee={sp.assignee}
+            currentProject={sp.project}
+            currentSearch={sp.q}
+            currentSortBy={sp.sortBy}
+            currentSortDir={sp.sortDir}
             teamMembers={teamMembers}
+            projects={projects}
           />
         </div>
 
@@ -315,7 +343,7 @@ export default async function TasksPage({ searchParams }: PageProps) {
             <div className="flex items-center gap-2">
               {page > 1 && (
                 <Button variant="outline" size="sm" asChild>
-                  <Link href={buildUrl(searchParams, { page: page - 1 })}><ChevronLeft className="h-4 w-4 mr-1" />Précédent</Link>
+                  <Link href={buildUrl(sp, { page: page - 1 })}><ChevronLeft className="h-4 w-4 mr-1" />Précédent</Link>
                 </Button>
               )}
               <div className="flex items-center gap-1">
@@ -324,14 +352,14 @@ export default async function TasksPage({ searchParams }: PageProps) {
                     <span key={`e-${i}`} className="px-2 text-muted-foreground">...</span>
                   ) : (
                     <Button key={p} variant={p === page ? "default" : "outline"} size="sm" className="w-9 h-8 p-0" asChild>
-                      <Link href={buildUrl(searchParams, { page: p as number })}>{p}</Link>
+                      <Link href={buildUrl(sp, { page: p as number })}>{p}</Link>
                     </Button>
                   )
                 )}
               </div>
               {page < totalPages && (
                 <Button variant="outline" size="sm" asChild>
-                  <Link href={buildUrl(searchParams, { page: page + 1 })}>Suivant<ChevronRight className="h-4 w-4 ml-1" /></Link>
+                  <Link href={buildUrl(sp, { page: page + 1 })}>Suivant<ChevronRight className="h-4 w-4 ml-1" /></Link>
                 </Button>
               )}
             </div>
@@ -342,32 +370,6 @@ export default async function TasksPage({ searchParams }: PageProps) {
   );
 }
 
-function KpiCard({ label, value, icon, color, urgent, href }: {
-  label: string; value: number; icon: React.ReactNode; color: string; urgent?: boolean; href?: string;
-}) {
-  const colorMap: Record<string, string> = {
-    blue: "border-blue-200 bg-blue-50/50 dark:bg-blue-950/10",
-    indigo: "border-indigo-200 bg-indigo-50/50 dark:bg-indigo-950/10",
-    red: "border-red-200 bg-red-50/50 dark:bg-red-950/10",
-    orange: "border-orange-200 bg-orange-50/50 dark:bg-orange-950/10",
-    yellow: "border-yellow-200 bg-yellow-50/50 dark:bg-yellow-950/10",
-    green: "border-green-200 bg-green-50/50 dark:bg-green-950/10",
-    teal: "border-teal-200 bg-teal-50/50 dark:bg-teal-950/10",
-  };
-  const Inner = (
-    <Card className={cn("border", colorMap[color], urgent && "ring-2 ring-red-400 ring-offset-1", href && "cursor-pointer hover:shadow-sm transition-shadow")}>
-      <CardContent className="p-3">
-        <div className="flex items-center justify-between mb-1">
-          {icon}
-          {urgent && <span className="text-red-500 text-xs font-bold animate-pulse">!</span>}
-        </div>
-        <div className="text-2xl font-bold">{value}</div>
-        <div className="text-xs text-muted-foreground leading-tight">{label}</div>
-      </CardContent>
-    </Card>
-  );
-  return href ? <Link href={href}>{Inner}</Link> : Inner;
-}
 
 function buildUrl(current: Record<string, string | undefined>, overrides: Record<string, string | number | undefined>): string {
   const params = new URLSearchParams();
