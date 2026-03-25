@@ -13,7 +13,7 @@ export default async function PaymentSuccessPage({
   const { token } = await params;
 
   const quote = await prisma.quote.findFirst({
-    where: { paymentToken: token },
+    where: { paymentToken: token, isActive: true },
     select: {
       total: true,
       currency: true,
@@ -135,6 +135,21 @@ export default async function PaymentSuccessPage({
 
         {/* CTAs */}
         <div className="space-y-2.5">
+          <a
+            href={`/pay/${token}/receipt`}
+            className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white font-semibold text-slate-900 transition hover:border-slate-300 hover:bg-slate-50"
+          >
+            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M12 3v12m0 0l-4-4m4 4l4-4M5 17v2a2 2 0 002 2h10a2 2 0 002-2v-2"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            Télécharger mon reçu
+          </a>
           <a
             href={waUrl}
             target="_blank"

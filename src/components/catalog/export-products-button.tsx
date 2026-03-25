@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { exportProductsCSV } from "@/lib/actions/catalog.actions";
 import { Loader2, Download } from "lucide-react";
+import { toast } from "sonner";
 
 export function ExportProductsButton() {
   const [loading, setLoading] = useState(false);
@@ -13,7 +14,7 @@ export function ExportProductsButton() {
     const result = await exportProductsCSV();
     setLoading(false);
     if (result.error) {
-      alert(result.error);
+      toast.error(result.error);
       return;
     }
     const bom = "\uFEFF";
@@ -24,6 +25,7 @@ export function ExportProductsButton() {
     a.download = `catalogue-produits-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+    toast.success("Export catalogue telecharge");
   }
 
   return (

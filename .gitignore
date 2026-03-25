@@ -41,3 +41,18 @@ yarn-error.log*
 next-env.d.ts
 
 /src/generated/prisma
+
+# build backups & temp debug files
+.next_bak*/
+auth-cookies.txt
+auth-dev.log
+auth-stderr.log
+auth-stdout.log
+build-agent.log
+smoke-stderr.log
+smoke-stdout.log
+tsc-errors.txt
+typecheck.out
+typecheck-latest.log
+prisma-drift.sql
+prisma-drift-safe.sql

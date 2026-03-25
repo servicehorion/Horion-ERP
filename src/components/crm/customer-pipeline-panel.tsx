@@ -175,10 +175,10 @@ export function CustomerPipelinePanel({
                             </div>
                             {contactId && intent.status === "active" && !demoMode && (
                               <a
-                                href={`/orders/new?contactId=${contactId}`}
+                                href={`/sourcing/indicatif?contactId=${contactId}`}
                                 className="text-xs text-primary hover:underline inline-flex items-center gap-1"
                               >
-                                Créer commande
+                                Créer devis indicatif
                                 <ArrowUpRight className="h-3 w-3" />
                               </a>
                             )}

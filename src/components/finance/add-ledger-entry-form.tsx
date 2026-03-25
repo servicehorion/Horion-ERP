@@ -30,7 +30,19 @@ interface Account {
   type: string;
 }
 
-export function AddLedgerEntryForm({ accounts }: { accounts: Account[] }) {
+interface CostCenter {
+  id: string;
+  code: string;
+  name: string;
+}
+
+export function AddLedgerEntryForm({
+  accounts,
+  costCenters = [],
+}: {
+  accounts: Account[];
+  costCenters?: CostCenter[];
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -44,11 +56,13 @@ export function AddLedgerEntryForm({ accounts }: { accounts: Account[] }) {
     const fd = new FormData(e.currentTarget);
     const result = await createLedgerEntry({
       accountId: fd.get("accountId") as string,
+      contraAccountId: fd.get("contraAccountId") as string,
       type: fd.get("type") as string,
       amount: parseFloat(fd.get("amount") as string),
       currency: (fd.get("currency") as string) || "XAF",
       description: fd.get("description") as string,
       reference: (fd.get("reference") as string) || undefined,
+      costCenterId: (fd.get("costCenterId") as string) || undefined,
     });
 
     setLoading(false);
@@ -66,12 +80,12 @@ export function AddLedgerEntryForm({ accounts }: { accounts: Account[] }) {
       <DialogTrigger asChild>
         <Button size="sm">
           <Plus className="mr-2 h-4 w-4" />
-          Nouvelle écriture
+          Nouvelle ecriture
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Nouvelle écriture comptable</DialogTitle>
+          <DialogTitle>Nouvelle ecriture comptable</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
@@ -82,12 +96,28 @@ export function AddLedgerEntryForm({ accounts }: { accounts: Account[] }) {
             <Label>Compte *</Label>
             <Select name="accountId" required>
               <SelectTrigger>
-                <SelectValue placeholder="Sélectionner un compte" />
+                <SelectValue placeholder="Selectionner un compte" />
               </SelectTrigger>
               <SelectContent>
                 {accounts.map((a) => (
                   <SelectItem key={a.id} value={a.id}>
-                    {a.code} — {a.name} ({a.type})
+                    {a.code} - {a.name} ({a.type})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Contrepartie *</Label>
+            <Select name="contraAccountId" required>
+              <SelectTrigger>
+                <SelectValue placeholder="Selectionner la contrepartie" />
+              </SelectTrigger>
+              <SelectContent>
+                {accounts.map((a) => (
+                  <SelectItem key={`contra-${a.id}`} value={a.id}>
+                    {a.code} - {a.name} ({a.type})
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -100,8 +130,8 @@ export function AddLedgerEntryForm({ accounts }: { accounts: Account[] }) {
               <Select name="type" required defaultValue="DEBIT">
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="DEBIT">Débit</SelectItem>
-                  <SelectItem value="CREDIT">Crédit</SelectItem>
+                  <SelectItem value="DEBIT">Debit</SelectItem>
+                  <SelectItem value="CREDIT">Credit</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -113,7 +143,7 @@ export function AddLedgerEntryForm({ accounts }: { accounts: Account[] }) {
 
           <div className="space-y-2">
             <Label>Description *</Label>
-            <Textarea name="description" rows={2} required placeholder="Motif de l'écriture..." />
+            <Textarea name="description" rows={2} required placeholder="Motif de l'ecriture..." />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -130,14 +160,30 @@ export function AddLedgerEntryForm({ accounts }: { accounts: Account[] }) {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Référence</Label>
-              <Input name="reference" placeholder="N° pièce..." />
+              <Label>Reference</Label>
+              <Input name="reference" placeholder="N° piece..." />
             </div>
           </div>
 
+          {costCenters.length > 0 && (
+            <div className="space-y-2">
+              <Label>Centre de cout</Label>
+              <Select name="costCenterId">
+                <SelectTrigger><SelectValue placeholder="Selectionner" /></SelectTrigger>
+                <SelectContent>
+                  {costCenters.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.code} - {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           <Button type="submit" disabled={loading} className="w-full">
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Enregistrer l&apos;écriture
+            Enregistrer l'ecriture
           </Button>
         </form>
       </DialogContent>

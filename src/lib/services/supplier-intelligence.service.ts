@@ -801,6 +801,10 @@ export class SupplierIntelligenceService {
           orderBy: { createdAt: "desc" },
           take: 20,
         },
+        documents: {
+          orderBy: { createdAt: "desc" },
+          take: 20,
+        },
         orderItems: {
           include: {
             order: {

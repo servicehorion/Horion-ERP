@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2 } from "lucide-react";
@@ -45,14 +45,26 @@ interface LeadFormProps {
     containerType?: "LCL" | "FCL" | "AERIEN" | null;
     originCountry?: string | null;
     notes?: string | null;
+    salesTeamId?: string | null;
+    territoryId?: string | null;
   };
   contacts: { id: string; name: string }[];
   teamMembers: { id: string; name: string | null; email: string; role: string }[];
+  salesTeams: { id: string; name: string }[];
+  territories: { id: string; name: string }[];
   demoMode?: boolean;
   currentUserId?: string;
 }
 
-export function LeadForm({ lead, contacts, teamMembers, demoMode, currentUserId }: LeadFormProps) {
+export function LeadForm({
+  lead,
+  contacts,
+  teamMembers,
+  salesTeams,
+  territories,
+  demoMode,
+  currentUserId,
+}: LeadFormProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isEditing = !!lead;
@@ -72,6 +84,8 @@ export function LeadForm({ lead, contacts, teamMembers, demoMode, currentUserId 
       containerType: lead?.containerType ?? undefined,
       originCountry: lead?.originCountry || "CN",
       notes: lead?.notes || "",
+      salesTeamId: lead?.salesTeamId ?? undefined,
+      territoryId: lead?.territoryId ?? undefined,
     },
   });
 
@@ -90,6 +104,8 @@ export function LeadForm({ lead, contacts, teamMembers, demoMode, currentUserId 
         assignedTo: data.assignedTo || undefined,
         ownerId: data.ownerId || undefined,
         collaboratorIds: data.collaboratorIds || [],
+        salesTeamId: data.salesTeamId || undefined,
+        territoryId: data.territoryId || undefined,
       };
 
       const result = isEditing
@@ -101,7 +117,7 @@ export function LeadForm({ lead, contacts, teamMembers, demoMode, currentUserId 
         return;
       }
 
-      toast.success(isEditing ? "Lead mis Ã  jour" : "Lead crÃ©Ã©");
+      toast.success(isEditing ? "Lead mis a jour" : "Lead cree");
       router.push(isEditing ? `/crm/leads/${lead!.id}` : "/crm/leads");
     } catch (error) {
       toast.error("Erreur");
@@ -145,18 +161,18 @@ export function LeadForm({ lead, contacts, teamMembers, demoMode, currentUserId 
             name="assignedTo"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>AssignÃ© Ã </FormLabel>
+                <FormLabel>Assigne a</FormLabel>
                 <Select
                   onValueChange={(value) => field.onChange(value === "none" ? undefined : value)}
                   defaultValue={field.value ?? "none"}
                 >
                   <FormControl>
                     <SelectTrigger>
-                      <SelectValue placeholder="Non assignÃ©" />
+                      <SelectValue placeholder="Non assigne" />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="none">Non assignÃ©</SelectItem>
+                    <SelectItem value="none">Non assigne</SelectItem>
                     {teamMembers.map((m) => (
                       <SelectItem key={m.id} value={m.id}>
                         {m.name || m.email}
@@ -181,14 +197,72 @@ export function LeadForm({ lead, contacts, teamMembers, demoMode, currentUserId 
                 >
                   <FormControl>
                     <SelectTrigger>
-                      <SelectValue placeholder="Non assignÃƒÂ©" />
+                      <SelectValue placeholder="Non assigne" />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="none">Non assignÃƒÂ©</SelectItem>
+                    <SelectItem value="none">Non assigne</SelectItem>
                     {teamMembers.map((m) => (
                       <SelectItem key={m.id} value={m.id}>
                         {m.name || m.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="salesTeamId"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Equipe commerciale</FormLabel>
+                <Select
+                  onValueChange={(value) => field.onChange(value === "none" ? undefined : value)}
+                  defaultValue={field.value ?? "none"}
+                >
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Non definie" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="none">Non definie</SelectItem>
+                    {salesTeams.map((team) => (
+                      <SelectItem key={team.id} value={team.id}>
+                        {team.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="territoryId"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Territoire</FormLabel>
+                <Select
+                  onValueChange={(value) => field.onChange(value === "none" ? undefined : value)}
+                  defaultValue={field.value ?? "none"}
+                >
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Non defini" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="none">Non defini</SelectItem>
+                    {territories.map((territory) => (
+                      <SelectItem key={territory.id} value={territory.id}>
+                        {territory.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -205,7 +279,7 @@ export function LeadForm({ lead, contacts, teamMembers, demoMode, currentUserId 
               <FormItem>
                 <FormLabel>Source</FormLabel>
                 <FormControl>
-                  <Input {...field} placeholder="WhatsApp, salon, rÃ©fÃ©rence..." />
+                  <Input {...field} placeholder="WhatsApp, salon, reference..." />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -217,9 +291,9 @@ export function LeadForm({ lead, contacts, teamMembers, demoMode, currentUserId 
             name="category"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>CatÃ©gorie</FormLabel>
+                <FormLabel>Categorie</FormLabel>
                 <FormControl>
-                  <Input {...field} placeholder="Ex: Ã‰lectronique" />
+                  <Input {...field} placeholder="Ex: Electronique" />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -231,7 +305,7 @@ export function LeadForm({ lead, contacts, teamMembers, demoMode, currentUserId 
             name="estimatedValue"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Valeur estimÃ©e</FormLabel>
+                <FormLabel>Valeur estimee</FormLabel>
                 <FormControl>
                   <Input
                     type="number"
@@ -264,7 +338,7 @@ export function LeadForm({ lead, contacts, teamMembers, demoMode, currentUserId 
                   <SelectContent>
                     {Object.values(CURRENCIES).map((c) => (
                       <SelectItem key={c.code} value={c.code}>
-                        {c.code} — {c.name}
+                        {c.code} - {c.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -286,14 +360,14 @@ export function LeadForm({ lead, contacts, teamMembers, demoMode, currentUserId 
                 >
                   <FormControl>
                     <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner..." />
+                      <SelectValue placeholder="Selectionner..." />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="none">Non défini</SelectItem>
-                    <SelectItem value="LCL">LCL — Groupage maritime</SelectItem>
-                    <SelectItem value="FCL">FCL — Conteneur complet</SelectItem>
-                    <SelectItem value="AERIEN">Aérien</SelectItem>
+                    <SelectItem value="none">Non defini</SelectItem>
+                    <SelectItem value="LCL">LCL - Groupage maritime</SelectItem>
+                    <SelectItem value="FCL">FCL - Conteneur complet</SelectItem>
+                    <SelectItem value="AERIEN">Aerien</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />
@@ -323,7 +397,7 @@ export function LeadForm({ lead, contacts, teamMembers, demoMode, currentUserId 
             <FormItem>
               <FormLabel>Description</FormLabel>
               <FormControl>
-                <Textarea {...field} rows={4} placeholder="DÃ©crivez le besoin du client..." />
+                <Textarea {...field} rows={4} placeholder="Decrivez le besoin du client..." />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -337,7 +411,7 @@ export function LeadForm({ lead, contacts, teamMembers, demoMode, currentUserId 
             <FormItem>
               <FormLabel>Notes internes</FormLabel>
               <FormControl>
-                <Textarea {...field} rows={3} placeholder="Informations complémentaires sur ce lead..." />
+                <Textarea {...field} rows={3} placeholder="Informations complementaires sur ce lead..." />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -386,11 +460,10 @@ export function LeadForm({ lead, contacts, teamMembers, demoMode, currentUserId 
           </Button>
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {isEditing ? "Mettre Ã  jour" : "CrÃ©er le lead"}
+            {isEditing ? "Mettre a jour" : "Creer le lead"}
           </Button>
         </div>
       </form>
     </Form>
   );
 }
-

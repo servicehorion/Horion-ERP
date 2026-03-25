@@ -1,10 +1,16 @@
 import { CrmDashboard, type Customer, type Lead, type Prospect } from "@/components/crm/crm-dashboard";
 import { getContacts, getLeads } from "@/lib/actions/contact.actions";
 import { getTeamMembers } from "@/lib/actions/task.actions";
+import { getDemandIntakes } from "@/lib/actions/demand-intake.actions";
 import { auth } from "@/lib/auth";
 import { formatCurrency } from "@/config/currencies";
 import { formatDate } from "@/lib/utils";
 import { redirect } from "next/navigation";
+import Link from "next/link";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Inbox, AlertCircle, CheckCircle, ArrowRight } from "lucide-react";
 
 export const metadata = {
   title: "CRM | Horion ERP",
@@ -65,11 +71,12 @@ export default async function CRMPage() {
   const currentUserName = session?.user?.name || "Utilisateur";
   const currentUserId = session?.user?.id || "";
 
-  const [customersResult, prospectsResult, leadsResult, membersResult] = await Promise.all([
+  const [customersResult, prospectsResult, leadsResult, membersResult, demandsResult] = await Promise.all([
     getContacts({ type: "CLIENT", limit: 200 }),
     getContacts({ type: "PROSPECT", limit: 200 }),
     getLeads({ limit: 200 }),
     getTeamMembers("crm"),
+    getDemandIntakes({}),
   ]);
 
   const members = membersResult.data || [];
@@ -146,13 +153,81 @@ export default async function CRMPage() {
     originCountry: l.originCountry || undefined,
   }));
 
+  const recentDemands = (demandsResult.data?.demands ?? []).slice(0, 5) as any[];
+  const demandKpis = demandsResult.data?.kpis;
+
   return (
-    <CrmDashboard
-      initialCustomers={customers}
-      initialLeads={leads}
-      initialProspects={prospects}
-      currentUserName={currentUserName}
-      currentUserId={currentUserId}
-    />
+    <div className="space-y-6">
+      {/* ─── Demandes pré-vente widget ─── */}
+      <Card className="border-primary/20 bg-primary/5">
+        <CardHeader className="flex flex-row items-center justify-between pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Inbox className="h-4 w-4 text-primary" />
+            Pipeline Demandes Clients
+            {demandKpis && demandKpis.raw > 0 && (
+              <span className="ml-1 inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-100 text-xs font-semibold px-2 py-0.5">
+                <AlertCircle className="h-3 w-3" />
+                {demandKpis.raw} à traiter
+              </span>
+            )}
+          </CardTitle>
+          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+            {demandKpis && (
+              <>
+                <span><strong>{demandKpis.total}</strong> total</span>
+                <span className="text-blue-600"><strong>{demandKpis.qualified}</strong> qualif.</span>
+                <span className="text-amber-600"><strong>{demandKpis.indicatifPending}</strong> sourcing</span>
+                <span className="text-green-600"><strong>{demandKpis.converted}</strong> converties</span>
+              </>
+            )}
+            <Button variant="outline" size="sm" className="h-7 text-xs" asChild>
+              <Link href="/crm/demands">
+                Gérer <ArrowRight className="h-3 w-3 ml-1" />
+              </Link>
+            </Button>
+          </div>
+        </CardHeader>
+        {recentDemands.length > 0 ? (
+          <CardContent className="pt-0">
+            <div className="space-y-2">
+              {recentDemands.map((d: any) => (
+                <div key={d.id} className="flex items-center justify-between rounded-lg border bg-background p-2.5">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">{d.clientName}</p>
+                    <p className="text-xs text-muted-foreground truncate">{d.rawDescription}</p>
+                  </div>
+                  <Badge
+                    className={`ml-3 shrink-0 text-xs border-0 ${
+                      d.status === "RAW" ? "bg-muted text-muted-foreground"
+                      : d.status === "QUALIFIED" ? "bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-100"
+                      : d.status === "INDICATIF_PENDING" ? "bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-100"
+                      : d.status === "CONVERTED" ? "bg-green-100 text-green-800 dark:bg-green-900/60 dark:text-green-100"
+                      : d.status === "LOST" ? "bg-destructive/10 text-destructive"
+                      : "bg-violet-100 text-violet-800 dark:bg-violet-900/60 dark:text-violet-100"
+                    }`}
+                  >
+                    {d.status === "RAW" ? "Brut" : d.status === "QUALIFIED" ? "Qualifié" : d.status === "INDICATIF_PENDING" ? "Sourcing" : d.status === "CONVERTED" ? "Converti" : d.status === "LOST" ? "Perdu" : "Devis"}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        ) : (
+          <CardContent className="pt-0">
+            <p className="text-sm text-muted-foreground text-center py-4">
+              Aucune demande pour le moment — elles apparaissent automatiquement depuis WhatsApp ou le CRM
+            </p>
+          </CardContent>
+        )}
+      </Card>
+
+      <CrmDashboard
+        initialCustomers={customers}
+        initialLeads={leads}
+        initialProspects={prospects}
+        currentUserName={currentUserName}
+        currentUserId={currentUserId}
+      />
+    </div>
   );
 }

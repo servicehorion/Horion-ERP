@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import type { Prisma, SourcingStatus } from "@prisma/client";
+import type { PipelineType, Prisma, SourcingLevel, SourcingStatus } from "@prisma/client";
 
 const VALID_TRANSITIONS: Record<SourcingStatus, SourcingStatus[]> = {
   SEARCHING: ["OFFERS_RECEIVED", "CANCELLED"],
@@ -13,20 +13,42 @@ const VALID_TRANSITIONS: Record<SourcingStatus, SourcingStatus[]> = {
 export class SourcingCaseService {
   static async create(data: {
     orderId: string;
+    supplierId?: string;
+    contractId?: string;
     requirement: string;
     budget?: number;
     currency?: string;
+    level?: SourcingLevel;
+    platform?: string;
+    sensitiveProduct?: boolean;
+    category?: string;
+    pipelineType?: PipelineType;
+    assignedToId?: string;
+    assignedAgent?: string;
+    qcCostEst?: number;
   }) {
     return prisma.sourcingCase.create({
       data: {
         orderId: data.orderId,
+        supplierId: data.supplierId,
+        contractId: data.contractId,
         requirement: data.requirement,
         budget: data.budget,
         currency: data.currency || "RMB",
+        level: data.level ?? "INFORMATIF",
+        platform: data.platform,
+        sensitiveProduct: data.sensitiveProduct ?? false,
+        category: data.category,
+        pipelineType: data.pipelineType ?? "RETAIL",
+        assignedToId: data.assignedToId,
+        assignedAgent: data.assignedAgent,
+        qcCostEst: data.qcCostEst ?? undefined,
+        stageEnteredAt: new Date(),
       },
       include: {
         order: { select: { orderNumber: true, contact: { select: { name: true } } } },
         supplier: { select: { name: true } },
+        contract: { select: { id: true, contractNumber: true, status: true } },
         _count: { select: { offers: true, negotiations: true } },
       },
     });
@@ -48,6 +70,7 @@ export class SourcingCaseService {
           },
         },
         supplier: { select: { id: true, name: true, country: true, city: true, rating: true } },
+        contract: { select: { id: true, contractNumber: true, status: true, endAt: true } },
         offers: {
           include: {
             supplier: { select: { id: true, name: true, country: true, rating: true } },
@@ -61,6 +84,7 @@ export class SourcingCaseService {
       },
     });
   }
+
 
   static async list(
     tenantId: string,
@@ -90,6 +114,7 @@ export class SourcingCaseService {
         include: {
           order: { select: { orderNumber: true, contact: { select: { name: true } } } },
           supplier: { select: { id: true, name: true } },
+          contract: { select: { id: true, contractNumber: true, status: true, endAt: true } },
           _count: { select: { offers: true, negotiations: true } },
         },
         orderBy: { updatedAt: "desc" },
@@ -115,7 +140,7 @@ export class SourcingCaseService {
 
     return prisma.sourcingCase.update({
       where: { id },
-      data: { status: newStatus },
+      data: { status: newStatus, stageEnteredAt: new Date() },
       include: {
         order: { select: { orderNumber: true } },
         supplier: { select: { name: true } },
@@ -142,10 +167,12 @@ export class SourcingCaseService {
           supplierId,
           status: "SELECTED",
           selectedAt: new Date(),
+          stageEnteredAt: new Date(),
         },
         include: {
           order: { select: { orderNumber: true } },
           supplier: { select: { name: true } },
+          contract: { select: { id: true, contractNumber: true, status: true } },
           offers: {
             include: { supplier: { select: { name: true } } },
           },
@@ -163,10 +190,11 @@ export class SourcingCaseService {
 
     return prisma.sourcingCase.update({
       where: { id },
-      data: { status: "CONFIRMED" },
+      data: { status: "CONFIRMED", stageEnteredAt: new Date() },
       include: {
         order: { select: { orderNumber: true } },
         supplier: { select: { name: true } },
+        contract: { select: { id: true, contractNumber: true, status: true } },
       },
     });
   }
@@ -193,7 +221,7 @@ export class SourcingCaseService {
     if (sc && sc.status === "OFFERS_RECEIVED") {
       await prisma.sourcingCase.update({
         where: { id: data.sourcingCaseId },
-        data: { status: "NEGOTIATING" },
+        data: { status: "NEGOTIATING", stageEnteredAt: new Date() },
       });
     }
 
@@ -240,7 +268,7 @@ export class SourcingCaseService {
     if (sc && sc.status === "SEARCHING") {
       await prisma.sourcingCase.update({
         where: { id: data.sourcingCaseId },
-        data: { status: "OFFERS_RECEIVED" },
+        data: { status: "OFFERS_RECEIVED", stageEnteredAt: new Date() },
       });
     }
 
@@ -266,6 +294,7 @@ export class SourcingCaseService {
       include: {
         order: { select: { orderNumber: true, contact: { select: { name: true } } } },
         supplier: { select: { id: true, name: true } },
+        contract: { select: { id: true, contractNumber: true, status: true } },
         _count: { select: { offers: true } },
       },
       orderBy: { updatedAt: "desc" },

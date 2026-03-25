@@ -1,6 +1,48 @@
 import type { UserRole } from "@prisma/client";
+import { prisma } from "@/lib/db";
 
 type UserLike = { id: string; tenantId: string; role: UserRole };
+
+type DelegationRuleLite = {
+  delegatorId: string | null;
+  permissions: unknown;
+  startsAt: Date | null;
+  endsAt: Date | null;
+};
+
+const normalizePermissions = (value: unknown): string[] => {
+  if (!Array.isArray(value)) return [];
+  return value.filter((entry): entry is string => typeof entry === "string");
+};
+
+const isActiveWindow = (rule: DelegationRuleLite, now: Date) => {
+  if (rule.startsAt && rule.startsAt > now) return false;
+  if (rule.endsAt && rule.endsAt < now) return false;
+  return true;
+};
+
+async function getDelegatedUserIds(user: UserLike, module: string): Promise<string[]> {
+  const now = new Date();
+  const rules = await prisma.delegationRule.findMany({
+    where: {
+      tenantId: user.tenantId,
+      delegateeId: user.id,
+      isActive: true,
+    },
+    select: { delegatorId: true, permissions: true, startsAt: true, endsAt: true },
+  });
+
+  const delegators = rules
+    .filter((rule) => isActiveWindow(rule, now))
+    .filter((rule) => {
+      const permissions = normalizePermissions(rule.permissions);
+      return permissions.includes("*") || permissions.includes(module);
+    })
+    .map((rule) => rule.delegatorId)
+    .filter((id): id is string => Boolean(id));
+
+  return Array.from(new Set(delegators));
+}
 
 /**
  * Scope de module : détermine ce qu'un utilisateur peut voir dans un OS donné.
@@ -23,7 +65,7 @@ const SUPER_ROLES = new Set<UserRole>(["ADMIN", "CEO", "DIRECTION", "OPS"]);
  * ABAC — retourne le scope Prisma pour un module OS donné.
  *
  * Modules : "crm" | "project" | "logistics" | "sourcing" | "qc"
- *           | "finance" | "marketing" | "ai" | "orders" | "tasks"
+ *           | "finance" | "marketing" | "ai" | "orders" | "tasks" | "whatsapp"
  */
 export function getModuleScope(user: UserLike, module: string): ModuleScope {
   const tenantBase = { tenantId: user.tenantId };
@@ -143,6 +185,26 @@ export function getModuleScope(user: UserLike, module: string): ModuleScope {
       return { type: "none", where: {} };
     }
 
+    // â”€â”€â”€ WhatsApp OS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    case "whatsapp": {
+      if (user.role === "COMMUNITY_MANAGER" || user.role === "CRM_MANAGER") {
+        return { type: "full", where: tenantBase };
+      }
+      if (user.role === "COMMERCIAL") {
+        return {
+          type: "limited",
+          where: {
+            tenantId: user.tenantId,
+            OR: [
+              { assignedToId: user.id },
+              { ownerId: user.id },
+            ],
+          },
+        };
+      }
+      return { type: "none", where: {} };
+    }
+
     // ─── AI OS ──────────────────────────────────────────────────────────────
     case "ai": {
       if (user.role === "CTO" || user.role === "AI_ENGINEER") {
@@ -157,7 +219,14 @@ export function getModuleScope(user: UserLike, module: string): ModuleScope {
       if (user.role === "COMMERCIAL") {
         return {
           type: "limited",
-          where: { tenantId: user.tenantId, createdById: user.id },
+          where: {
+            tenantId: user.tenantId,
+            OR: [
+              { ownerId: user.id },
+              { onboardedById: user.id },
+              { collaborators: { some: { userId: user.id } } },
+            ],
+          },
         };
       }
       return { type: "full", where: tenantBase };
@@ -171,6 +240,25 @@ export function getModuleScope(user: UserLike, module: string): ModuleScope {
     default:
       return { type: "full", where: tenantBase };
   }
+}
+
+export async function getModuleScopeWithDelegation(user: UserLike, module: string): Promise<ModuleScope> {
+  const scope = getModuleScope(user, module);
+  if (scope.type !== "limited") return scope;
+  if (module !== "whatsapp") return scope;
+  if (user.role !== "COMMERCIAL") return scope;
+
+  const delegated = await getDelegatedUserIds(user, module);
+  if (delegated.length === 0) return scope;
+
+  const ids = Array.from(new Set([user.id, ...delegated]));
+  return {
+    type: "limited",
+    where: {
+      tenantId: user.tenantId,
+      OR: [{ assignedToId: { in: ids } }, { ownerId: { in: ids } }],
+    },
+  };
 }
 
 // ─── Compatibilité : anciennes exports CRM ───────────────────────────────────
@@ -204,6 +292,25 @@ export function getCrmContactScope(user: UserLike) {
   return { tenantId: user.tenantId };
 }
 
+export async function getCrmContactScopeWithDelegation(user: UserLike) {
+  const scope = getCrmContactScope(user);
+  if (!scope) return null;
+  if (user.role !== "COMMERCIAL") return scope;
+
+  const delegated = await getDelegatedUserIds(user, "crm");
+  if (delegated.length === 0) return scope;
+
+  const ids = Array.from(new Set([user.id, ...delegated]));
+  return {
+    tenantId: user.tenantId,
+    OR: [
+      { ownerId: { in: ids } },
+      { onboardedById: { in: ids } },
+      { collaborators: { some: { userId: { in: ids } } } },
+    ],
+  };
+}
+
 /** WHERE clause Prisma pour les leads CRM selon le rôle */
 export function getCrmLeadScope(user: UserLike) {
   const scope = getModuleScope(user, "crm");
@@ -221,6 +328,60 @@ export function getCrmLeadScope(user: UserLike) {
     };
   }
   return { contact: { tenantId: user.tenantId } };
+}
+
+export async function getCrmLeadScopeWithDelegation(user: UserLike) {
+  const scope = getCrmLeadScope(user);
+  if (!scope) return null;
+  if (user.role !== "COMMERCIAL") return scope;
+
+  const delegated = await getDelegatedUserIds(user, "crm");
+  if (delegated.length === 0) return scope;
+
+  const ids = Array.from(new Set([user.id, ...delegated]));
+  return {
+    contact: { tenantId: user.tenantId },
+    OR: [
+      { ownerId: { in: ids } },
+      { onboardedById: { in: ids } },
+      { assignedTo: { in: ids } },
+      { collaborators: { some: { userId: { in: ids } } } },
+    ],
+  };
+}
+
+/** WHERE clause Prisma pour les commandes selon le role */
+export function getOrderScope(user: UserLike) {
+  const scope = getModuleScope(user, "orders");
+  if (scope.type === "none") return null;
+  if (scope.type === "full") return { tenantId: user.tenantId };
+  return {
+    tenantId: user.tenantId,
+    OR: [
+      { ownerId: user.id },
+      { onboardedById: user.id },
+      { collaborators: { some: { userId: user.id } } },
+    ],
+  };
+}
+
+export async function getOrderScopeWithDelegation(user: UserLike) {
+  const scope = getOrderScope(user);
+  if (!scope) return null;
+  if (user.role !== "COMMERCIAL") return scope;
+
+  const delegated = await getDelegatedUserIds(user, "orders");
+  if (delegated.length === 0) return scope;
+
+  const ids = Array.from(new Set([user.id, ...delegated]));
+  return {
+    tenantId: user.tenantId,
+    OR: [
+      { ownerId: { in: ids } },
+      { onboardedById: { in: ids } },
+      { collaborators: { some: { userId: { in: ids } } } },
+    ],
+  };
 }
 
 export function canExportCrm(role: UserRole) {

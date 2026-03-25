@@ -1,11 +1,20 @@
 "use client";
 
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
-  ResponsiveContainer, Line, ComposedChart,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  Line,
+  ComposedChart,
 } from "recharts";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp } from "lucide-react";
+
+import { StableResponsiveChart } from "@/components/shared/stable-responsive-chart";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface CashflowPoint {
   month: string;
@@ -23,8 +32,9 @@ function formatK(v: number): string {
 
 function formatMonth(m: string): string {
   const [year, month] = m.split("-");
-  const months = ["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"];
-  return `${months[parseInt(month) - 1]} ${year.slice(2)}`;
+  const months = ["Jan", "Fev", "Mar", "Avr", "Mai", "Jun", "Jul", "Aou", "Sep", "Oct", "Nov", "Dec"];
+  const index = Math.max(0, Math.min(months.length - 1, Number(month) - 1));
+  return `${months[index]} ${year.slice(2)}`;
 }
 
 export function CashflowChart({ data }: { data: CashflowPoint[] }) {
@@ -37,8 +47,8 @@ export function CashflowChart({ data }: { data: CashflowPoint[] }) {
             Cash-flow mensuel
           </CardTitle>
         </CardHeader>
-        <CardContent className="text-center text-muted-foreground py-8">
-          Aucune donnée de cash-flow disponible
+        <CardContent className="py-8 text-center text-muted-foreground">
+          Aucune donnee de cash-flow disponible
         </CardContent>
       </Card>
     );
@@ -58,7 +68,7 @@ export function CashflowChart({ data }: { data: CashflowPoint[] }) {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <ResponsiveContainer width="100%" height={320}>
+        <StableResponsiveChart className="h-[320px]" minHeight={320}>
           <ComposedChart data={formatted} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
             <XAxis dataKey="label" tick={{ fontSize: 11 }} />
@@ -69,17 +79,17 @@ export function CashflowChart({ data }: { data: CashflowPoint[] }) {
             />
             <Legend />
             <Bar dataKey="inbound" name="Encaissements" fill="#22c55e" radius={[2, 2, 0, 0]} />
-            <Bar dataKey="outbound" name="Décaissements" fill="#ef4444" radius={[2, 2, 0, 0]} />
+            <Bar dataKey="outbound" name="Decaissements" fill="#ef4444" radius={[2, 2, 0, 0]} />
             <Line
               type="monotone"
               dataKey="balance"
-              name="Solde cumulé"
+              name="Solde cumule"
               stroke="#3b82f6"
               strokeWidth={2}
               dot={{ r: 3 }}
             />
           </ComposedChart>
-        </ResponsiveContainer>
+        </StableResponsiveChart>
       </CardContent>
     </Card>
   );

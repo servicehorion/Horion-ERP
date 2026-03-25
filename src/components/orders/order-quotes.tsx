@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
-import { Loader2, Plus, Send, CheckCircle, XCircle, Clock, FileDown } from "lucide-react";
+import { Loader2, Plus, Send, CheckCircle, XCircle, Clock, FileDown, Mail, ShieldCheck, Link2, Copy } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
 
@@ -16,7 +16,18 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { createQuote, sendQuote, acceptQuote, rejectQuote, expireQuote, exportQuotePDF } from "@/lib/actions/order.actions";
+import {
+  createQuote,
+  sendQuote,
+  acceptQuote,
+  rejectQuote,
+  expireQuote,
+  exportQuotePDF,
+  approveQuote,
+  rejectQuoteApproval,
+  sendQuoteEmail,
+} from "@/lib/actions/order.actions";
+import { generatePaymentLink } from "@/lib/actions/quote.actions";
 import { CurrencyDisplay } from "@/components/shared/currency-display";
 import { CURRENCIES } from "@/config/currencies";
 import { formatDate } from "@/lib/utils";
@@ -24,7 +35,10 @@ import { formatDate } from "@/lib/utils";
 type Quote = {
   id: string;
   version: number;
+  isActive?: boolean;
   status: string;
+  approvalStatus?: string;
+  approvedAt?: Date | null;
   merchandiseTotal: any;
   logisticsCost: any;
   commission: any;
@@ -34,7 +48,17 @@ type Quote = {
   validUntil?: Date | null;
   createdAt: Date;
   sentAt?: Date | null;
+  sentByEmailAt?: Date | null;
+  sentByEmailTo?: string | null;
   acceptedAt?: Date | null;
+  signatureToken?: string | null;
+  signedAt?: Date | null;
+  signedByName?: string | null;
+  signedByEmail?: string | null;
+  pricingSnapshot?: any;
+  paymentToken?: string | null;
+  paymentStatus?: string | null;
+  paymentExpiry?: Date | null;
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -43,6 +67,12 @@ const STATUS_COLORS: Record<string, string> = {
   ACCEPTED: "bg-green-100 text-green-800",
   REJECTED: "bg-red-100 text-red-800",
   EXPIRED: "bg-gray-200 text-gray-500",
+};
+
+const APPROVAL_COLORS: Record<string, string> = {
+  PENDING: "bg-amber-100 text-amber-800",
+  APPROVED: "bg-emerald-100 text-emerald-800",
+  REJECTED: "bg-rose-100 text-rose-800",
 };
 
 const formSchema = z.object({
@@ -62,17 +92,24 @@ export function OrderQuotes({
   defaults,
   canCreate,
   canSend,
+  canApprove,
+  contactEmail,
 }: {
   orderId: string;
   quotes: Quote[];
   defaults: { merchandiseTotal: number; logisticsCost: number; commission: number; insuranceCost?: number };
   canCreate?: boolean;
   canSend?: boolean;
+  canApprove?: boolean;
+  contactEmail?: string | null;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [workingId, setWorkingId] = useState<string | null>(null);
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [emailQuoteId, setEmailQuoteId] = useState<string | null>(null);
+  const [emailTarget, setEmailTarget] = useState(contactEmail || "");
 
   const form = useForm<QuoteFormValues>({
     resolver: zodResolver(formSchema) as any,
@@ -135,6 +172,58 @@ export function OrderQuotes({
       }
     } catch {
       toast.error("Erreur");
+    } finally {
+      setWorkingId(null);
+    }
+  }
+
+  async function handleApprove(action: "approve" | "reject", quoteId: string) {
+    setWorkingId(quoteId);
+    try {
+      const res =
+        action === "approve"
+          ? await approveQuote(quoteId)
+          : await rejectQuoteApproval(quoteId);
+      if (res.error) toast.error(res.error);
+      else {
+        toast.success("Validation mise Ã  jour");
+        router.refresh();
+      }
+    } catch {
+      toast.error("Erreur");
+    } finally {
+      setWorkingId(null);
+    }
+  }
+
+  async function handleEmailSend() {
+    if (!emailQuoteId) return;
+    setWorkingId(emailQuoteId);
+    try {
+      const res = await sendQuoteEmail(emailQuoteId, emailTarget);
+      if (res.error) toast.error(res.error);
+      else {
+        toast.success("Email envoyÃ©");
+        setEmailOpen(false);
+        router.refresh();
+      }
+    } catch {
+      toast.error("Erreur");
+    } finally {
+      setWorkingId(null);
+    }
+  }
+
+  async function handleGeneratePaymentLink(quoteId: string) {
+    setWorkingId(quoteId);
+    try {
+      const res = await generatePaymentLink(quoteId);
+      if (res.error) { toast.error(res.error); return; }
+      await navigator.clipboard.writeText(res.data!.url);
+      toast.success("Lien de paiement copié dans le presse-papier");
+      router.refresh();
+    } catch {
+      toast.error("Erreur lors de la génération du lien");
     } finally {
       setWorkingId(null);
     }
@@ -317,6 +406,31 @@ export function OrderQuotes({
         )}
       </div>
 
+      <Dialog open={emailOpen} onOpenChange={setEmailOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Envoyer par email</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <FormLabel>Email destinataire</FormLabel>
+              <Input
+                value={emailTarget}
+                onChange={(e) => setEmailTarget(e.target.value)}
+                placeholder="client@exemple.com"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setEmailOpen(false)}>Annuler</Button>
+            <Button onClick={handleEmailSend} disabled={!emailTarget || !emailQuoteId}>
+              {emailQuoteId && workingId === emailQuoteId ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Envoyer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {quotes.length === 0 ? (
         <div className="rounded-lg border p-6 text-sm text-muted-foreground text-center">
           Aucun devis pour le moment.
@@ -328,7 +442,9 @@ export function OrderQuotes({
               <TableRow>
                 <TableHead>Version</TableHead>
                 <TableHead>Statut</TableHead>
+                <TableHead>Validation</TableHead>
                 <TableHead>Montant</TableHead>
+                <TableHead>Lignes</TableHead>
                 <TableHead>Validite</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
@@ -336,9 +452,15 @@ export function OrderQuotes({
             <TableBody>
               {quotes.map((quote) => {
                 const isWorking = workingId === quote.id;
-                const canSendNow = canSend && quote.status === "DRAFT";
-                const canDecide = canSend && quote.status === "SENT";
-                const canExpire = canSend && quote.status === "SENT";
+                const isActiveVersion = quote.isActive !== false;
+                const approval = quote.approvalStatus || "PENDING";
+                const canSendNow = isActiveVersion && canSend && quote.status === "DRAFT" && approval === "APPROVED";
+                const canDecide = isActiveVersion && canSend && quote.status === "SENT";
+                const canExpire = isActiveVersion && canSend && quote.status === "SENT";
+                const canApproveNow = isActiveVersion && canApprove && approval === "PENDING";
+                const lineCount = Array.isArray(quote.pricingSnapshot?.items)
+                  ? quote.pricingSnapshot.items.length
+                  : 0;
                 return (
                   <TableRow key={quote.id}>
                     <TableCell className="font-medium">v{quote.version}</TableCell>
@@ -346,7 +468,28 @@ export function OrderQuotes({
                       <Badge className={STATUS_COLORS[quote.status] || ""}>{quote.status}</Badge>
                     </TableCell>
                     <TableCell>
+                      <div className="flex flex-col gap-1">
+                        <Badge className={APPROVAL_COLORS[approval] || ""}>{approval}</Badge>
+                        {!isActiveVersion && (
+                          <span className="text-[11px] text-amber-700">Version historique remplacee</span>
+                        )}
+                        {quote.sentByEmailAt && (
+                          <span className="text-[11px] text-muted-foreground">
+                            Email: {formatDate(quote.sentByEmailAt)}
+                          </span>
+                        )}
+                        {quote.signedAt && (
+                          <span className="text-[11px] text-emerald-700">
+                            SignÃ©: {formatDate(quote.signedAt)}
+                          </span>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
                       <CurrencyDisplay amount={Number(quote.total)} currency={quote.currency} />
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {lineCount > 0 ? `${lineCount} item(s)` : "-"}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {quote.validUntil ? formatDate(quote.validUntil) : "-"}
@@ -361,10 +504,72 @@ export function OrderQuotes({
                         {isWorking ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <FileDown className="mr-1 h-3 w-3" />}
                         PDF
                       </Button>
+                      {canApproveNow && (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleApprove("approve", quote.id)}
+                            disabled={isWorking}
+                          >
+                            <ShieldCheck className="mr-1 h-3 w-3" />
+                            Approuver
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleApprove("reject", quote.id)}
+                            disabled={isWorking}
+                          >
+                            <XCircle className="mr-1 h-3 w-3" />
+                            Rejeter
+                          </Button>
+                        </>
+                      )}
                       {canSendNow && (
                         <Button size="sm" onClick={() => handleAction("send", quote.id)} disabled={isWorking}>
                           <Send className="mr-1 h-3 w-3" />
                           Envoyer
+                        </Button>
+                      )}
+                      {isActiveVersion && canSend && approval === "APPROVED" && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setEmailQuoteId(quote.id);
+                            setEmailTarget(contactEmail || "");
+                            setEmailOpen(true);
+                          }}
+                          disabled={isWorking}
+                        >
+                          <Mail className="mr-1 h-3 w-3" />
+                          Email
+                        </Button>
+                      )}
+                      {isActiveVersion && quote.status === "ACCEPTED" && !quote.paymentToken && canSend && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleGeneratePaymentLink(quote.id)}
+                          disabled={isWorking}
+                        >
+                          {isWorking ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Link2 className="mr-1 h-3 w-3" />}
+                          Lien paiement
+                        </Button>
+                      )}
+                      {isActiveVersion && quote.paymentToken && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            const baseUrl = window.location.origin;
+                            navigator.clipboard.writeText(`${baseUrl}/pay/${quote.paymentToken}`);
+                            toast.success("Lien copié");
+                          }}
+                        >
+                          <Copy className="mr-1 h-3 w-3" />
+                          Copier lien
                         </Button>
                       )}
                       {canDecide && (

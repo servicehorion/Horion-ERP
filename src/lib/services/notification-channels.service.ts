@@ -31,13 +31,15 @@ export class SlackNotificationChannel {
 
   static async send(payload: ChannelPayload): Promise<void> {
     if (!this.webhookUrl) {
-      // STUB: log and return — no Slack webhook configured
-      console.log("[SlackChannel] STUB — would send:", {
-        channel: this.channel,
-        text: `*${payload.title}*${payload.message ? `\n${payload.message}` : ""}`,
-        type: payload.type,
-        urgency: payload.urgency,
-      });
+      // STUB: silently skip in production when Slack is not configured
+      if (process.env.NODE_ENV !== "production") {
+        console.log("[SlackChannel] STUB — would send:", {
+          channel: this.channel,
+          text: `*${payload.title}*${payload.message ? `\n${payload.message}` : ""}`,
+          type: payload.type,
+          urgency: payload.urgency,
+        });
+      }
       return;
     }
 
@@ -88,26 +90,60 @@ export class SlackNotificationChannel {
 
 export class EmailNotificationChannel {
   private static fromAddress = process.env.EMAIL_FROM ?? "noreply@horion.cd";
-  private static provider = process.env.EMAIL_PROVIDER ?? "stub"; // "resend" | "smtp" | "ses"
+  private static provider =
+    process.env.EMAIL_PROVIDER ??
+    (process.env.RESEND_API_KEY ? "resend" : "stub"); // "resend" | "smtp" | "ses"
 
   static async send(payload: ChannelPayload & { to: string }): Promise<void> {
-    if (this.provider === "stub" || !payload.to) {
-      // STUB: log and return — no email provider configured
-      console.log("[EmailChannel] STUB — would send:", {
-        from: this.fromAddress,
-        to: payload.to,
-        subject: payload.title,
-        body: payload.message,
-        type: payload.type,
-      });
+    if (!payload.to) return;
+
+    if (this.provider === "stub") {
+      // STUB: silently skip in production when no email provider is configured
+      if (process.env.NODE_ENV !== "production") {
+        console.log("[EmailChannel] STUB — would send:", {
+          from: this.fromAddress,
+          to: payload.to,
+          subject: payload.title,
+          body: payload.message,
+          type: payload.type,
+        });
+      }
       return;
     }
 
-    // TODO: integrate with Resend / SMTP / SES
-    // Example with Resend:
-    // const { Resend } = await import("resend");
-    // const resend = new Resend(process.env.RESEND_API_KEY);
-    // await resend.emails.send({ from: this.fromAddress, to: payload.to, subject: payload.title, html: buildHtml(payload) });
+    if (this.provider === "resend") {
+      const apiKey = process.env.RESEND_API_KEY;
+      if (!apiKey) {
+        console.error("[EmailChannel] RESEND_API_KEY missing.");
+        return;
+      }
+
+      try {
+        const { renderEmailHtml } = await import("@/lib/email-templates");
+        let ResendCtor: any = null;
+        try {
+          const mod = await import("resend");
+          ResendCtor = mod.Resend;
+        } catch (err) {
+          console.error("[EmailChannel] Resend SDK not installed.", err);
+          return;
+        }
+
+        const resend = new ResendCtor(apiKey);
+        await resend.emails.send({
+          from: this.fromAddress,
+          to: payload.to,
+          subject: payload.title,
+          html: renderEmailHtml(payload),
+          text: payload.message || undefined,
+        });
+      } catch (err) {
+        console.error("[EmailChannel] Failed to send via Resend:", err);
+      }
+      return;
+    }
+
+    console.warn(`[EmailChannel] Provider "${this.provider}" not implemented.`);
   }
 
   static async sendTaskAssigned(
@@ -156,12 +192,14 @@ export class WhatsAppNotificationChannel {
 
   static async send(payload: ChannelPayload & { to: string }): Promise<void> {
     if (!this.apiUrl || !this.token) {
-      // STUB: log and return — no WhatsApp API configured
-      console.log("[WhatsAppChannel] STUB — would send:", {
-        to: payload.to,
-        message: `*${payload.title}*${payload.message ? `\n${payload.message}` : ""}`,
-        type: payload.type,
-      });
+      // STUB: silently skip in production when WhatsApp API is not configured
+      if (process.env.NODE_ENV !== "production") {
+        console.log("[WhatsAppChannel] STUB — would send:", {
+          to: payload.to,
+          message: `*${payload.title}*${payload.message ? `\n${payload.message}` : ""}`,
+          type: payload.type,
+        });
+      }
       return;
     }
 

@@ -18,7 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { CurrencyDisplay } from "@/components/shared/currency-display";
-import { createPayment } from "@/lib/actions/payment.actions";
+import { createPayment, createPaymentSchedule, autoReconcileOrderPayments } from "@/lib/actions/payment.actions";
 import { convertCurrency, CURRENCIES } from "@/config/currencies";
 import { formatDate } from "@/lib/utils";
 
@@ -50,10 +50,27 @@ const TYPE_LABELS: Record<string, string> = {
 const STATUS_COLORS: Record<string, string> = {
   PENDING: "bg-gray-100 text-gray-800",
   PROCESSING: "bg-blue-100 text-blue-800",
+  PENDING_PROOF: "bg-amber-100 text-amber-800",
+  PROOF_UPLOADED: "bg-sky-100 text-sky-800",
+  PROOF_REJECTED: "bg-rose-100 text-rose-800",
   CONFIRMED: "bg-green-100 text-green-800",
   FAILED: "bg-red-100 text-red-800",
   CANCELLED: "bg-gray-200 text-gray-500",
+  EXPIRED: "bg-zinc-200 text-zinc-700",
   REFUNDED: "bg-orange-100 text-orange-800",
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  PENDING: "En attente",
+  PROCESSING: "Traitement",
+  PENDING_PROOF: "Preuve attendue",
+  PROOF_UPLOADED: "Preuve reçue",
+  PROOF_REJECTED: "Preuve rejetée",
+  CONFIRMED: "Confirmé",
+  FAILED: "Échoué",
+  CANCELLED: "Annulé",
+  EXPIRED: "Expiré",
+  REFUNDED: "Remboursé",
 };
 
 const formSchema = z.object({
@@ -85,6 +102,15 @@ export function OrderPayments({
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [scheduleSubmitting, setScheduleSubmitting] = useState(false);
+  const [reconciling, setReconciling] = useState(false);
+  const [schedule, setSchedule] = useState({
+    depositPercent: 30,
+    installments: 2,
+    intervalDays: 30,
+    startDate: new Date().toISOString().slice(0, 10),
+  });
   const [submitting, setSubmitting] = useState(false);
 
   const summary = useMemo(() => {
@@ -166,6 +192,46 @@ export function OrderPayments({
     }
   }
 
+  async function handleSchedule() {
+    setScheduleSubmitting(true);
+    try {
+      const res = await createPaymentSchedule({
+        orderId,
+        depositPercent: Number(schedule.depositPercent),
+        installments: Number(schedule.installments),
+        intervalDays: Number(schedule.intervalDays),
+        startDate: schedule.startDate,
+      });
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success("Echeancier cree");
+      setScheduleOpen(false);
+      router.refresh();
+    } catch {
+      toast.error("Erreur echeancier");
+    } finally {
+      setScheduleSubmitting(false);
+    }
+  }
+
+  async function handleReconcile() {
+    setReconciling(true);
+    try {
+      const res = await autoReconcileOrderPayments(orderId);
+      if (res.error) toast.error(res.error);
+      else {
+        toast.success(`Reconciliations: ${res.data?.reconciled ?? 0}`);
+        router.refresh();
+      }
+    } catch {
+      toast.error("Erreur reconciliation");
+    } finally {
+      setReconciling(false);
+    }
+  }
+
   if (!canView) {
     return (
       <div className="rounded-lg border p-6 text-sm text-muted-foreground">
@@ -213,184 +279,263 @@ export function OrderPayments({
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-medium">Paiements</h3>
         {canCreate && (
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm" className="gap-2">
-                <Plus className="h-4 w-4" />
-                Ajouter un paiement
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-xl">
-              <DialogHeader>
-                <DialogTitle>Nouveau paiement</DialogTitle>
-              </DialogHeader>
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <FormField
-                      control={form.control}
-                      name="direction"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Direction</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl>
-                              <SelectTrigger><SelectValue /></SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="INBOUND">Entrant</SelectItem>
-                              <SelectItem value="OUTBOUND">Sortant</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="type"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Type</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl>
-                              <SelectTrigger><SelectValue /></SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {Object.entries(TYPE_LABELS).map(([value, label]) => (
-                                <SelectItem key={value} value={value}>{label}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="amount"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Montant</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={field.value ?? ""}
-                              onChange={(e) => field.onChange(Number(e.target.value))}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="currency"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Devise</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl>
-                              <SelectTrigger><SelectValue /></SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {Object.values(CURRENCIES).map((c) => (
-                                <SelectItem key={c.code} value={c.code}>{c.code}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="fxRate"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Taux FX (optionnel)</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              step="0.0001"
-                              value={field.value ?? ""}
-                              onChange={(e) => {
-                                const v = e.target.value;
-                                field.onChange(v === "" ? undefined : Number(v));
-                              }}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="dueAt"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Echeance (optionnel)</FormLabel>
-                          <FormControl>
-                            <Input type="date" value={field.value ?? ""} onChange={field.onChange} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="method"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Methode</FormLabel>
-                          <FormControl>
-                            <Input {...field} placeholder="Virement, cash..." />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="reference"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Reference</FormLabel>
-                          <FormControl>
-                            <Input {...field} placeholder="Ref bancaire" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+          <div className="flex gap-2">
+            <Dialog open={scheduleOpen} onOpenChange={setScheduleOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm">
+                  Echeancier
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Creer un echeancier</DialogTitle>
+                </DialogHeader>
+                <div className="grid gap-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <FormLabel>Acompte (%)</FormLabel>
+                      <Input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={schedule.depositPercent}
+                        onChange={(e) => setSchedule((s) => ({ ...s, depositPercent: Number(e.target.value) }))}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <FormLabel>Nombre d'echeances</FormLabel>
+                      <Input
+                        type="number"
+                        min="1"
+                        value={schedule.installments}
+                        onChange={(e) => setSchedule((s) => ({ ...s, installments: Number(e.target.value) }))}
+                      />
+                    </div>
                   </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <FormLabel>Intervalle (jours)</FormLabel>
+                      <Input
+                        type="number"
+                        min="1"
+                        value={schedule.intervalDays}
+                        onChange={(e) => setSchedule((s) => ({ ...s, intervalDays: Number(e.target.value) }))}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <FormLabel>Date debut</FormLabel>
+                      <Input
+                        type="date"
+                        value={schedule.startDate}
+                        onChange={(e) => setSchedule((s) => ({ ...s, startDate: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="ghost" onClick={() => setScheduleOpen(false)}>Annuler</Button>
+                  <Button onClick={handleSchedule} disabled={scheduleSubmitting}>
+                    {scheduleSubmitting && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+                    Generer
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
 
-                  <FormField
-                    control={form.control}
-                    name="notes"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Notes</FormLabel>
-                        <FormControl>
-                          <Textarea rows={3} {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+            <Button variant="outline" size="sm" onClick={handleReconcile} disabled={reconciling}>
+              {reconciling && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+              Sync banque
+            </Button>
 
-                  <DialogFooter>
-                    <Button type="submit" disabled={submitting}>
-                      {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      Enregistrer
-                    </Button>
-                  </DialogFooter>
-                </form>
-              </Form>
-            </DialogContent>
-          </Dialog>
+            <Dialog open={open} onOpenChange={setOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm" className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  Ajouter un paiement
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-xl">
+                <DialogHeader>
+                  <DialogTitle>Nouveau paiement</DialogTitle>
+                </DialogHeader>
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <FormField
+                        control={form.control}
+                        name="direction"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Direction</FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="INBOUND">Entrant</SelectItem>
+                                <SelectItem value="OUTBOUND">Sortant</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="type"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Type</FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {Object.entries(TYPE_LABELS).map(([value, label]) => (
+                                  <SelectItem key={value} value={value}>
+                                    {label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="amount"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Montant</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={field.value ?? ""}
+                                onChange={(e) => field.onChange(Number(e.target.value))}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="currency"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Devise</FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {Object.values(CURRENCIES).map((c) => (
+                                  <SelectItem key={c.code} value={c.code}>
+                                    {c.code}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="fxRate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Taux FX (optionnel)</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                step="0.0001"
+                                value={field.value ?? ""}
+                                onChange={(e) => {
+                                  const v = e.target.value;
+                                  field.onChange(v === "" ? undefined : Number(v));
+                                }}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="dueAt"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Echeance (optionnel)</FormLabel>
+                            <FormControl>
+                              <Input type="date" value={field.value ?? ""} onChange={field.onChange} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="method"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Methode</FormLabel>
+                            <FormControl>
+                              <Input {...field} placeholder="Virement, cash..." />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="reference"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Reference</FormLabel>
+                            <FormControl>
+                              <Input {...field} placeholder="Ref bancaire" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <FormField
+                      control={form.control}
+                      name="notes"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Notes</FormLabel>
+                          <FormControl>
+                            <Textarea rows={3} {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <DialogFooter>
+                      <Button type="submit" disabled={submitting}>
+                        {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Enregistrer
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
+          </div>
         )}
       </div>
 
@@ -424,7 +569,9 @@ export function OrderPayments({
                     <CurrencyDisplay amount={Number(payment.amountXAF)} currency="XAF" />
                   </TableCell>
                   <TableCell>
-                    <Badge className={STATUS_COLORS[payment.status] || ""}>{payment.status}</Badge>
+                    <Badge className={STATUS_COLORS[payment.status] || ""}>
+                      {STATUS_LABELS[payment.status] || payment.status}
+                    </Badge>
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {payment.dueAt ? formatDate(payment.dueAt) : "-"}

@@ -3,9 +3,10 @@ import { ArrowLeft, ListTodo } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { TaskKanban } from "@/components/tasks/task-kanban";
+import { TaskBoardGroupBy } from "@/components/tasks/task-board-groupby";
 import { TaskCreateDialog } from "@/components/tasks/task-create-dialog";
 import { getKanbanTasks, getTeamMembers } from "@/lib/actions/task.actions";
+import { getProjects } from "@/lib/actions/project.actions";
 
 export const metadata = {
   title: "Kanban Tâches | Horion ERP",
@@ -30,13 +31,15 @@ const MODULE_FILTERS = [
 export default async function TasksBoardPage({ searchParams }: PageProps) {
   const module = searchParams.module === "all" ? undefined : searchParams.module;
 
-  const [kanbanResult, membersResult] = await Promise.all([
+  const [kanbanResult, membersResult, projectsResult] = await Promise.all([
     getKanbanTasks(module),
     getTeamMembers(),
+    getProjects({ limit: 200 }),
   ]);
 
   const tasks = (kanbanResult as any).data ?? [];
   const teamMembers = membersResult.data ?? [];
+  const projects = (projectsResult as any).data?.map((p: any) => ({ id: p.id, name: p.name })) ?? [];
 
   const totalActive = tasks.filter((t: any) => !["COMPLETED", "CANCELLED"].includes(t.status)).length;
   const slaBreaches = tasks.filter((t: any) => t.slaBreach).length;
@@ -66,7 +69,7 @@ export default async function TasksBoardPage({ searchParams }: PageProps) {
               <Badge variant="destructive">{slaBreaches} SLA!</Badge>
             )}
           </div>
-          <TaskCreateDialog teamMembers={teamMembers} />
+          <TaskCreateDialog teamMembers={teamMembers} projects={projects} />
         </div>
       </div>
 
@@ -99,7 +102,7 @@ export default async function TasksBoardPage({ searchParams }: PageProps) {
           </p>
         </div>
       ) : (
-        <TaskKanban tasks={tasks} module={module} />
+        <TaskBoardGroupBy tasks={tasks} module={module} />
       )}
     </div>
   );

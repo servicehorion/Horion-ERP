@@ -25,7 +25,10 @@ async function main() {
   console.log(`Tenant: ${tenant.name}`);
 
   // 2. Create users
-  const passwordHash = await bcrypt.hash("horion2026", 10);
+  // Password read from SEED_PASSWORD env var; falls back to dev default.
+  // Set SEED_PASSWORD in CI/staging to avoid hardcoded credentials in logs.
+  const seedPassword = process.env.SEED_PASSWORD || "horion2026";
+  const passwordHash = await bcrypt.hash(seedPassword, 10);
 
   const users = [
     { id: "user-admin", email: "admin@horion.co", name: "Admin Horion", role: UserRole.ADMIN },
@@ -71,28 +74,24 @@ async function main() {
     console.log(`FX Rate: ${fx.fromCurrency}/${fx.toCurrency} = ${fx.rate}`);
   }
 
-  // 4. Create delegation rules
+  // 4. Create delegation rules (permissions-based model)
   const delegationRules = [
-    { role: UserRole.OPS, action: "approve_payment", maxAmountXAF: 500000 },
-    { role: UserRole.OPS, action: "select_supplier", maxAmountXAF: 2000000 },
-    { role: UserRole.FINANCE, action: "approve_payment", maxAmountXAF: 5000000 },
-    { role: UserRole.FINANCE, action: "approve_refund", maxAmountXAF: 1000000 },
-    { role: UserRole.DIRECTION, action: "approve_payment", maxAmountXAF: null },
-    { role: UserRole.DIRECTION, action: "approve_refund", maxAmountXAF: null },
+    { permissions: ["approve_payment"], maxAmountXAF: 500000 },
+    { permissions: ["select_supplier"], maxAmountXAF: 2000000 },
+    { permissions: ["approve_payment", "approve_refund"], maxAmountXAF: 5000000 },
+    { permissions: ["approve_payment", "approve_refund"], maxAmountXAF: null },
   ];
 
   for (const rule of delegationRules) {
     await prisma.delegationRule.create({
       data: {
         tenantId: tenant.id,
-        role: rule.role,
-        action: rule.action,
+        permissions: rule.permissions,
         maxAmountXAF: rule.maxAmountXAF,
-        requiresApproval: rule.maxAmountXAF !== null,
-        approverRole: rule.maxAmountXAF !== null ? UserRole.DIRECTION : undefined,
+        isActive: true,
       },
     });
-    console.log(`Delegation: ${rule.role} can ${rule.action} up to ${rule.maxAmountXAF ?? "unlimited"} XAF`);
+    console.log(`Delegation rule: ${rule.permissions.join("+")} up to ${rule.maxAmountXAF ?? "unlimited"} XAF`);
   }
 
   // 5. Create ledger accounts
@@ -148,11 +147,8 @@ async function main() {
   }
 
   console.log("\nSeed completed successfully!");
-  console.log("\nLogin credentials:");
-  console.log("  admin@horion.co / horion2026");
-  console.log("  ops@horion.co / horion2026");
-  console.log("  finance@horion.co / horion2026");
-  console.log("  ceo@horion.co / horion2026");
+  console.log("Seeded users: admin@horion.co, ops@horion.co, finance@horion.co, ceo@horion.co");
+  console.log("Password set from SEED_PASSWORD env var (or dev default if not set).");
 }
 
 main()

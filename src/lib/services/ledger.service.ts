@@ -49,6 +49,7 @@ export class LedgerService {
   static async createEntry(data: {
     accountId: string;
     orderId?: string;
+    costCenterId?: string;
     type: string;
     amount: number;
     currency: string;
@@ -60,6 +61,7 @@ export class LedgerService {
         data: {
           accountId: data.accountId,
           orderId: data.orderId,
+          costCenterId: data.costCenterId || undefined,
           type: data.type,
           amount: data.amount,
           currency: data.currency,
@@ -162,7 +164,7 @@ export class LedgerService {
   }
 
   // Seed standard chart of accounts for import/export business
-  static async seedChartOfAccounts(tenantId: string) {
+  static async seedChartOfAccounts(tenantId: string, template: "STANDARD" | "OHADA" | "PCG_CONGO" = "STANDARD") {
     const standard = [
       // Assets
       { code: "101", name: "Caisse XAF", type: "ASSET" as AccountType, currency: "XAF" },
@@ -194,8 +196,50 @@ export class LedgerService {
       { code: "310", name: "Résultat exercice", type: "EQUITY" as AccountType, currency: "XAF" },
     ];
 
+    const ohada = [
+      { code: "10", name: "Capital", type: "EQUITY" as AccountType, currency: "XAF" },
+      { code: "11", name: "Reserves", type: "EQUITY" as AccountType, currency: "XAF" },
+      { code: "12", name: "Resultat", type: "EQUITY" as AccountType, currency: "XAF" },
+      { code: "20", name: "Immobilisations", type: "ASSET" as AccountType, currency: "XAF" },
+      { code: "30", name: "Stocks", type: "ASSET" as AccountType, currency: "XAF" },
+      { code: "40", name: "Clients", type: "ASSET" as AccountType, currency: "XAF" },
+      { code: "50", name: "Banques", type: "ASSET" as AccountType, currency: "XAF" },
+      { code: "60", name: "Achats", type: "EXPENSE" as AccountType, currency: "XAF" },
+      { code: "62", name: "Services exterieurs", type: "EXPENSE" as AccountType, currency: "XAF" },
+      { code: "66", name: "Charges financieres", type: "EXPENSE" as AccountType, currency: "XAF" },
+      { code: "70", name: "Ventes", type: "REVENUE" as AccountType, currency: "XAF" },
+      { code: "71", name: "Services", type: "REVENUE" as AccountType, currency: "XAF" },
+      { code: "44", name: "Etat - TVA", type: "LIABILITY" as AccountType, currency: "XAF" },
+      { code: "45", name: "Dettes fournisseurs", type: "LIABILITY" as AccountType, currency: "XAF" },
+    ];
+
+    const pcgCongo = [
+      { code: "101", name: "Capital social", type: "EQUITY" as AccountType, currency: "XAF" },
+      { code: "106", name: "Reserves", type: "EQUITY" as AccountType, currency: "XAF" },
+      { code: "12", name: "Resultat", type: "EQUITY" as AccountType, currency: "XAF" },
+      { code: "20", name: "Immobilisations incorporelles", type: "ASSET" as AccountType, currency: "XAF" },
+      { code: "21", name: "Immobilisations corporelles", type: "ASSET" as AccountType, currency: "XAF" },
+      { code: "30", name: "Stocks", type: "ASSET" as AccountType, currency: "XAF" },
+      { code: "40", name: "Clients", type: "ASSET" as AccountType, currency: "XAF" },
+      { code: "50", name: "Banques", type: "ASSET" as AccountType, currency: "XAF" },
+      { code: "60", name: "Achats", type: "EXPENSE" as AccountType, currency: "XAF" },
+      { code: "61", name: "Services exterieurs", type: "EXPENSE" as AccountType, currency: "XAF" },
+      { code: "63", name: "Impots et taxes", type: "EXPENSE" as AccountType, currency: "XAF" },
+      { code: "70", name: "Ventes", type: "REVENUE" as AccountType, currency: "XAF" },
+      { code: "44", name: "Etat - TVA", type: "LIABILITY" as AccountType, currency: "XAF" },
+      { code: "45", name: "Fournisseurs", type: "LIABILITY" as AccountType, currency: "XAF" },
+    ];
+
+    const templateMap = {
+      STANDARD: standard,
+      OHADA: ohada,
+      PCG_CONGO: pcgCongo,
+    } as const;
+
+    const selected = templateMap[template] || standard;
+
     const created = [];
-    for (const acct of standard) {
+    for (const acct of selected) {
       try {
         const a = await prisma.ledgerAccount.upsert({
           where: { tenantId_code: { tenantId, code: acct.code } },

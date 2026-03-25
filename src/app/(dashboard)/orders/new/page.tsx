@@ -15,9 +15,10 @@ export const metadata = {
 export default async function NewOrderPage({
   searchParams,
 }: {
-  searchParams?: { contactId?: string };
+  searchParams?: Promise<{ contactId?: string }>;
 }) {
   const session = await auth();
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
 
   if (!session?.user?.tenantId) {
     redirect("/login");
@@ -54,7 +55,7 @@ export default async function NewOrderPage({
       </div>
 
       <div className="mx-auto max-w-4xl">
-        <OrderForm contacts={contacts} initialContactId={searchParams?.contactId} />
+        <OrderForm contacts={contacts} initialContactId={resolvedSearchParams?.contactId} />
       </div>
     </div>
   );

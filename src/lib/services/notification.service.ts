@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import type { NotificationType } from "@prisma/client";
+import { EmailNotificationChannel } from "@/lib/services/notification-channels.service";
 
 /**
  * NotificationService — In-app notification system.
@@ -184,7 +185,7 @@ export class NotificationService {
     taskTitle: string,
     assignedByName: string
   ) {
-    return this.notify({
+    await this.notify({
       tenantId,
       userId: assigneeId,
       type: "TASK_ASSIGNED",
@@ -193,6 +194,19 @@ export class NotificationService {
       entityType: "task",
       entityId: taskId,
     });
+
+    const assignee = await prisma.user.findUnique({
+      where: { id: assigneeId },
+      select: { email: true },
+    });
+    if (assignee?.email) {
+      await EmailNotificationChannel.sendTaskAssigned(
+        assignee.email,
+        taskTitle,
+        taskId,
+        assignedByName
+      );
+    }
   }
 
   /**
@@ -233,12 +247,35 @@ export class NotificationService {
     tenantId: string,
     taskTitle: string
   ) {
-    return this.notifyTaskAssignees(taskId, {
+    await this.notifyTaskAssignees(taskId, {
       tenantId,
       type: "SLA_BREACH",
       title: `SLA DÉPASSÉ: ${taskTitle}`,
       message: "Action immédiate requise — le SLA est dépassé",
     });
+
+    const assignees = await prisma.taskAssignment.findMany({
+      where: { taskId },
+      include: { user: { select: { email: true } } },
+    });
+
+    await Promise.all(
+      assignees
+        .map((a) => a.user?.email)
+        .filter(Boolean)
+        .map((email) =>
+          EmailNotificationChannel.send({
+            to: email as string,
+            type: "SLA_BREACH",
+            title: `SLA DÉPASSÉ: ${taskTitle}`,
+            message: "Action immédiate requise — le SLA est dépassé",
+            entityType: "task",
+            entityId: taskId,
+            taskId,
+            urgency: "critical",
+          })
+        )
+    );
   }
 
   /**
@@ -255,10 +292,10 @@ export class NotificationService {
         role: { in: ["ADMIN", "CEO", "DIRECTION"] },
         isActive: true,
       },
-      select: { id: true },
+      select: { id: true, email: true },
     });
 
-    return this.notifyMany(
+    await this.notifyMany(
       approvers.map((a) => a.id),
       {
         tenantId,
@@ -268,6 +305,24 @@ export class NotificationService {
         entityType: "task",
         entityId: taskId,
       }
+    );
+
+    await Promise.all(
+      approvers
+        .map((a) => a.email)
+        .filter(Boolean)
+        .map((email) =>
+          EmailNotificationChannel.send({
+            to: email as string,
+            type: "APPROVAL_REQUIRED",
+            title: `Approbation requise: ${taskTitle}`,
+            message: "Une tâche nécessite votre approbation",
+            entityType: "task",
+            entityId: taskId,
+            taskId,
+            urgency: "high",
+          })
+        )
     );
   }
 

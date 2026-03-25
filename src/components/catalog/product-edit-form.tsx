@@ -202,6 +202,20 @@ export function ProductEditForm({ productId, defaultValues, categories }: Props)
 
           <FormField
             control={form.control}
+            name="preferredPlatform"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Plateforme prioritaire</FormLabel>
+                <FormControl>
+                  <Input {...field} value={field.value ?? ""} placeholder="1688, Taobao, Alibaba..." />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
             name="priceMin"
             render={({ field }) => (
               <FormItem>
@@ -284,6 +298,161 @@ export function ProductEditForm({ productId, defaultValues, categories }: Props)
             )}
           />
         </div>
+
+        <div className="grid gap-6 md:grid-cols-2">
+          <FormField
+            control={form.control}
+            name="aliasesJson"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Alias produit</FormLabel>
+                <FormControl>
+                  <Input
+                    value={Array.isArray(field.value) ? field.value.join(", ") : ""}
+                    onChange={(e) =>
+                      field.onChange(
+                        e.target.value
+                          .split(",")
+                          .map((value) => value.trim())
+                          .filter(Boolean)
+                      )
+                    }
+                    placeholder="Ex: coque iphone 15, case iphone 15"
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="searchKeywordsJson"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Mots-clés mémoire</FormLabel>
+                <FormControl>
+                  <Input
+                    value={Array.isArray(field.value) ? field.value.join(", ") : ""}
+                    onChange={(e) =>
+                      field.onChange(
+                        e.target.value
+                          .split(",")
+                          .map((value) => value.trim())
+                          .filter(Boolean)
+                      )
+                    }
+                    placeholder="Ex: accessoire mobile, iphone, silicone"
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+          <FormField
+            control={form.control}
+            name="weightedAverageCost"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Coût moyen pondéré</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    value={field.value ?? ""}
+                    onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="estimatedCost"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Coût estimé maison</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    value={field.value ?? ""}
+                    onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="defaultRiskBufferPct"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Buffer risque %</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    value={field.value ?? ""}
+                    onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="defaultHiddenMarginPct"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Marge cachée %</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    value={field.value ?? ""}
+                    onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        <FormField
+          control={form.control}
+          name="recommendedSellPrice"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Prix Horion recommandé</FormLabel>
+              <FormControl>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  value={field.value ?? ""}
+                  onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
+                  placeholder="Calculé à partir du coût réel + buffer + marge"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         <FormField
           control={form.control}

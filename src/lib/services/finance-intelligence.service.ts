@@ -120,9 +120,17 @@ export class FinanceIntelligenceService {
         tenantId,
         status: { notIn: ["CLOTURE", "ANNULE"] },
       },
-      include: {
+      select: {
+        id: true,
+        orderNumber: true,
+        totalClient: true,
+        createdAt: true,
+        status: true,
         contact: { select: { name: true } },
-        payments: { where: { status: "CONFIRMED" } },
+        payments: {
+          where: { status: "CONFIRMED" },
+          select: { direction: true, amountXAF: true },
+        },
       },
     });
 
@@ -253,10 +261,12 @@ export class FinanceIntelligenceService {
   static async getRevenueByClient(tenantId: string) {
     const orders = await prisma.order.findMany({
       where: { tenantId },
-      include: {
+      select: {
+        contactId: true,
         contact: { select: { name: true } },
         payments: {
           where: { status: "CONFIRMED", direction: "INBOUND" },
+          select: { amountXAF: true },
         },
       },
     });
@@ -285,7 +295,7 @@ export class FinanceIntelligenceService {
 
     const byMethod: Record<string, { count: number; total: number }> = {};
     for (const p of payments) {
-      const method = p.method || "Non spécifié";
+      const method = p.method || "Non specifie";
       if (!byMethod[method]) byMethod[method] = { count: 0, total: 0 };
       byMethod[method].count++;
       byMethod[method].total += Number(p.amountXAF);

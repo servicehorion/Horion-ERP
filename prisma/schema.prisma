@@ -10,6 +10,18 @@ datasource db {
   provider = "postgresql"
 }
 
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum EmailStatus {
+  SENT
+  OPENED
+  CLICKED
+}
+
 // ============================================================
 // A. IDENTITY & ACCESS
 // ============================================================
@@ -24,60 +36,186 @@ model Tenant {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users              User[]
-  orders             Order[]
-  contacts           Contact[]
-  tasks              Task[]
-  projects           Project[]
-  ledgerAccounts     LedgerAccount[]
-  auditLogs          AuditLog[]
-  delegationRules    DelegationRule[]
-  channels           Channel[]
-  catalogProducts    CatalogProduct[]
-  productCategories  ProductCategory[]
-  catalogMedia       CatalogMedia[]
-  taskTemplates      TaskTemplate[]
-  recurringTasks     RecurringTask[]
-  notifications      Notification[]
+  users                      User[]
+  orders                     Order[]
+  orderApprovalRules         OrderApprovalRule[]
+  contacts                   Contact[]
+  tasks                      Task[]
+  projects                   Project[]
+  ledgerAccounts             LedgerAccount[]
+  auditLogs                  AuditLog[]
+  delegationRules            DelegationRule[]
+  channels                   Channel[]
+  catalogProducts            CatalogProduct[]
+  productCategories          ProductCategory[]
+  catalogMedia               CatalogMedia[]
+  qcInspections              QcInspection[]
+  qcPartnerProfiles          QcPartnerProfile[]
+  taskTemplates              TaskTemplate[]
+  recurringTasks             RecurringTask[]
+  notifications              Notification[]
+  groupageBatches            GroupageBatch[]
+  demandIntakes              DemandIntake[]
+  catalogSourcingHistory     CatalogSourcingHistory[]
+  marketInsights             SourcingMarketInsight[]
+  accountingPeriods          AccountingPeriod[]
+  journals                   Journal[]
+  journalEntries             JournalEntry[]
+  invoices                   Invoice[]
+  financeApprovals           FinanceApproval[]
+  financeApprovalRules       FinanceApprovalRule[]
+  budgetPlans                BudgetPlan[]
+  forecastScenarios          ForecastScenario[]
+  cashPlans                  CashPlan[]
+  legalEntities              LegalEntity[]
+  consolidationRuns          ConsolidationRun[]
+  taxRates                   TaxRate[]
+  taxReports                 TaxReport[]
+  bankConnections            BankConnection[]
+  bankReconciliations        BankReconciliation[]
+  marketDataRecords          MarketData[]
+  exposures                  Exposure[]
+  riskMetrics                RiskMetric[]
+  costCenters                CostCenter[]
+  assetCategories            AssetCategory[]
+  fixedAssets                FixedAsset[]
+  assetDepreciations         AssetDepreciation[]
+  payrollProfiles            PayrollProfile[]
+  payrollRuns                PayrollRun[]
+  whatsappAccounts           WhatsappAccount[]
+  whatsappContacts           WhatsappContact[]
+  whatsappConversations      WhatsappConversation[]
+  whatsappChannels           WhatsappChannel[]
+  whatsappTemplates          WhatsappTemplate[]
+  whatsappCampaigns          WhatsappCampaign[]
+  whatsappIntents            WhatsappIntent[]
+  whatsappTags               WhatsappTag[]
+  whatsappAuditLogs          WhatsappAuditLog[]
+  emailLogs                  EmailLog[]
+  pipelines                  Pipeline[]
+  meetings                   Meeting[]
+  nurturingSequences         NurturingSequence[]
+  qcPlans                    QcPlan[]
+  emailCampaigns             EmailCampaign[]
+  botFlows                   BotFlow[]
+  savedFilters               SavedFilter[]
+  goals                      Goal[]
+  crmInboundSources          CrmInboundSource[]
+  crmInboundEvents           CrmInboundEvent[]
+  leadMiningProviders        LeadMiningProvider[]
+  leadMiningJobs             LeadMiningJob[]
+  leadMiningResults          LeadMiningResult[]
+  salesTeams                 SalesTeam[]
+  salesTerritories           SalesTerritory[]
+  salesQuotas                SalesQuota[]
+  leadScoreModels            LeadScoreModel[]
+  leadScoreSnapshots         LeadScoreSnapshot[]
+  strategicDecisions         StrategicDecision[]
+  decisionExecutionTemplates DecisionExecutionTemplate[]
+  strategicRisks             StrategicRisk[]
+  supplierContracts          SupplierContract[]
+  returnMerchandises         ReturnMerchandise[]
+  qcLabConnections           QcLabConnection[]
+  qcSpcCharts                QcSpcChart[]
+  qcLotTraces                QcLotTrace[]
+  agentLogs                  AgentLog[]
+  sourcingTickets            SourcingTicket[]
 
   @@map("tenants")
 }
 
 model User {
-  id        String   @id @default(cuid())
-  tenantId  String
-  email     String   @unique
-  password  String
-  name      String
-  role      UserRole @default(OPS)
-  avatarUrl String?
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String    @id @default(cuid())
+  tenantId    String
+  email       String    @unique
+  password    String
+  name        String
+  role        UserRole  @default(OPS)
+  avatarUrl   String?
+  isActive    Boolean   @default(true)
+  lastLoginAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
-  tenant          Tenant           @relation(fields: [tenantId], references: [id])
-  taskAssignments TaskAssignment[]
-  approvals       Approval[]
-  auditLogs       AuditLog[]
-  taskComments    TaskComment[]
-  taskWatchers    TaskWatcher[]
-  taskAttachments TaskAttachment[]
-  notifications   Notification[]
-  ownedContacts   Contact[]         @relation("ContactOwner")
-  onboardedContacts Contact[]       @relation("ContactOnboardedBy")
-  contactCollaborations ContactCollaborator[]
-  ownedLeads      Lead[]            @relation("LeadOwner")
-  onboardedLeads  Lead[]            @relation("LeadOnboardedBy")
-  leadCollaborations LeadCollaborator[]
-  ownedOrders     Order[]           @relation("OrderOwner")
-  onboardedOrders Order[]           @relation("OrderOnboardedBy")
-  orderCollaborations OrderCollaborator[]
-  orderAttachments OrderAttachment[]
-  projectMembers  ProjectMember[]
-  timeEntries     TaskTimeEntry[]
+  tenant                        Tenant                      @relation(fields: [tenantId], references: [id])
+  taskAssignments               TaskAssignment[]
+  approvals                     Approval[]
+  financeApprovalsRequested     FinanceApproval[]           @relation("FinanceApprovalRequestedBy")
+  financeApprovalsApproved      FinanceApproval[]           @relation("FinanceApprovalApprovedBy")
+  financeApprovalsEscalated     FinanceApproval[]           @relation("FinanceApprovalEscalatedBy")
+  auditLogs                     AuditLog[]
+  taskComments                  TaskComment[]
+  taskWatchers                  TaskWatcher[]
+  taskAttachments               TaskAttachment[]
+  notifications                 Notification[]
+  ownedContacts                 Contact[]                   @relation("ContactOwner")
+  approvedOrders                Order[]                     @relation("OrderApprovedBy")
+  orderApprovalDecisions        OrderApproval[]             @relation("OrderApprovalDecidedBy")
+  orderRevisionsCreated         OrderRevision[]             @relation("OrderRevisionCreatedBy")
+  onboardedContacts             Contact[]                   @relation("ContactOnboardedBy")
+  contactCollaborations         ContactCollaborator[]
+  ownedLeads                    Lead[]                      @relation("LeadOwner")
+  onboardedLeads                Lead[]                      @relation("LeadOnboardedBy")
+  leadCollaborations            LeadCollaborator[]
+  ownedOrders                   Order[]                     @relation("OrderOwner")
+  onboardedOrders               Order[]                     @relation("OrderOnboardedBy")
+  orderCollaborations           OrderCollaborator[]
+  orderAttachments              OrderAttachment[]
+  approvedQuotes                Quote[]                     @relation("QuoteApprovedBy")
+  projectMembers                ProjectMember[]
+  timeEntries                   TaskTimeEntry[]
+  payrollProfile                PayrollProfile?
+  payrollLines                  PayrollLine[]
+  payrollRunsCreated            PayrollRun[]                @relation("PayrollRunCreatedBy")
+  assignedSourcingCases         SourcingCase[]              @relation("SourcingCaseAssignee")
+  qualifiedDemands              DemandIntake[]              @relation("DemandQualifiedBy")
+  assignedDemands               DemandIntake[]              @relation("DemandAssignee")
+  cmDemands                     DemandIntake[]              @relation("DemandCm")
+  sourcingDecisions             SourcingDecision[]
+  whatsappAssignedConversations WhatsappConversation[]      @relation("WhatsappAssigned")
+  whatsappOwnedConversations    WhatsappConversation[]      @relation("WhatsappOwner")
+  whatsappCampaigns             WhatsappCampaign[]          @relation("WhatsappCampaignCreator")
+  whatsappQualifiedIntents      WhatsappIntent[]            @relation("WhatsappIntentQualifiedBy")
+  whatsappAssignedLeadPipelines WhatsappLeadPipeline[]      @relation("WhatsappLeadAssigned")
+  whatsappAuditLogs             WhatsappAuditLog[]
+  delegationsGiven              DelegationRule[]            @relation("DelegationDelegator")
+  delegationsReceived           DelegationRule[]            @relation("DelegationDelegatee")
+  qcInspections                 QcInspection[]              @relation("QcInspector")
+  qcRequestsApproved            QCRequest[]                 @relation("QcClientApprovedBy")
+  qcReportsShared               QCReport[]                  @relation("QcReportSharedBy")
+  emailCampaignsCreated         EmailCampaign[]             @relation("EmailCampaignCreator")
+  taskCommentReactions          TaskCommentReaction[]
+  savedFilters                  SavedFilter[]
+  goalsOwned                    Goal[]                      @relation("GoalOwner")
+  strategicDecisionsOwned       StrategicDecision[]         @relation("DecisionOwner")
+  decisionExecutionTemplates    DecisionExecutionTemplate[]
+  strategicRisksOwned           StrategicRisk[]             @relation("StrategicRiskOwner")
+  riskMitigationEntries         RiskMitigationEntry[]       @relation("RiskMitigationAuthor")
+  managedSalesTeams             SalesTeam[]                 @relation("SalesTeamManager")
+  salesTeamMemberships          SalesTeamMember[]
+  salesQuotas                   SalesQuota[]
+  requestedReturns              ReturnMerchandise[]         @relation("ReturnRequestedBy")
+  approvedReturns               ReturnMerchandise[]         @relation("ReturnApprovedBy")
+  assignedSourcingTickets       SourcingTicket[]            @relation("SourcingTicketAssignee")
+  warehouseReceiptsAsAgent      WarehouseReceipt[]          @relation("WarehouseReceiptAgent")
+  twoFactorSecret               TwoFactorSecret?
+
+  twoFactorEnabled Boolean @default(false)
 
   @@index([tenantId])
   @@map("users")
+}
+
+model TwoFactorSecret {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  secret      String // base32-encoded TOTP secret (store encrypted in prod)
+  backupCodes Json     @default("[]") // hashed one-time backup codes
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("two_factor_secrets")
 }
 
 enum UserRole {
@@ -99,22 +237,27 @@ enum UserRole {
 }
 
 model DelegationRule {
-  id               String   @id @default(cuid())
-  tenantId         String
-  role             UserRole
-  action           String
-  maxAmountXAF     Decimal? @db.Decimal(15, 2)
-  maxAmountUSD     Decimal? @db.Decimal(15, 2)
-  maxAmountRMB     Decimal? @db.Decimal(15, 2)
-  requiresApproval Boolean  @default(false)
-  approverRole     UserRole?
-  conditions       Json     @default("{}")
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id           String    @id @default(cuid())
+  tenantId     String
+  delegatorId  String?
+  delegateeId  String?
+  permissions  Json      @default("[]")
+  isActive     Boolean   @default(true)
+  startsAt     DateTime?
+  endsAt       DateTime?
+  maxAmountXAF Decimal?  @db.Decimal(15, 2)
+  maxAmountUSD Decimal?  @db.Decimal(15, 2)
+  maxAmountRMB Decimal?  @db.Decimal(15, 2)
+  conditions   Json      @default("{}")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
-  tenant Tenant @relation(fields: [tenantId], references: [id])
+  tenant    Tenant @relation(fields: [tenantId], references: [id])
+  delegator User?  @relation("DelegationDelegator", fields: [delegatorId], references: [id])
+  delegatee User?  @relation("DelegationDelegatee", fields: [delegateeId], references: [id])
 
-  @@index([tenantId, role, action])
+  @@index([tenantId, delegatorId])
+  @@index([tenantId, delegateeId])
   @@map("delegation_rules")
 }
 
@@ -123,29 +266,31 @@ model DelegationRule {
 // ============================================================
 
 model Contact {
-  id         String      @id @default(cuid())
-  tenantId   String
-  type       ContactType
-  name       String
-  company    String?
-  phone      String?
-  email      String?
-  whatsapp   String?
-  city       String?
-  country    String      @default("CG")
-    notes      String?
-    trustScore Int         @default(50)
-    tags       Json        @default("[]")
-    ownerId    String?
-    onboardedById String?
-    createdAt  DateTime    @default(now())
-    updatedAt  DateTime    @updatedAt
+  id            String      @id @default(cuid())
+  tenantId      String
+  type          ContactType
+  name          String
+  company       String?
+  phone         String?
+  email         String?
+  whatsapp      String?
+  city          String?
+  country       String      @default("CG")
+  notes         String?
+  trustScore    Int         @default(50)
+  tags          Json        @default("[]")
+  customFields  Json?
+  ownerId       String?
+  onboardedById String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 
-    tenant               Tenant                     @relation(fields: [tenantId], references: [id])
-    owner                User?                      @relation("ContactOwner", fields: [ownerId], references: [id])
-    onboardedBy          User?                      @relation("ContactOnboardedBy", fields: [onboardedById], references: [id])
-    collaborators        ContactCollaborator[]
-    orders               Order[]
+  tenant               Tenant                    @relation(fields: [tenantId], references: [id])
+  owner                User?                     @relation("ContactOwner", fields: [ownerId], references: [id])
+  onboardedBy          User?                     @relation("ContactOnboardedBy", fields: [onboardedById], references: [id])
+  collaborators        ContactCollaborator[]
+  orders               Order[]
+  invoices             Invoice[]
   leads                Lead[]
   conversations        Conversation[]
   communityMemberships CommunityMembership[]
@@ -154,16 +299,28 @@ model Contact {
   financialMetrics     CustomerFinancialMetrics?
   riskProfile          CustomerRiskProfile?
   pipelineIntents      CustomerPipelineIntent[]
+  whatsappIntents      WhatsappIntent[]
   aiProfile            CustomerAIProfile?
+  qcPartnerProfile     QcPartnerProfile?
+  qcPartnerRequests    QCRequest[]               @relation("QcPartner")
   supplyChains         CustomerSupplyChain[]
   segmentations        CustomerSegmentation[]
+  whatsappProfiles     WhatsappContact[]
+  demandIntakes        DemandIntake[]
+  meetings             Meeting[]
+  emailLogs            EmailLog[]
+  emailRecipients      EmailRecipient[]
+  crmInboundEvents          CrmInboundEvent[]
+  leadMiningResults         LeadMiningResult[]
+  sourcingTickets           SourcingTicket[]
+  customsBrokerClearances   OrderCustomsClearance[]     @relation("CustomsBroker")
 
-    @@index([tenantId])
-    @@index([tenantId, type])
-    @@index([ownerId])
-    @@index([onboardedById])
-    @@map("contacts")
-  }
+  @@index([tenantId])
+  @@index([tenantId, type])
+  @@index([ownerId])
+  @@index([onboardedById])
+  @@map("contacts")
+}
 
 enum ContactType {
   CLIENT
@@ -176,33 +333,63 @@ enum ContactType {
 }
 
 model Lead {
-  id             String         @id @default(cuid())
-  contactId      String
-  status         LeadStatus     @default(NEW)
-  source         String?
-  description    String?
-    estimatedValue Decimal?      @db.Decimal(15, 2)
-    currency       String        @default("XAF")
-    category       String?
-    assignedTo     String?
-    ownerId        String?
-    onboardedById  String?
-    containerType  ContainerType?
-    originCountry  String?       @default("CN")
-    notes          String?
-    createdAt      DateTime      @default(now())
-    updatedAt      DateTime      @updatedAt
+  id              String         @id @default(cuid())
+  contactId       String
+  status          LeadStatus     @default(NEW)
+  source          String?
+  description     String?
+  estimatedValue  Decimal?       @db.Decimal(15, 2)
+  currency        String         @default("XAF")
+  category        String?
+  assignedTo      String?
+  ownerId         String?
+  onboardedById   String?
+  containerType   ContainerType?
+  originCountry   String?        @default("CN")
+  notes           String?
+  isArchived      Boolean        @default(false)
+  archivedAt      DateTime?
+  score           Int            @default(0)
+  winProbability  Int            @default(0)
+  scoredAt        DateTime?
+  slaDeadline     DateTime?
+  slaStatus       String?
+  customFields    Json?
+  pipelineId      String?
+  pipelineStageId String?
+  salesTeamId     String?
+  territoryId     String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 
-    contact       Contact            @relation(fields: [contactId], references: [id])
-    owner         User?              @relation("LeadOwner", fields: [ownerId], references: [id])
-    onboardedBy   User?              @relation("LeadOnboardedBy", fields: [onboardedById], references: [id])
-    collaborators LeadCollaborator[]
+  contact              Contact               @relation(fields: [contactId], references: [id])
+  owner                User?                 @relation("LeadOwner", fields: [ownerId], references: [id])
+  onboardedBy          User?                 @relation("LeadOnboardedBy", fields: [onboardedById], references: [id])
+  collaborators        LeadCollaborator[]
+  pipeline             Pipeline?             @relation(fields: [pipelineId], references: [id])
+  pipelineStage        PipelineStage?        @relation(fields: [pipelineStageId], references: [id])
+  salesTeam            SalesTeam?            @relation(fields: [salesTeamId], references: [id])
+  territory            SalesTerritory?       @relation(fields: [territoryId], references: [id])
+  inboundEvents        CrmInboundEvent[]
+  orders               Order[]
+  scoreSnapshots       LeadScoreSnapshot[]
+  leadMiningResults    LeadMiningResult[]
+  nurturingEnrollments NurturingEnrollment[]
+  meetings             Meeting[]
+  emailLogs            EmailLog[]
+  demandIntakes        DemandIntake[]
+  sourcingTickets      SourcingTicket[]
 
-    @@index([contactId])
-    @@index([ownerId])
-    @@index([onboardedById])
-    @@map("leads")
-  }
+  @@index([contactId])
+  @@index([ownerId])
+  @@index([onboardedById])
+  @@index([isArchived])
+  @@index([score])
+  @@index([slaStatus])
+  @@index([salesTeamId])
+  @@index([territoryId])
+  @@map("leads")
+}
 
 enum LeadStatus {
   NEW
@@ -282,59 +469,118 @@ model Message {
   @@map("messages")
 }
 
+model EmailLog {
+  id         String      @id @default(cuid())
+  tenantId   String
+  contactId  String?
+  leadId     String?
+  subject    String
+  body       String
+  status     EmailStatus @default(SENT)
+  sentAt     DateTime    @default(now())
+  openedAt   DateTime?
+  clickedAt  DateTime?
+  provider   String?     @default("resend")
+  providerId String?
+  metadata   Json        @default("{}")
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id])
+  contact Contact? @relation(fields: [contactId], references: [id])
+  lead    Lead?    @relation(fields: [leadId], references: [id])
+
+  @@index([tenantId])
+  @@index([contactId])
+  @@index([leadId])
+  @@index([providerId])
+  @@map("email_logs")
+}
+
 // ============================================================
 // C. COMMERCE / ORDERS (NOYAU CENTRAL)
 // ============================================================
 
 model Order {
-  id               String      @id @default(cuid())
-  tenantId         String
-  orderNumber      String      @unique
-  contactId        String
-  ownerId          String?
-  onboardedById    String?
-  status           OrderStatus @default(DEMANDE)
-  priority         Priority    @default(NORMAL)
-  merchandiseTotal Decimal     @db.Decimal(15, 2) @default(0)
-  logisticsCost    Decimal     @db.Decimal(15, 2) @default(0)
-  commissionRate   Decimal     @db.Decimal(5, 4)  @default(0.10)
-  commissionAmount Decimal     @db.Decimal(15, 2) @default(0)
-  insuranceAmount  Decimal     @db.Decimal(15, 2) @default(0)
-  totalClient      Decimal     @db.Decimal(15, 2) @default(0)
-  currency         String      @default("XAF")
-  originCountry    String      @default("CN")
-  destinationCity  String      @default("Brazzaville")
+  id                String              @id @default(cuid())
+  tenantId          String
+  orderNumber       String              @unique
+  contactId         String
+  currentQuoteId    String?
+  ownerId           String?
+  onboardedById     String?
+  projectId         String?
+  leadId            String?
+  status            OrderStatus         @default(DEMANDE)
+  approvalStatus    OrderApprovalStatus @default(NOT_REQUIRED)
+  approvedById      String?
+  approvedAt        DateTime?
+  priority          Priority            @default(NORMAL)
+  merchandiseTotal  Decimal             @default(0) @db.Decimal(15, 2)
+  logisticsCost     Decimal             @default(0) @db.Decimal(15, 2)
+  commissionRate    Decimal             @default(0.10) @db.Decimal(5, 4)
+  commissionAmount  Decimal             @default(0) @db.Decimal(15, 2)
+  insuranceAmount   Decimal             @default(0) @db.Decimal(15, 2)
+  qcOption                QcUpsellOption @default(NONE)
+  qcCost                  Decimal        @default(0) @db.Decimal(15, 2)
+  serviceProtectionOption String?        @default("NONE") // NONE | BASIC (3%)
+  serviceProtectionFeeAmt Decimal        @default(0) @db.Decimal(15, 2)
+  totalClient             Decimal        @default(0) @db.Decimal(15, 2)
+  currency          String              @default("XAF")
+  budgetPlannedXAF  Decimal             @default(0) @db.Decimal(15, 2)
+  budgetActualXAF   Decimal             @default(0) @db.Decimal(15, 2)
+  fxRatesSnapshot   Json                @default("{}")
+  fxImpactXAF       Decimal             @default(0) @db.Decimal(15, 2)
+  originCountry     String              @default("CN")
+  destinationCity   String              @default("Brazzaville")
   estimatedDelivery DateTime?
   actualDelivery    DateTime?
-  archivedAt       DateTime?
-  notes            String?
-  riskLevel        RiskLevel   @default(LOW)
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @updatedAt
-  
-  tenant        Tenant          @relation(fields: [tenantId], references: [id])
-  contact       Contact         @relation(fields: [contactId], references: [id])
-  owner         User?           @relation("OrderOwner", fields: [ownerId], references: [id])
-  onboardedBy   User?           @relation("OrderOnboardedBy", fields: [onboardedById], references: [id])
-  collaborators OrderCollaborator[]
-  attachments   OrderAttachment[]
-  items         OrderItem[]
-  quotes        Quote[]
-  timeline      OrderTimeline[]
-  sourcingCases SourcingCase[]
-  qcRequests    QCRequest[]
-  shipments     Shipment[]
-  payments      Payment[]
-  tasks         Task[]
-  disputes      Dispute[]
-  marginReport  MarginReport?
-  
+  archivedAt        DateTime?
+  notes             String?
+  riskLevel         RiskLevel           @default(LOW)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  tenant           Tenant                 @relation(fields: [tenantId], references: [id])
+  contact          Contact                @relation(fields: [contactId], references: [id])
+  currentQuote     Quote?                 @relation("OrderCurrentQuote", fields: [currentQuoteId], references: [id], onDelete: SetNull)
+  owner            User?                  @relation("OrderOwner", fields: [ownerId], references: [id])
+  approvedBy       User?                  @relation("OrderApprovedBy", fields: [approvedById], references: [id])
+  onboardedBy      User?                  @relation("OrderOnboardedBy", fields: [onboardedById], references: [id])
+  collaborators    OrderCollaborator[]
+  attachments      OrderAttachment[]
+  items            OrderItem[]
+  quotes           Quote[]
+  timeline         OrderTimeline[]
+  sourcingCases    SourcingCase[]
+  qcRequests       QCRequest[]
+  shipments        Shipment[]
+  payments         Payment[]
+  tasks            Task[]
+  disputes         Dispute[]
+  returns          ReturnMerchandise[]
+  marginReport     MarginReport?
+  invoices         Invoice[]
+  approvals        OrderApproval[]
+  revisions        OrderRevision[]
+  ediTransmissions OrderEdiTransmission[]
+  portalTokens     OrderPortalToken[]
+  project          Project?               @relation(fields: [projectId], references: [id])
+  lead             Lead?                  @relation(fields: [leadId], references: [id])
+  qcInspections    QcInspection[]
+  demandIntakes    DemandIntake[]
+  customsClearance  OrderCustomsClearance?
+  warehouseReceipts WarehouseReceipt[]
+
   @@index([tenantId])
   @@index([tenantId, status])
   @@index([orderNumber])
   @@index([ownerId])
   @@index([onboardedById])
+  @@index([currentQuoteId])
+  @@index([projectId])
   @@index([archivedAt])
+  @@index([leadId])
   @@map("orders")
 }
 
@@ -345,6 +591,7 @@ enum OrderStatus {
   PAIEMENT_EN_COURS
   SOURCING
   EN_PRODUCTION
+  RECU_ENTREPOT
   QC_EN_COURS
   QC_VALIDE
   EN_TRANSIT
@@ -353,6 +600,108 @@ enum OrderStatus {
   CLOTURE
   ANNULE
   LITIGE
+}
+
+enum OrderApprovalStatus {
+  NOT_REQUIRED
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model OrderApprovalRule {
+  id           String   @id @default(cuid())
+  tenantId     String
+  name         String
+  minAmountXAF Decimal  @db.Decimal(15, 2)
+  sequence     Int      @default(1)
+  requiredRole UserRole
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant Tenant          @relation(fields: [tenantId], references: [id])
+  steps  OrderApproval[]
+
+  @@index([tenantId])
+  @@map("order_approval_rules")
+}
+
+model OrderApproval {
+  id          String         @id @default(cuid())
+  orderId     String
+  ruleId      String
+  status      ApprovalStatus @default(PENDING)
+  decidedById String?
+  decidedAt   DateTime?
+  note        String?
+  createdAt   DateTime       @default(now())
+
+  order     Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  rule      OrderApprovalRule @relation(fields: [ruleId], references: [id])
+  decidedBy User?             @relation("OrderApprovalDecidedBy", fields: [decidedById], references: [id])
+
+  @@index([orderId])
+  @@index([ruleId])
+  @@map("order_approvals")
+}
+
+model OrderRevision {
+  id             String   @id @default(cuid())
+  orderId        String
+  revisionNumber Int
+  reason         String?
+  snapshot       Json
+  createdById    String?
+  createdAt      DateTime @default(now())
+
+  order     Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  createdBy User? @relation("OrderRevisionCreatedBy", fields: [createdById], references: [id])
+
+  @@unique([orderId, revisionNumber])
+  @@index([orderId])
+  @@map("order_revisions")
+}
+
+enum EdiStatus {
+  PENDING
+  SENT
+  ACKNOWLEDGED
+  FAILED
+}
+
+model OrderEdiTransmission {
+  id           String    @id @default(cuid())
+  orderId      String
+  supplierId   String?
+  provider     String
+  status       EdiStatus @default(PENDING)
+  payload      Json
+  response     Json?
+  errorMessage String?
+  sentAt       DateTime?
+  ackAt        DateTime?
+  createdAt    DateTime  @default(now())
+
+  order    Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  supplier Supplier? @relation(fields: [supplierId], references: [id])
+
+  @@index([orderId])
+  @@index([supplierId])
+  @@map("order_edi_transmissions")
+}
+
+model OrderPortalToken {
+  id        String     @id @default(cuid())
+  orderId   String
+  token     String     @unique
+  role      PortalRole @default(CLIENT)
+  expiresAt DateTime?
+  createdAt DateTime   @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@map("order_portal_tokens")
 }
 
 enum Priority {
@@ -370,16 +719,16 @@ enum RiskLevel {
 }
 
 model OrderItem {
-  id           String  @id @default(cuid())
+  id           String   @id @default(cuid())
   orderId      String
   productId    String?
   supplierId   String?
   description  String
   quantity     Int
-  unitPrice    Decimal @db.Decimal(15, 2)
-  currency     String  @default("RMB")
-  unitPriceXAF Decimal @db.Decimal(15, 2) @default(0)
-  totalXAF     Decimal @db.Decimal(15, 2) @default(0)
+  unitPrice    Decimal  @db.Decimal(15, 2)
+  currency     String   @default("RMB")
+  unitPriceXAF Decimal  @default(0) @db.Decimal(15, 2)
+  totalXAF     Decimal  @default(0) @db.Decimal(15, 2)
   hsCode       String?
   weight       Decimal? @db.Decimal(10, 2)
   volume       Decimal? @db.Decimal(10, 4)
@@ -395,25 +744,51 @@ model OrderItem {
 }
 
 model Quote {
-  id               String      @id @default(cuid())
+  id               String              @id @default(cuid())
   orderId          String
-  version          Int         @default(1)
-  status           QuoteStatus @default(DRAFT)
-  merchandiseTotal Decimal     @db.Decimal(15, 2)
-  logisticsCost    Decimal     @db.Decimal(15, 2)
-  commission       Decimal     @db.Decimal(15, 2)
-  insuranceCost    Decimal     @db.Decimal(15, 2) @default(0)
-  total            Decimal     @db.Decimal(15, 2)
-  currency         String      @default("XAF")
+  version          Int                 @default(1)
+  isActive         Boolean             @default(true)
+  status           QuoteStatus         @default(DRAFT)
+  approvalStatus   QuoteApprovalStatus @default(PENDING)
+  approvedById     String?
+  approvedAt       DateTime?
+  approvalNote     String?
+  merchandiseTotal Decimal             @db.Decimal(15, 2)
+  logisticsCost    Decimal             @db.Decimal(15, 2)
+  commission       Decimal             @db.Decimal(15, 2)
+  insuranceCost    Decimal             @default(0) @db.Decimal(15, 2)
+  qcOption                QcUpsellOption @default(NONE)
+  qcCost                  Decimal        @default(0) @db.Decimal(15, 2)
+  serviceProtectionOption String?        @default("NONE") // NONE | BASIC (3%)
+  serviceProtectionFeeAmt Decimal        @default(0) @db.Decimal(15, 2)
+  cgvAcceptedAt           DateTime?      // Acceptance CGV par le client
+  total                   Decimal        @db.Decimal(15, 2)
+  currency         String              @default("XAF")
   validUntil       DateTime?
   sentAt           DateTime?
+  sentByEmailAt    DateTime?
+  sentByEmailTo    String?
   acceptedAt       DateTime?
-  pricingSnapshot  Json        @default("{}")
-  createdAt        DateTime    @default(now())
+  signatureToken   String?             @unique
+  signedAt         DateTime?
+  signedByName     String?
+  signedByEmail    String?
+  signedByIp       String?
+  paymentToken     String?             @unique
+  paymentExpiry    DateTime?
+  paymentStatus    String?             @default("PENDING")
+  paymentMethod    String?
+  paidAt           DateTime?
+  pricingSnapshot  Json                @default("{}")
+  createdAt        DateTime            @default(now())
 
-  order Order @relation(fields: [orderId], references: [id])
+  order             Order   @relation(fields: [orderId], references: [id])
+  currentForOrders  Order[] @relation("OrderCurrentQuote")
+  approvedBy        User?   @relation("QuoteApprovedBy", fields: [approvedById], references: [id])
 
+  @@unique([orderId, version])
   @@index([orderId])
+  @@index([orderId, isActive])
   @@map("quotes")
 }
 
@@ -423,6 +798,18 @@ enum QuoteStatus {
   ACCEPTED
   REJECTED
   EXPIRED
+}
+
+enum QuoteApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum QcUpsellOption {
+  NONE
+  VIRTUAL
+  PHYSICAL
 }
 
 model OrderTimeline {
@@ -456,13 +843,19 @@ model OrderCollaborator {
 }
 
 model OrderAttachment {
-  id        String   @id @default(cuid())
-  orderId   String
-  userId    String?
-  name      String
-  url       String
-  type      String   @default("link")
-  createdAt DateTime @default(now())
+  id              String   @id @default(cuid())
+  orderId         String
+  userId          String?
+  name            String
+  url             String
+  type            String   @default("link")
+  storageProvider String?
+  bucket          String?
+  storageKey      String?
+  mimeType        String?
+  size            Int?
+  isPublic        Boolean  @default(false)
+  createdAt       DateTime @default(now())
 
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
   user  User? @relation(fields: [userId], references: [id])
@@ -484,7 +877,8 @@ model Dispute {
   createdAt   DateTime      @default(now())
   resolvedAt  DateTime?
 
-  order Order @relation(fields: [orderId], references: [id])
+  order   Order               @relation(fields: [orderId], references: [id])
+  returns ReturnMerchandise[]
 
   @@index([orderId])
   @@map("disputes")
@@ -507,50 +901,229 @@ enum DisputeStatus {
   CLOSED
 }
 
+enum ReturnMerchandiseStatus {
+  REQUESTED
+  APPROVAL_PENDING
+  APPROVED
+  REJECTED
+  IN_TRANSIT_TO_WAREHOUSE
+  RECEIVED
+  INSPECTED
+  RESOLVED
+  CLOSED
+}
+
+enum ReturnLineCondition {
+  UNOPENED
+  OPENED
+  DAMAGED
+  DEFECTIVE
+  UNKNOWN
+}
+
+model ReturnMerchandise {
+  id             String                  @id @default(cuid())
+  tenantId       String
+  orderId        String
+  disputeId      String?
+  status         ReturnMerchandiseStatus @default(REQUESTED)
+  reason         String
+  requestedById  String?
+  approvedById   String?
+  approvedAt     DateTime?
+  receivedAt     DateTime?
+  warehouseSite  String?
+  trackingNumber String?
+  notes          String?
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+
+  tenant      Tenant                  @relation(fields: [tenantId], references: [id])
+  order       Order                   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  dispute     Dispute?                @relation(fields: [disputeId], references: [id])
+  requestedBy User?                   @relation("ReturnRequestedBy", fields: [requestedById], references: [id])
+  approvedBy  User?                   @relation("ReturnApprovedBy", fields: [approvedById], references: [id])
+  lines       ReturnMerchandiseLine[]
+
+  @@index([tenantId, status])
+  @@index([orderId])
+  @@index([disputeId])
+  @@map("return_merchandises")
+}
+
+model ReturnMerchandiseLine {
+  id          String              @id @default(cuid())
+  rmaId       String
+  description String
+  quantity    Int                 @default(1)
+  condition   ReturnLineCondition @default(UNKNOWN)
+  notes       String?
+  createdAt   DateTime            @default(now())
+
+  rma ReturnMerchandise @relation(fields: [rmaId], references: [id], onDelete: Cascade)
+
+  @@index([rmaId])
+  @@map("return_merchandise_lines")
+}
+
+// ============================================================
+// C2. DOUANES & PROTECTION (lié aux commandes)
+// ============================================================
+
+enum CustomsClearanceStatus {
+  PENDING
+  IN_PROGRESS
+  CLEARED
+  HOLD
+  REJECTED
+}
+
+model OrderCustomsClearance {
+  id                String                 @id @default(cuid())
+  orderId           String                 @unique
+  brokerContactId   String?
+  incoterm          String?                // EXW | FOB | CIF | DAP | DDP
+  dutiesAmount      Decimal?               @db.Decimal(15, 2)
+  feesAmount        Decimal?               @db.Decimal(15, 2)
+  currency          String                 @default("XAF")
+  status            CustomsClearanceStatus @default(PENDING)
+  declarationRef    String?
+  clearedAt         DateTime?
+  dapDeliveryStatus String?
+  documents         Json                   @default("[]") // [{name, url, type}]
+  notes             String?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+
+  order  Order    @relation(fields: [orderId], references: [id])
+  broker Contact? @relation("CustomsBroker", fields: [brokerContactId], references: [id])
+
+  @@index([orderId])
+  @@map("order_customs_clearances")
+}
+
 // ============================================================
 // D. SOURCING
 // ============================================================
 
-model Supplier {
-  id                   String         @id @default(cuid())
-  name                 String
-  country              String         @default("CN")
-  city                 String?
-  platform             String?        // 1688, alibaba, offline
-  status               SupplierStatus @default(ACTIVE)
-  contactName          String?
-  phone                String?
-  wechat               String?
-  email                String?
-  category             String?
-  rating               Int            @default(50)
-  leadTimeDays         Int?
-  moq                  String?
-  paymentTerms         String?
-  contactsJson         Json           @default("{}") // WeChat, WhatsApp, email, horaires, langue
-  negotiatedTermsJson  Json           @default("{}") // paiement, incoterm, délais, garanties
-  qcPassRate           Decimal?       @db.Decimal(5, 2)
-  logisticsReliability Decimal?       @db.Decimal(5, 2)
-  incidentRate         Decimal?       @db.Decimal(5, 2)
-  notes                String?
-  isVerified           Boolean        @default(false)
-  createdAt            DateTime       @default(now())
-  updatedAt            DateTime       @updatedAt
+// ── D0. SourcingTicket (pivot pré-vente) ──────────────────────
 
-  offers           Offer[]
-  sourcingCases    SourcingCase[]
-  supplierScores   SupplierScore[]
-  supplierProducts SupplierProduct[]
-  catalogMedia     CatalogMedia[]
-  orderItems       OrderItem[]
+enum SourcingTicketStatus {
+  CREATED
+  INTERNAL_SCANNING
+  CATALOG_MATCH_REVIEW
+  EXTERNAL_SOURCING_PENDING
+  PENDING_PARTNER_INFO
+  QUOTE_READY
+  QUOTED
+  CONVERTED
+  LOST
+}
+
+model SourcingTicket {
+  id                  String               @id @default(cuid())
+  tenantId            String
+  demandId            String?
+  contactId           String?
+  leadId              String?
+  quoteId             String?
+  orderId             String?
+  status              SourcingTicketStatus @default(CREATED)
+  description         String
+  category            String?
+  quantity            Int?
+  targetPrice         Decimal?             @db.Decimal(15, 2)
+  currency            String               @default("USD")
+  catalogProductId    String?
+  catalogMatchScore   Decimal?             @db.Decimal(5, 2)
+  catalogMatchSource  String?              // EXACT | FUZZY | CATEGORY | NONE
+  imageVectorId       String?
+  internalDecision    String?              // USE_CATALOG | EXTERNAL_SOURCING | MANUAL
+  externalProvider    String?
+  estimatedWeight     Decimal?             @db.Decimal(10, 3)
+  estimatedDimensions Json?                // {l, w, h, unit}
+  pricingSnapshot     Json                 @default("{}")
+  assignedToId        String?
+  assignedAgent       String?              // AI agent identifier
+  convertedAt         DateTime?
+  lostAt              DateTime?
+  lostReason          String?
+  notes               String?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  tenant         Tenant          @relation(fields: [tenantId], references: [id])
+  demand         DemandIntake?   @relation(fields: [demandId], references: [id])
+  contact        Contact?        @relation(fields: [contactId], references: [id])
+  lead           Lead?           @relation(fields: [leadId], references: [id])
+  catalogProduct CatalogProduct? @relation("SourcingTicketProduct", fields: [catalogProductId], references: [id])
+  assignedTo     User?           @relation("SourcingTicketAssignee", fields: [assignedToId], references: [id])
+
+  @@index([tenantId, status])
+  @@index([demandId])
+  @@index([contactId])
+  @@index([assignedToId])
+  @@map("sourcing_tickets")
+}
+
+model Supplier {
+  id                        String                  @id @default(cuid())
+  name                      String
+  country                   String                  @default("CN")
+  city                      String?
+  platform                  String? // 1688, alibaba, offline
+  status                    SupplierStatus          @default(ACTIVE)
+  contactName               String?
+  phone                     String?
+  wechat                    String?
+  whatsapp                  String?
+  email                     String?
+  website                   String?
+  storeUrl                  String?
+  address                   String?
+  category                  String?
+  rating                    Int                     @default(50)
+  leadTimeDays              Int?
+  sampleLeadTimeDays        Int?
+  responseTimeHours         Int?
+  productionCapacityMonthly Int?
+  moq                       String?
+  paymentTerms              String?
+  contactsJson              Json                    @default("{}") // WeChat, WhatsApp, email, horaires, langue
+  negotiatedTermsJson       Json                    @default("{}") // paiement, incoterm, d????lais, garanties
+  languagesJson             Json                    @default("[]")
+  certificationsJson        Json                    @default("[]")
+  qcPassRate                Decimal?                @db.Decimal(5, 2)
+  logisticsReliability      Decimal?                @db.Decimal(5, 2)
+  incidentRate              Decimal?                @db.Decimal(5, 2)
+  notes                     String?
+  isVerified                Boolean                 @default(false)
+  lifecycleStatus           SupplierLifecycleStatus @default(ACTIVE)
+  createdAt                 DateTime                @default(now())
+  updatedAt                 DateTime                @updatedAt
+
+  offers               Offer[]
+  sourcingCases        SourcingCase[]
+  supplierScores       SupplierScore[]
+  supplierProducts     SupplierProduct[]
+  catalogMedia         CatalogMedia[]
+  documents            SupplierDocument[]
+  sourcingDecisions    SourcingDecision[]
+  orderItems           OrderItem[]
   customerSupplyChains CustomerSupplyChain[]
+  invoices             Invoice[]
 
   // Supplier Intelligence
-  financialMetrics    SupplierFinancialMetrics?
-  performanceProfile  SupplierPerformanceProfile?
-  riskProfile         SupplierRiskProfile?
-  aiProfile           SupplierAIProfile?
-  segmentations       SupplierSegmentation[]
+  financialMetrics   SupplierFinancialMetrics?
+  performanceProfile SupplierPerformanceProfile?
+  riskProfile        SupplierRiskProfile?
+  aiProfile          SupplierAIProfile?
+  segmentations      SupplierSegmentation[]
+  ediTransmissions   OrderEdiTransmission[]
+  qcInspections      QcInspection[]              @relation("SupplierQcInspections")
+  qcRequests         QCRequest[]
+  qcReports          QCReport[]
+  contracts          SupplierContract[]
 
   @@map("suppliers")
 }
@@ -560,6 +1133,48 @@ enum SupplierStatus {
   TESTING
   SUSPENDED
   BLACKLIST
+}
+
+enum SupplierLifecycleStatus {
+  ACTIVE
+  DORMANT
+  BLACKLISTED
+  STRATEGIC
+}
+
+enum SupplierContractStatus {
+  DRAFT
+  ACTIVE
+  EXPIRED
+  TERMINATED
+}
+
+model SupplierContract {
+  id             String                 @id @default(cuid())
+  tenantId       String
+  supplierId     String
+  contractNumber String
+  status         SupplierContractStatus @default(DRAFT)
+  title          String
+  startAt        DateTime
+  endAt          DateTime?
+  currency       String                 @default("USD")
+  negotiatedBy   String?
+  termsJson      Json                   @default("{}")
+  priceGrid      Json                   @default("{}")
+  penaltyClauses Json                   @default("{}")
+  notes          String?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  tenant        Tenant         @relation(fields: [tenantId], references: [id])
+  supplier      Supplier       @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  sourcingCases SourcingCase[]
+
+  @@unique([tenantId, contractNumber])
+  @@index([tenantId, status])
+  @@index([supplierId, status])
+  @@map("supplier_contracts")
 }
 
 model SupplierScore {
@@ -578,24 +1193,80 @@ model SupplierScore {
 }
 
 model SourcingCase {
-  id          String         @id @default(cuid())
-  orderId     String
-  supplierId  String?
-  status      SourcingStatus @default(SEARCHING)
-  requirement String
-  budget      Decimal?       @db.Decimal(15, 2)
-  currency    String         @default("RMB")
-  selectedAt  DateTime?
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  id             String         @id @default(cuid())
+  orderId        String
+  supplierId     String?
+  contractId     String?
+  status         SourcingStatus @default(SEARCHING)
+  level          SourcingLevel  @default(INFORMATIF)
+  requirement    String
+  budget         Decimal?       @db.Decimal(15, 2)
+  currency       String         @default("RMB")
+  selectedAt     DateTime?
+  category       String?
+  pipelineType   PipelineType   @default(RETAIL)
+  assignedToId   String?
+  assignedAgent  String?
+  stageEnteredAt DateTime       @default(now())
+  qcCostEst      Decimal?       @db.Decimal(15, 2)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
-  order        Order            @relation(fields: [orderId], references: [id])
-  supplier     Supplier?        @relation(fields: [supplierId], references: [id])
-  offers       Offer[]
-  negotiations NegotiationLog[]
+  // Sourcing context
+  platform         String? // 1688, taobao, alibaba, aliexpress, amazon, web
+  bufferPercent    Decimal? @db.Decimal(5, 2) // 15-20 for informatif
+  sensitiveProduct Boolean  @default(false)
+
+  // Dimensions (required for profond)
+  weightKg    Decimal? @db.Decimal(10, 3)
+  lengthCm    Decimal? @db.Decimal(10, 2)
+  widthCm     Decimal? @db.Decimal(10, 2)
+  heightCm    Decimal? @db.Decimal(10, 2)
+  cartonCount Int?
+
+  // Calculated transport
+  volumetricWeightKg Decimal? @db.Decimal(10, 3)
+  taxableWeightKg    Decimal? @db.Decimal(10, 3)
+  transportCostEst   Decimal? @db.Decimal(15, 2)
+  transportCurrency  String   @default("XAF")
+  transportBufferPct Decimal? @db.Decimal(5, 2) // 5-8%
+
+  // Margin simulation
+  unitPriceRmb        Decimal?  @db.Decimal(15, 2)
+  quantity            Int?
+  totalCostXAF        Decimal?  @db.Decimal(15, 2)
+  prixFinalXAF        Decimal?  @db.Decimal(15, 2)
+  marginPct           Decimal?  @db.Decimal(5, 2)
+  marginApprovedByCeo Boolean   @default(false)
+  ceoApprovedAt       DateTime?
+
+  // Data capitalization
+  weightEstimated    Decimal? @db.Decimal(10, 3)
+  weightReal         Decimal? @db.Decimal(10, 3)
+  marginPrevue       Decimal? @db.Decimal(5, 2)
+  marginReelle       Decimal? @db.Decimal(5, 2)
+  delayEstimatedDays Int?
+  delayRealDays      Int?
+
+  order              Order               @relation(fields: [orderId], references: [id])
+  supplier           Supplier?           @relation(fields: [supplierId], references: [id])
+  contract           SupplierContract?   @relation(fields: [contractId], references: [id])
+  assignedTo         User?               @relation("SourcingCaseAssignee", fields: [assignedToId], references: [id])
+  offers             Offer[]
+  negotiations       NegotiationLog[]
+  groupageBatchItems GroupageBatchItem[]
+  decisions          SourcingDecision[]
+  convertedDemands   DemandIntake[]
 
   @@index([orderId])
+  @@index([contractId])
+  @@index([level])
   @@map("sourcing_cases")
+}
+
+enum SourcingLevel {
+  INFORMATIF
+  PROFOND
 }
 
 enum SourcingStatus {
@@ -607,24 +1278,86 @@ enum SourcingStatus {
   CANCELLED
 }
 
+enum PipelineType {
+  RETAIL
+  WHOLESALE
+  VIP
+  STRATEGIC
+}
+
+enum DemandSource {
+  WHATSAPP
+  PHONE
+  EMAIL
+  GROUP
+  CRM
+  APP
+  MANUAL
+}
+
+enum DemandStatus {
+  RAW
+  QUALIFIED
+  INDICATIF_PENDING
+  QUOTE_DRAFT
+  QUOTE_PENDING_APPROVAL
+  QUOTE_APPROVED
+  QUOTE_SENT
+  CLIENT_ACCEPTED
+  PAYMENT_SUBMITTED
+  PAYMENT_VALIDATED
+  CONVERTED
+  LOST
+}
+
+enum DemandUrgency {
+  NORMAL
+  HIGH
+  CRITICAL
+}
+
+enum ClientSegment {
+  VIP
+  STANDARD
+  RISK
+}
+
+enum DecisionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum MarketTrend {
+  TIGHTENING
+  LOOSENING
+  STABLE
+}
+
+enum MarketTiming {
+  BUY_NOW
+  WAIT
+  URGENT
+}
+
 model Offer {
-  id                String   @id @default(cuid())
+  id                String    @id @default(cuid())
   sourcingCaseId    String?
   supplierId        String
   supplierProductId String?
   productId         String?
-  unitPrice         Decimal  @db.Decimal(15, 2)
-  currency          String   @default("RMB")
+  unitPrice         Decimal   @db.Decimal(15, 2)
+  currency          String    @default("RMB")
   moq               Int?
   leadTimeDays      Int?
-  sampleAvailable   Boolean  @default(false)
+  sampleAvailable   Boolean   @default(false)
   notes             String?
-  isSelected        Boolean  @default(false)
-  validFrom         DateTime @default(now())
+  isSelected        Boolean   @default(false)
+  validFrom         DateTime  @default(now())
   validTo           DateTime?
-  sourceType        String   @default("sourcing") // sourcing, order, manual
+  sourceType        String    @default("sourcing") // sourcing, order, manual
   sourceId          String?
-  createdAt         DateTime @default(now())
+  createdAt         DateTime  @default(now())
 
   sourcingCase    SourcingCase?    @relation(fields: [sourcingCaseId], references: [id])
   supplier        Supplier         @relation(fields: [supplierId], references: [id])
@@ -652,28 +1385,230 @@ model NegotiationLog {
   @@map("negotiation_logs")
 }
 
+model DemandIntake {
+  id               String        @id @default(cuid())
+  tenantId         String
+  source           DemandSource
+  sourceRef        String?
+  sourcePayload    Json?
+  clientName       String
+  clientSegment    ClientSegment @default(STANDARD)
+  rawDescription   String
+  category         String?
+  quantity         Int?
+  targetPrice      Decimal?      @db.Decimal(15, 2)
+  currency         String        @default("USD")
+  urgency          DemandUrgency @default(NORMAL)
+  country          String?
+  estimatedRevenue Decimal?      @db.Decimal(15, 2)
+  status           DemandStatus  @default(RAW)
+  receivedAt       DateTime      @default(now())
+  aiScore          Int           @default(50)
+  rejectionReason  String?
+  qualifiedById    String?
+  assignedToId     String?
+  convertedCaseId  String?
+  convertedAt      DateTime? // Date de conversion DemandIntake → Order
+  convertedQuoteId String?   // Devis ayant déclenché la conversion
+  contactId        String?
+  leadId           String?
+  orderId          String?
+  quoteId          String?
+  cmId             String?
+
+  tenant        Tenant             @relation(fields: [tenantId], references: [id])
+  qualifiedBy   User?              @relation("DemandQualifiedBy", fields: [qualifiedById], references: [id])
+  assignedTo    User?              @relation("DemandAssignee", fields: [assignedToId], references: [id])
+  cm              User?              @relation("DemandCm", fields: [cmId], references: [id])
+  convertedCase   SourcingCase?      @relation(fields: [convertedCaseId], references: [id])
+  contact         Contact?           @relation(fields: [contactId], references: [id])
+  lead            Lead?              @relation(fields: [leadId], references: [id])
+  order           Order?             @relation(fields: [orderId], references: [id])
+  attachments     DemandAttachment[]
+  sourcingTickets SourcingTicket[]
+
+  @@unique([tenantId, source, sourceRef])
+  @@index([tenantId, status])
+  @@index([tenantId, source])
+  @@index([assignedToId])
+  @@index([contactId])
+  @@index([cmId])
+  @@map("demand_intakes")
+}
+
+model DemandAttachment {
+  id        String   @id @default(cuid())
+  demandId  String
+  name      String
+  url       String
+  type      String   @default("link")
+  createdAt DateTime @default(now())
+
+  demand DemandIntake @relation(fields: [demandId], references: [id], onDelete: Cascade)
+
+  @@index([demandId])
+  @@map("demand_attachments")
+}
+
+model SourcingDecision {
+  id             String         @id @default(cuid())
+  sourcingCaseId String
+  supplierId     String?
+  status         DecisionStatus @default(PENDING)
+  note           String?
+  marginImpact   Decimal?       @db.Decimal(15, 2)
+  decidedById    String?
+  createdAt      DateTime       @default(now())
+
+  sourcingCase SourcingCase @relation(fields: [sourcingCaseId], references: [id], onDelete: Cascade)
+  supplier     Supplier?    @relation(fields: [supplierId], references: [id])
+  decidedBy    User?        @relation(fields: [decidedById], references: [id])
+
+  @@index([sourcingCaseId])
+  @@map("sourcing_decisions")
+}
+
+model SourcingMarketInsight {
+  id                String       @id @default(cuid())
+  tenantId          String
+  product           String
+  category          String?
+  currentPrice      Decimal      @db.Decimal(15, 2)
+  priceChange30d    Decimal      @db.Decimal(5, 2)
+  volatilityScore   Int          @default(0)
+  marketTrend       MarketTrend  @default(STABLE)
+  recommendedTiming MarketTiming @default(WAIT)
+  averageMOQ        Int          @default(0)
+  supplierCount     Int          @default(0)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@map("sourcing_market_insights")
+}
+
+model SupplierDocument {
+  id         String    @id @default(cuid())
+  supplierId String
+  name       String
+  url        String
+  type       String    @default("document")
+  verifiedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@index([supplierId])
+  @@map("supplier_documents")
+}
+
+// ============================================================
+// D2. TRANSPORT PALIERS & GROUPAGE
+// ============================================================
+
+model TransportPalier {
+  id          String   @id @default(cuid())
+  tenantId    String?
+  mode        String   @default("AIR") // AIR, SEA, ROAD
+  fromKg      Decimal  @db.Decimal(10, 3)
+  toKg        Decimal? @db.Decimal(10, 3) // null = no upper bound
+  ratePerKg   Decimal  @db.Decimal(10, 2) // FCFA/kg
+  currency    String   @default("XAF")
+  destination String   @default("CG")
+  isSensitive Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  @@index([mode, destination, isSensitive])
+  @@map("transport_paliers")
+}
+
+model GroupageBatch {
+  id          String    @id @default(cuid())
+  tenantId    String
+  name        String
+  destination String    @default("CG")
+  status      String    @default("FORMING") // FORMING, CONFIRMED, SHIPPED, CLOSED
+  mode        String    @default("SEA")
+  totalCbm    Decimal?  @db.Decimal(10, 4)
+  totalWeight Decimal?  @db.Decimal(10, 3)
+  etd         DateTime?
+  eta         DateTime?
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  tenant    Tenant              @relation(fields: [tenantId], references: [id])
+  items     GroupageBatchItem[]
+  shipments Shipment[]
+
+  @@index([tenantId])
+  @@map("groupage_batches")
+}
+
+model GroupageBatchItem {
+  id             String   @id @default(cuid())
+  batchId        String
+  sourcingCaseId String
+  weightKg       Decimal? @db.Decimal(10, 3)
+  cbm            Decimal? @db.Decimal(10, 4)
+  notes          String?
+  createdAt      DateTime @default(now())
+
+  batch        GroupageBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  sourcingCase SourcingCase  @relation(fields: [sourcingCaseId], references: [id])
+
+  @@unique([batchId, sourcingCaseId])
+  @@index([batchId])
+  @@map("groupage_batch_items")
+}
+
 // ============================================================
 // E. QC (CONTROLE QUALITE)
 // ============================================================
 
 model QCRequest {
-  id          String   @id @default(cuid())
-  orderId     String
-  type        QCType   @default(PRE_SHIPMENT)
-  status      QCStatus @default(PENDING)
-  inspector   String?
-  cost        Decimal? @db.Decimal(15, 2)
-  currency    String   @default("USD")
-  scheduledAt DateTime?
-  completedAt DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                 String    @id @default(cuid())
+  orderId            String
+  type               QCType    @default(PRE_SHIPMENT)
+  level              QCLevel   @default(VIRTUAL)
+  status             QCStatus  @default(PENDING)
+  inspector          String?
+  partnerId          String?
+  supplierId         String?
+  productId          String?
+  cost               Decimal?  @db.Decimal(15, 2)
+  currency           String    @default("USD")
+  scheduledAt        DateTime?
+  completedAt        DateTime?
+  decisionNotes      String?
+  clientApprovedAt   DateTime?
+  clientApprovedById String?
+  lotNumber          String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
-  order   Order      @relation(fields: [orderId], references: [id])
-  reports QCReport[]
+  order            Order           @relation(fields: [orderId], references: [id])
+  partner          Contact?        @relation("QcPartner", fields: [partnerId], references: [id])
+  supplier         Supplier?       @relation(fields: [supplierId], references: [id])
+  product          CatalogProduct? @relation(fields: [productId], references: [id])
+  clientApprovedBy User?           @relation("QcClientApprovedBy", fields: [clientApprovedById], references: [id])
+  reports          QCReport[]
+  labTests         QcLabTest[]
 
   @@index([orderId])
+  @@index([partnerId])
+  @@index([supplierId])
+  @@index([productId])
   @@map("qc_requests")
+}
+
+enum QCLevel {
+  VIRTUAL
+  PHYSICAL
+  EXTREME
 }
 
 enum QCType {
@@ -693,23 +1628,36 @@ enum QCStatus {
 }
 
 model QCReport {
-  id             String   @id @default(cuid())
-  qcRequestId    String
-  productId      String?
-  supplierId     String?
-  overallResult  String
-  defectRate     Decimal? @db.Decimal(5, 2)
-  photos         Json     @default("[]")
-  findings       Json     @default("[]")
-  recommendation String?
-  createdAt      DateTime @default(now())
+  id                 String    @id @default(cuid())
+  qcRequestId        String
+  productId          String?
+  supplierId         String?
+  overallResult      String
+  defectRate         Decimal?  @db.Decimal(5, 2)
+  photos             Json      @default("[]")
+  videos             Json      @default("[]")
+  packagingVideo     String?
+  quantityConfirmed  Boolean?
+  qualityConfirmed   Boolean?
+  packagingConfirmed Boolean?
+  findings           Json      @default("[]")
+  recommendation     String?
+  summary            String?
+  sharedWithClient   Boolean   @default(false)
+  sharedAt           DateTime?
+  sharedById         String?
+  createdAt          DateTime  @default(now())
 
   qcRequest       QCRequest         @relation(fields: [qcRequestId], references: [id])
   product         CatalogProduct?   @relation(fields: [productId], references: [id])
+  supplier        Supplier?         @relation(fields: [supplierId], references: [id])
+  sharedBy        User?             @relation("QcReportSharedBy", fields: [sharedById], references: [id])
   nonConformities QCNonConformity[]
 
   @@index([qcRequestId])
   @@index([productId])
+  @@index([supplierId])
+  @@index([sharedWithClient])
   @@map("qc_reports")
 }
 
@@ -723,10 +1671,37 @@ model QCNonConformity {
   resolution  String?
   createdAt   DateTime @default(now())
 
+  aiDetected    Boolean  @default(false)
+  aiConfidence  Decimal? @db.Decimal(3, 2)
+  aiRawResponse Json?
+
   report QCReport @relation(fields: [reportId], references: [id])
 
   @@index([reportId])
   @@map("qc_non_conformities")
+}
+
+model QcPartnerProfile {
+  id               String   @id @default(cuid())
+  tenantId         String
+  contactId        String   @unique
+  city             String?
+  specialties      String[] @default([])
+  leadTimeDays     Int?
+  basePrice        Decimal? @db.Decimal(15, 2)
+  priceGrid        Json     @default("{}") // {category: {VIRTUAL: 20, PHYSICAL: 100, EXTREME: 0}}
+  rating           Int      @default(50)
+  totalInspections Int      @default(0)
+  passRate         Decimal? @db.Decimal(5, 2)
+  notes            String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id])
+  contact Contact @relation(fields: [contactId], references: [id])
+
+  @@index([tenantId])
+  @@map("qc_partner_profiles")
 }
 
 // ============================================================
@@ -734,20 +1709,26 @@ model QCNonConformity {
 // ============================================================
 
 model FreightPartner {
-  id          String   @id @default(cuid())
-  name        String
-  type        String
-  country     String
-  contactName String?
-  phone       String?
-  email       String?
-  wechat      String?
-  rating      Int      @default(50)
-  notes       String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                 String   @id @default(cuid())
+  name               String
+  type               String
+  country            String
+  city               String?
+  contactName        String?
+  phone              String?
+  email              String?
+  wechat             String?
+  whatsapp           String?
+  website            String?
+  address            String?
+  rating             Int      @default(50)
+  contactsJson       Json     @default("{}")
+  serviceProfileJson Json     @default("{}")
+  notes              String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
-  shipments Shipment[]
+  shipments            Shipment[]
   customerSupplyChains CustomerSupplyChain[]
 
   @@map("freight_partners")
@@ -760,12 +1741,25 @@ model Shipment {
   status               ShipmentStatus @default(PENDING)
   freightPartnerId     String?
   consolidationBatchId String?
+  groupageBatchId      String?
   origin               String         @default("Guangzhou")
   destination          String         @default("Pointe-Noire")
+  trackingProvider     String?
+  trackingNumber       String?
+  trackingStatus       String?
+  trackingUrl          String?
+  lastTrackingSyncAt   DateTime?
   containerNumber      String?
   blNumber             String?
   weight               Decimal?       @db.Decimal(10, 2)
   volume               Decimal?       @db.Decimal(10, 4)
+  lengthCm             Decimal?       @db.Decimal(10, 2)
+  widthCm              Decimal?       @db.Decimal(10, 2)
+  heightCm             Decimal?       @db.Decimal(10, 2)
+  volumetricWeightKg   Decimal?       @db.Decimal(10, 3)
+  chargeableWeightKg   Decimal?       @db.Decimal(10, 3)
+  proofImageUrl        String?
+  weightValidatedAt    DateTime?
   estimatedDeparture   DateTime?
   actualDeparture      DateTime?
   estimatedArrival     DateTime?
@@ -775,13 +1769,20 @@ model Shipment {
   createdAt            DateTime       @default(now())
   updatedAt            DateTime       @updatedAt
 
-  order              Order               @relation(fields: [orderId], references: [id])
-  freightPartner     FreightPartner?     @relation(fields: [freightPartnerId], references: [id])
-  consolidationBatch ConsolidationBatch? @relation(fields: [consolidationBatchId], references: [id])
+  order              Order                 @relation(fields: [orderId], references: [id])
+  freightPartner     FreightPartner?       @relation(fields: [freightPartnerId], references: [id])
+  consolidationBatch ConsolidationBatch?   @relation(fields: [consolidationBatchId], references: [id])
+  groupageBatch      GroupageBatch?        @relation(fields: [groupageBatchId], references: [id])
   trackingEvents     TrackingEvent[]
   customsClearance   CustomsClearance?
+  aiInsight          ShipmentAIInsight?
+  costLines          ShipmentCostLine[]
+  incidents          ShipmentIncident[]
+  portalTokens       ShipmentPortalToken[]
+  warehouseReceipt   WarehouseReceipt?
 
   @@index([orderId])
+  @@index([groupageBatchId])
   @@map("shipments")
 }
 
@@ -863,6 +1864,92 @@ enum CustomsStatus {
   REJECTED
 }
 
+enum LogisticsRiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum IncidentStatus {
+  OPEN
+  INVESTIGATING
+  RESOLVED
+  ESCALATED
+  CLOSED
+}
+
+enum PortalRole {
+  CLIENT
+  CARRIER
+}
+
+model ShipmentAIInsight {
+  id                 String             @id @default(cuid())
+  shipmentId         String             @unique
+  predictedArrival   DateTime?
+  predictedDelayDays Int?
+  riskScore          Int                @default(50)
+  riskLevel          LogisticsRiskLevel @default(MEDIUM)
+  factors            Json               @default("[]")
+  calculatedAt       DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  shipment Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  @@map("shipment_ai_insights")
+}
+
+model ShipmentCostLine {
+  id         String   @id @default(cuid())
+  shipmentId String
+  type       String
+  amount     Decimal  @db.Decimal(15, 2)
+  currency   String   @default("USD")
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  shipment Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  @@index([shipmentId])
+  @@map("shipment_cost_lines")
+}
+
+model ShipmentIncident {
+  id          String             @id @default(cuid())
+  shipmentId  String
+  type        String
+  severity    LogisticsRiskLevel @default(MEDIUM)
+  status      IncidentStatus     @default(OPEN)
+  description String
+  resolution  String?
+  amount      Decimal?           @db.Decimal(15, 2)
+  currency    String             @default("USD")
+  createdAt   DateTime           @default(now())
+  resolvedAt  DateTime?
+  updatedAt   DateTime           @updatedAt
+
+  shipment Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  @@index([shipmentId])
+  @@map("shipment_incidents")
+}
+
+model ShipmentPortalToken {
+  id         String     @id @default(cuid())
+  shipmentId String
+  token      String     @unique
+  role       PortalRole @default(CLIENT)
+  expiresAt  DateTime?
+  createdAt  DateTime   @default(now())
+
+  shipment Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  @@index([shipmentId])
+  @@map("shipment_portal_tokens")
+}
+
 // ============================================================
 // G. FINANCE
 // ============================================================
@@ -874,11 +1961,12 @@ model LedgerAccount {
   name      String
   type      AccountType
   currency  String      @default("XAF")
-  balance   Decimal     @db.Decimal(15, 2) @default(0)
+  balance   Decimal     @default(0) @db.Decimal(15, 2)
   createdAt DateTime    @default(now())
 
-  tenant  Tenant        @relation(fields: [tenantId], references: [id])
-  entries LedgerEntry[]
+  tenant       Tenant        @relation(fields: [tenantId], references: [id])
+  entries      LedgerEntry[]
+  journalLines JournalLine[]
 
   @@unique([tenantId, code])
   @@map("ledger_accounts")
@@ -893,20 +1981,23 @@ enum AccountType {
 }
 
 model LedgerEntry {
-  id          String   @id @default(cuid())
-  accountId   String
-  orderId     String?
-  type        String
-  amount      Decimal  @db.Decimal(15, 2)
-  currency    String
-  description String
-  reference   String?
-  createdAt   DateTime @default(now())
+  id           String   @id @default(cuid())
+  accountId    String
+  orderId      String?
+  costCenterId String?
+  type         String
+  amount       Decimal  @db.Decimal(15, 2)
+  currency     String
+  description  String
+  reference    String?
+  createdAt    DateTime @default(now())
 
-  account LedgerAccount @relation(fields: [accountId], references: [id])
+  account    LedgerAccount @relation(fields: [accountId], references: [id])
+  costCenter CostCenter?   @relation(fields: [costCenterId], references: [id])
 
   @@index([accountId])
   @@index([orderId])
+  @@index([costCenterId])
   @@map("ledger_entries")
 }
 
@@ -920,8 +2011,14 @@ model Payment {
   currency    String
   amountXAF   Decimal          @db.Decimal(15, 2)
   fxRate      Decimal?         @db.Decimal(12, 6)
+  methodKey   PaymentMethod?
   method      String?
   reference   String?
+  proofUrl    String?
+  depositCode String?          @unique
+  expiresAt   DateTime?
+  proofUploadedAt DateTime?
+  dueAt       DateTime?
   paidAt      DateTime?
   confirmedAt DateTime?
   notes       String?
@@ -950,10 +2047,24 @@ enum PaymentType {
   REFUND
 }
 
+enum PaymentMethod {
+  MOBILE_MONEY_MTN
+  MOBILE_MONEY_AIRTEL
+  CARD_VISA
+  CARD_MASTERCARD
+  WIRE_TRANSFER
+  CASH_DEPOSIT
+  AGGREGATOR
+}
+
 enum PaymentStatus {
   PENDING
+  PENDING_PROOF
+  PROOF_UPLOADED
+  PROOF_REJECTED
   PROCESSING
   CONFIRMED
+  EXPIRED
   FAILED
   CANCELLED
   REFUNDED
@@ -977,9 +2088,15 @@ model MarginReport {
   orderId       String   @unique
   revenue       Decimal  @db.Decimal(15, 2)
   cogs          Decimal  @db.Decimal(15, 2)
+  freightCost   Decimal  @default(0) @db.Decimal(15, 2)
+  qcCost        Decimal  @default(0) @db.Decimal(15, 2)
+  customsDuties Decimal  @default(0) @db.Decimal(15, 2)
+  protectionFee Decimal  @default(0) @db.Decimal(15, 2)
   commission    Decimal  @db.Decimal(15, 2)
   grossMargin   Decimal  @db.Decimal(15, 2)
   marginPercent Decimal  @db.Decimal(5, 2)
+  netMargin     Decimal  @default(0) @db.Decimal(15, 2)
+  netMarginPct  Decimal  @default(0) @db.Decimal(5, 2)
   currency      String   @default("XAF")
   calculatedAt  DateTime @default(now())
 
@@ -989,7 +2106,774 @@ model MarginReport {
 }
 
 // ============================================================
-// H. TASK ENGINE (CENTRALISE) — Enterprise + AI-Agent Ready
+// G2. FINANCE - ADVANCED
+// ============================================================
+
+model AccountingPeriod {
+  id         String                 @id @default(cuid())
+  tenantId   String
+  name       String
+  startAt    DateTime
+  endAt      DateTime
+  status     AccountingPeriodStatus @default(OPEN)
+  closedAt   DateTime?
+  closedById String?
+  createdAt  DateTime               @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, status])
+  @@map("accounting_periods")
+}
+
+enum AccountingPeriodStatus {
+  OPEN
+  CLOSED
+}
+
+model Journal {
+  id        String      @id @default(cuid())
+  tenantId  String
+  code      String
+  name      String
+  type      JournalType @default(GENERAL)
+  isActive  Boolean     @default(true)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  tenant  Tenant         @relation(fields: [tenantId], references: [id])
+  entries JournalEntry[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, type])
+  @@map("journals")
+}
+
+enum JournalType {
+  GENERAL
+  SALES
+  PURCHASE
+  CASH
+  BANK
+  ADJUSTMENT
+}
+
+model JournalEntry {
+  id         String             @id @default(cuid())
+  tenantId   String
+  journalId  String
+  periodId   String?
+  reference  String?
+  memo       String?
+  status     JournalEntryStatus @default(DRAFT)
+  postedAt   DateTime?
+  postedById String?
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+
+  tenant  Tenant        @relation(fields: [tenantId], references: [id])
+  journal Journal       @relation(fields: [journalId], references: [id])
+  lines   JournalLine[]
+
+  @@index([tenantId, journalId])
+  @@index([periodId])
+  @@map("journal_entries")
+}
+
+enum JournalEntryStatus {
+  DRAFT
+  POSTED
+  REVERSED
+}
+
+model JournalLine {
+  id          String         @id @default(cuid())
+  entryId     String
+  accountId   String
+  type        LedgerLineType
+  amount      Decimal        @db.Decimal(15, 2)
+  currency    String
+  fxRate      Decimal?       @db.Decimal(12, 6)
+  description String?
+  orderId     String?
+  paymentId   String?
+  invoiceId   String?
+  createdAt   DateTime       @default(now())
+
+  entry   JournalEntry  @relation(fields: [entryId], references: [id])
+  account LedgerAccount @relation(fields: [accountId], references: [id])
+
+  @@index([entryId])
+  @@index([accountId])
+  @@map("journal_lines")
+}
+
+enum LedgerLineType {
+  DEBIT
+  CREDIT
+}
+
+model Invoice {
+  id             String           @id @default(cuid())
+  tenantId       String
+  direction      InvoiceDirection
+  status         InvoiceStatus    @default(DRAFT)
+  invoiceNumber  String
+  contactId      String?
+  supplierId     String?
+  orderId        String?
+  currency       String           @default("XAF")
+  subtotal       Decimal          @default(0) @db.Decimal(15, 2)
+  taxTotal       Decimal          @default(0) @db.Decimal(15, 2)
+  total          Decimal          @default(0) @db.Decimal(15, 2)
+  issuedAt       DateTime?
+  dueAt          DateTime?
+  paidAt         DateTime?
+  notes          String?
+  externalStatus String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  tenant    Tenant            @relation(fields: [tenantId], references: [id])
+  contact   Contact?          @relation(fields: [contactId], references: [id])
+  supplier  Supplier?         @relation(fields: [supplierId], references: [id])
+  order     Order?            @relation(fields: [orderId], references: [id])
+  lines     InvoiceLine[]
+  schedules InvoiceSchedule[]
+  reminders InvoiceReminder[]
+
+  @@unique([tenantId, invoiceNumber])
+  @@index([tenantId, status])
+  @@map("invoices")
+}
+
+enum InvoiceDirection {
+  AR
+  AP
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PARTIAL
+  PAID
+  OVERDUE
+  VOID
+}
+
+model InvoiceLine {
+  id          String   @id @default(cuid())
+  invoiceId   String
+  description String
+  quantity    Int      @default(1)
+  unitPrice   Decimal  @db.Decimal(15, 2)
+  taxRate     Decimal? @db.Decimal(5, 2)
+  total       Decimal  @db.Decimal(15, 2)
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+  @@map("invoice_lines")
+}
+
+model InvoiceSchedule {
+  id        String           @id @default(cuid())
+  invoiceId String
+  dueAt     DateTime
+  amount    Decimal          @db.Decimal(15, 2)
+  status    InvoicePayStatus @default(PENDING)
+  paidAt    DateTime?
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+  @@map("invoice_schedules")
+}
+
+enum InvoicePayStatus {
+  PENDING
+  PAID
+  OVERDUE
+}
+
+model InvoiceReminder {
+  id        String   @id @default(cuid())
+  invoiceId String
+  channel   String
+  status    String   @default("SENT")
+  sentAt    DateTime @default(now())
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+  @@map("invoice_reminders")
+}
+
+model FinanceApproval {
+  id            String         @id @default(cuid())
+  tenantId      String
+  workflowId    String         @default(cuid())
+  sequence      Int            @default(1)
+  entityType    String
+  entityId      String
+  ruleId        String?
+  requiredRole  UserRole?
+  status        ApprovalStatus @default(PENDING)
+  requestedById String
+  approvedById  String?
+  escalatedById String?
+  dueAt         DateTime?
+  escalatedAt   DateTime?
+  approvedAt    DateTime?
+  notes         String?
+  createdAt     DateTime       @default(now())
+
+  tenant      Tenant               @relation(fields: [tenantId], references: [id])
+  rule        FinanceApprovalRule? @relation(fields: [ruleId], references: [id])
+  requestedBy User                 @relation("FinanceApprovalRequestedBy", fields: [requestedById], references: [id])
+  approvedBy  User?                @relation("FinanceApprovalApprovedBy", fields: [approvedById], references: [id])
+  escalatedBy User?                @relation("FinanceApprovalEscalatedBy", fields: [escalatedById], references: [id])
+
+  @@index([tenantId, entityType, status])
+  @@index([workflowId, sequence])
+  @@map("finance_approvals")
+}
+
+model FinanceApprovalRule {
+  id           String   @id @default(cuid())
+  tenantId     String
+  entityType   String
+  name         String
+  minAmountXAF Decimal  @default(0) @db.Decimal(15, 2)
+  sequence     Int      @default(1)
+  requiredRole UserRole
+  slaHours     Int      @default(24)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant    Tenant            @relation(fields: [tenantId], references: [id])
+  approvals FinanceApproval[]
+
+  @@index([tenantId, entityType, sequence])
+  @@map("finance_approval_rules")
+}
+
+model BudgetPlan {
+  id        String       @id @default(cuid())
+  tenantId  String
+  name      String
+  year      Int
+  status    BudgetStatus @default(DRAFT)
+  currency  String       @default("XAF")
+  total     Decimal      @default(0) @db.Decimal(15, 2)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  tenant Tenant       @relation(fields: [tenantId], references: [id])
+  lines  BudgetLine[]
+
+  @@index([tenantId, year])
+  @@map("budget_plans")
+}
+
+enum BudgetStatus {
+  DRAFT
+  ACTIVE
+  CLOSED
+}
+
+model BudgetLine {
+  id           String  @id @default(cuid())
+  budgetId     String
+  category     String
+  costCenterId String?
+  month        Int?
+  amount       Decimal @db.Decimal(15, 2)
+
+  budget     BudgetPlan  @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  costCenter CostCenter? @relation(fields: [costCenterId], references: [id])
+
+  @@index([budgetId])
+  @@index([costCenterId])
+  @@map("budget_lines")
+}
+
+model ForecastScenario {
+  id        String       @id @default(cuid())
+  tenantId  String
+  name      String
+  type      ForecastType @default(BASE)
+  createdAt DateTime     @default(now())
+
+  tenant Tenant         @relation(fields: [tenantId], references: [id])
+  lines  ForecastLine[]
+
+  @@index([tenantId, type])
+  @@map("forecast_scenarios")
+}
+
+enum ForecastType {
+  BASE
+  OPTIMISTIC
+  PESSIMISTIC
+}
+
+model ForecastLine {
+  id         String  @id @default(cuid())
+  scenarioId String
+  month      String
+  revenue    Decimal @default(0) @db.Decimal(15, 2)
+  cogs       Decimal @default(0) @db.Decimal(15, 2)
+  expenses   Decimal @default(0) @db.Decimal(15, 2)
+  cashIn     Decimal @default(0) @db.Decimal(15, 2)
+  cashOut    Decimal @default(0) @db.Decimal(15, 2)
+
+  scenario ForecastScenario @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+
+  @@index([scenarioId])
+  @@map("forecast_lines")
+}
+
+model CashPlan {
+  id        String         @id @default(cuid())
+  tenantId  String
+  name      String
+  status    CashPlanStatus @default(DRAFT)
+  startAt   DateTime
+  endAt     DateTime
+  currency  String         @default("XAF")
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  tenant Tenant         @relation(fields: [tenantId], references: [id])
+  lines  CashPlanLine[]
+
+  @@index([tenantId, status])
+  @@map("cash_plans")
+}
+
+enum CashPlanStatus {
+  DRAFT
+  ACTIVE
+  CLOSED
+}
+
+model CashPlanLine {
+  id          String   @id @default(cuid())
+  planId      String
+  date        DateTime
+  direction   String
+  amount      Decimal  @db.Decimal(15, 2)
+  description String?
+
+  plan CashPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([planId])
+  @@map("cash_plan_lines")
+}
+
+model LegalEntity {
+  id           String   @id @default(cuid())
+  tenantId     String
+  name         String
+  country      String?
+  baseCurrency String   @default("XAF")
+  taxId        String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  tenant             Tenant              @relation(fields: [tenantId], references: [id])
+  consolidationLines ConsolidationLine[]
+
+  @@index([tenantId])
+  @@map("legal_entities")
+}
+
+model ConsolidationRun {
+  id           String              @id @default(cuid())
+  tenantId     String
+  periodId     String?
+  status       ConsolidationStatus @default(DRAFT)
+  baseCurrency String              @default("XAF")
+  notes        String?
+  createdAt    DateTime            @default(now())
+  completedAt  DateTime?
+
+  tenant Tenant              @relation(fields: [tenantId], references: [id])
+  lines  ConsolidationLine[]
+
+  @@index([tenantId, status])
+  @@map("consolidation_runs")
+}
+
+enum ConsolidationStatus {
+  DRAFT
+  RUNNING
+  CLOSED
+}
+
+model ConsolidationLine {
+  id       String  @id @default(cuid())
+  runId    String
+  entityId String
+  metric   String
+  amount   Decimal @db.Decimal(15, 2)
+  currency String
+
+  run    ConsolidationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  entity LegalEntity      @relation(fields: [entityId], references: [id])
+
+  @@index([runId])
+  @@map("consolidation_lines")
+}
+
+model TaxRate {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  rate      Decimal  @db.Decimal(5, 2)
+  type      String   @default("VAT")
+  country   String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@map("tax_rates")
+}
+
+model TaxReport {
+  id          String          @id @default(cuid())
+  tenantId    String
+  periodId    String?
+  type        String
+  status      TaxReportStatus @default(DRAFT)
+  totalTax    Decimal         @default(0) @db.Decimal(15, 2)
+  currency    String          @default("XAF")
+  periodStart DateTime?
+  periodEnd   DateTime?
+  filedAt     DateTime?
+  dueAt       DateTime?
+  createdAt   DateTime        @default(now())
+
+  tenant Tenant    @relation(fields: [tenantId], references: [id])
+  lines  TaxLine[]
+
+  @@index([tenantId, status])
+  @@map("tax_reports")
+}
+
+enum TaxReportStatus {
+  DRAFT
+  FILED
+  PAID
+}
+
+model TaxLine {
+  id        String  @id @default(cuid())
+  reportId  String
+  name      String
+  base      Decimal @db.Decimal(15, 2)
+  taxAmount Decimal @db.Decimal(15, 2)
+
+  report TaxReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId])
+  @@map("tax_lines")
+}
+
+model BankConnection {
+  id             String               @id @default(cuid())
+  tenantId       String
+  provider       String
+  status         BankConnectionStatus @default(ACTIVE)
+  accountName    String?
+  accountNumber  String?
+  currency       String               @default("XAF")
+  apiBaseUrl     String?
+  clientId       String?
+  clientSecret   String?
+  accessToken    String?
+  refreshToken   String?
+  tokenExpiresAt DateTime?
+  webhookSecret  String?
+  lastError      String?
+  lastSyncAt     DateTime?
+  createdAt      DateTime             @default(now())
+
+  tenant       Tenant            @relation(fields: [tenantId], references: [id])
+  transactions BankTransaction[]
+
+  @@index([tenantId, status])
+  @@map("bank_connections")
+}
+
+enum BankConnectionStatus {
+  ACTIVE
+  DISCONNECTED
+  ERROR
+}
+
+model BankTransaction {
+  id               String                @id @default(cuid())
+  connectionId     String
+  occurredAt       DateTime
+  amount           Decimal               @db.Decimal(15, 2)
+  currency         String
+  direction        String
+  counterparty     String?
+  category         String?
+  description      String?
+  reference        String?
+  status           BankTransactionStatus @default(PENDING)
+  matchedPaymentId String?
+  matchScore       Decimal?              @db.Decimal(5, 2)
+  matchMethod      String?
+  metadata         Json                  @default("{}")
+  createdAt        DateTime              @default(now())
+
+  connection BankConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@index([connectionId, status])
+  @@map("bank_transactions")
+}
+
+enum BankTransactionStatus {
+  PENDING
+  POSTED
+  RECONCILED
+}
+
+model BankReconciliation {
+  id           String    @id @default(cuid())
+  tenantId     String
+  periodId     String?
+  status       String    @default("OPEN")
+  reconciledAt DateTime?
+  createdById  String?
+  createdAt    DateTime  @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@map("bank_reconciliations")
+}
+
+model CostCenter {
+  id          String   @id @default(cuid())
+  tenantId    String
+  code        String
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+
+  tenant        Tenant        @relation(fields: [tenantId], references: [id])
+  ledgerEntries LedgerEntry[]
+  budgetLines   BudgetLine[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("cost_centers")
+}
+
+model AssetCategory {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  code      String?
+  createdAt DateTime @default(now())
+
+  tenant Tenant       @relation(fields: [tenantId], references: [id])
+  assets FixedAsset[]
+
+  @@index([tenantId])
+  @@map("asset_categories")
+}
+
+enum DepreciationMethod {
+  STRAIGHT_LINE
+}
+
+enum AssetStatus {
+  ACTIVE
+  DISPOSED
+  PAUSED
+}
+
+model FixedAsset {
+  id                      String             @id @default(cuid())
+  tenantId                String
+  categoryId              String?
+  name                    String
+  acquisitionDate         DateTime
+  acquisitionCost         Decimal            @db.Decimal(15, 2)
+  currency                String             @default("XAF")
+  usefulLifeMonths        Int
+  salvageValue            Decimal            @default(0) @db.Decimal(15, 2)
+  depreciationMethod      DepreciationMethod @default(STRAIGHT_LINE)
+  accumulatedDepreciation Decimal            @default(0) @db.Decimal(15, 2)
+  netBookValue            Decimal            @default(0) @db.Decimal(15, 2)
+  status                  AssetStatus        @default(ACTIVE)
+  createdAt               DateTime           @default(now())
+
+  tenant        Tenant              @relation(fields: [tenantId], references: [id])
+  category      AssetCategory?      @relation(fields: [categoryId], references: [id])
+  depreciations AssetDepreciation[]
+
+  @@index([tenantId])
+  @@index([categoryId])
+  @@map("fixed_assets")
+}
+
+model AssetDepreciation {
+  id        String   @id @default(cuid())
+  tenantId  String
+  assetId   String
+  period    String
+  amount    Decimal  @db.Decimal(15, 2)
+  createdAt DateTime @default(now())
+
+  tenant Tenant     @relation(fields: [tenantId], references: [id])
+  asset  FixedAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([assetId])
+  @@map("asset_depreciations")
+}
+
+enum PayrollRunStatus {
+  DRAFT
+  PROCESSING
+  CLOSED
+  PAID
+}
+
+enum PayrollLineStatus {
+  PENDING
+  PAID
+}
+
+model PayrollProfile {
+  id          String   @id @default(cuid())
+  tenantId    String
+  userId      String   @unique
+  baseSalary  Decimal  @db.Decimal(15, 2)
+  currency    String   @default("XAF")
+  bankAccount String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@unique([tenantId, userId])
+  @@index([tenantId])
+  @@map("payroll_profiles")
+}
+
+model PayrollRun {
+  id          String           @id @default(cuid())
+  tenantId    String
+  periodStart DateTime
+  periodEnd   DateTime
+  status      PayrollRunStatus @default(DRAFT)
+  totalGross  Decimal          @default(0) @db.Decimal(15, 2)
+  totalNet    Decimal          @default(0) @db.Decimal(15, 2)
+  createdById String?
+  createdAt   DateTime         @default(now())
+
+  tenant    Tenant        @relation(fields: [tenantId], references: [id])
+  createdBy User?         @relation("PayrollRunCreatedBy", fields: [createdById], references: [id])
+  lines     PayrollLine[]
+
+  @@index([tenantId])
+  @@map("payroll_runs")
+}
+
+model PayrollLine {
+  id         String            @id @default(cuid())
+  runId      String
+  userId     String
+  baseSalary Decimal           @db.Decimal(15, 2)
+  allowances Decimal           @default(0) @db.Decimal(15, 2)
+  deductions Decimal           @default(0) @db.Decimal(15, 2)
+  gross      Decimal           @default(0) @db.Decimal(15, 2)
+  net        Decimal           @default(0) @db.Decimal(15, 2)
+  status     PayrollLineStatus @default(PENDING)
+  paidAt     DateTime?
+
+  run  PayrollRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  user User       @relation(fields: [userId], references: [id])
+
+  @@index([runId])
+  @@index([userId])
+  @@map("payroll_lines")
+}
+
+model MarketData {
+  id        String   @id @default(cuid())
+  tenantId  String
+  symbol    String
+  name      String?
+  type      String?
+  lastPrice Decimal  @db.Decimal(15, 4)
+  changePct Decimal? @db.Decimal(7, 2)
+  updatedAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@map("market_data")
+}
+
+model Exposure {
+  id           String       @id @default(cuid())
+  tenantId     String
+  type         ExposureType
+  currency     String?
+  amount       Decimal      @db.Decimal(15, 2)
+  counterparty String?
+  dueAt        DateTime?
+  status       String       @default("OPEN")
+  createdAt    DateTime     @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, type])
+  @@map("exposures")
+}
+
+enum ExposureType {
+  FX
+  CUSTOMER
+  SUPPLIER
+}
+
+model RiskMetric {
+  id        String         @id @default(cuid())
+  tenantId  String
+  type      RiskMetricType
+  value     Decimal        @db.Decimal(15, 4)
+  status    String         @default("OK")
+  createdAt DateTime       @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, type])
+  @@map("risk_metrics")
+}
+
+enum RiskMetricType {
+  FX
+  CREDIT
+  LIQUIDITY
+  MARKET
+}
+
+// ============================================================
+// H. TASK ENGINE (CENTRALISE) â€” Enterprise + AI-Agent Ready
 // ============================================================
 
 model Task {
@@ -1014,16 +2898,16 @@ model Task {
   createdAt         DateTime   @default(now())
   updatedAt         DateTime   @updatedAt
 
-  // Subtasks — self-relation
+  // Subtasks â€” self-relation
   parentTaskId String?
-  parent       Task?  @relation("TaskSubtasks", fields: [parentTaskId], references: [id])
-  children     Task[] @relation("TaskSubtasks")
-  position     Int    @default(0) // ordering in lists/kanban
+  parent       Task?   @relation("TaskSubtasks", fields: [parentTaskId], references: [id])
+  children     Task[]  @relation("TaskSubtasks")
+  position     Int     @default(0) // ordering in lists/kanban
 
   // Project / Sprint link
-  projectId      String?
-  sprintId       String?
-  storyPoints    Int?
+  projectId   String?
+  sprintId    String?
+  storyPoints Int?
 
   // Template & scheduling
   templateId     String?
@@ -1035,24 +2919,28 @@ model Task {
   // Tags (simple array)
   tags String[] @default([])
 
+  // Custom fields (flexible JSON for per-module metadata)
+  customFields Json? @default("{}")
+
   // AI Agent fields
   agentId   String? // which agent is executing
   agentName String? // human-readable agent name
 
-  tenant           Tenant            @relation(fields: [tenantId], references: [id])
-  order            Order?            @relation(fields: [entityId], references: [id])
-  project          Project?          @relation(fields: [projectId], references: [id])
-  sprint           Sprint?           @relation(fields: [sprintId], references: [id])
-  assignments      TaskAssignment[]
-  approvals        Approval[]
-  comments         TaskComment[]
-  watchers         TaskWatcher[]
-  agentExecutions  AgentExecution[]
-  attachments      TaskAttachment[]
-  timeEntries      TaskTimeEntry[]
+  tenant          Tenant           @relation(fields: [tenantId], references: [id])
+  order           Order?           @relation(fields: [entityId], references: [id])
+  project         Project?         @relation(fields: [projectId], references: [id])
+  sprint          Sprint?          @relation(fields: [sprintId], references: [id])
+  assignments     TaskAssignment[]
+  approvals       Approval[]
+  comments        TaskComment[]
+  watchers        TaskWatcher[]
+  agentExecutions AgentExecution[]
+  attachments     TaskAttachment[]
+  timeEntries     TaskTimeEntry[]
+  checklists      TaskChecklist[]
   // Dependencies
-  dependencies     TaskDependency[]  @relation("TaskDependencies")
-  dependents       TaskDependency[]  @relation("TaskDependents")
+  dependencies    TaskDependency[] @relation("TaskDependencies")
+  dependents      TaskDependency[] @relation("TaskDependents")
 
   @@index([tenantId, status])
   @@index([tenantId, module])
@@ -1114,7 +3002,7 @@ enum ApprovalDecision {
   ESCALATED
 }
 
-// ── Task Comments (dedicated model, not AuditLog) ──────────────
+// â”€â”€ Task Comments (dedicated model, not AuditLog) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 model TaskComment {
   id        String   @id @default(cuid())
@@ -1125,14 +3013,48 @@ model TaskComment {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [id])
+  task      Task                  @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user      User                  @relation(fields: [userId], references: [id])
+  reactions TaskCommentReaction[]
 
   @@index([taskId, createdAt])
   @@map("task_comments")
 }
 
-// ── Task Attachments ──────────────────────────────────────────
+// â”€â”€ Task Comment Reactions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+model TaskCommentReaction {
+  id        String   @id @default(cuid())
+  commentId String
+  userId    String
+  emoji     String
+  createdAt DateTime @default(now())
+
+  comment TaskComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user    User        @relation(fields: [userId], references: [id])
+
+  @@unique([commentId, userId, emoji])
+  @@map("task_comment_reactions")
+}
+
+// â”€â”€ Task Checklists â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+model TaskChecklist {
+  id        String   @id @default(cuid())
+  taskId    String
+  text      String
+  checked   Boolean  @default(false)
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@map("task_checklists")
+}
+
+// â”€â”€ Task Attachments â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 model TaskAttachment {
   id        String   @id @default(cuid())
@@ -1141,7 +3063,7 @@ model TaskAttachment {
   name      String
   url       String
   type      String   @default("link") // link, file, image, document
-  size      Int?     // bytes
+  size      Int? // bytes
   createdAt DateTime @default(now())
 
   task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
@@ -1151,7 +3073,7 @@ model TaskAttachment {
   @@map("task_attachments")
 }
 
-// ── Task Watchers ──────────────────────────────────────────────
+// â”€â”€ Task Watchers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 model TaskWatcher {
   id     String @id @default(cuid())
@@ -1165,14 +3087,14 @@ model TaskWatcher {
   @@map("task_watchers")
 }
 
-// ── Task Dependencies (DAG) ────────────────────────────────────
+// â”€â”€ Task Dependencies (DAG) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 model TaskDependency {
-  id           String         @id @default(cuid())
-  taskId       String
-  dependsOnId  String
-  type         DependencyType @default(BLOCKS)
-  createdAt    DateTime       @default(now())
+  id          String         @id @default(cuid())
+  taskId      String
+  dependsOnId String
+  type        DependencyType @default(BLOCKS)
+  createdAt   DateTime       @default(now())
 
   task      Task @relation("TaskDependencies", fields: [taskId], references: [id], onDelete: Cascade)
   dependsOn Task @relation("TaskDependents", fields: [dependsOnId], references: [id], onDelete: Cascade)
@@ -1182,35 +3104,35 @@ model TaskDependency {
 }
 
 enum DependencyType {
-  BLOCKS   // dependsOn must complete before task can start
+  BLOCKS // dependsOn must complete before task can start
   REQUIRES // dependsOn must complete before task can complete
-  RELATED  // informational link
+  RELATED // informational link
 }
 
-// ── Task Templates ─────────────────────────────────────────────
+// â”€â”€ Task Templates â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 model TaskTemplate {
-  id                  String   @id @default(cuid())
-  tenantId            String
-  name                String
-  description         String?
-  module              String
-  taskType            String
-  titleTemplate       String   // e.g. "Vérifier QC pour {{orderNumber}}"
-  descriptionTemplate String?
-  defaultPriority     Priority @default(NORMAL)
-  defaultSlaHours     Int?
-  defaultTags         String[] @default([])
-  requiresApproval    Boolean  @default(false)
-  automationAllowed   Boolean  @default(false)
-  ownerType           OwnerType @default(HUMAN)
+  id                    String    @id @default(cuid())
+  tenantId              String
+  name                  String
+  description           String?
+  module                String
+  taskType              String
+  titleTemplate         String // e.g. "VÃ©rifier QC pour {{orderNumber}}"
+  descriptionTemplate   String?
+  defaultPriority       Priority  @default(NORMAL)
+  defaultSlaHours       Int?
+  defaultTags           String[]  @default([])
+  requiresApproval      Boolean   @default(false)
+  automationAllowed     Boolean   @default(false)
+  ownerType             OwnerType @default(HUMAN)
   // Subtask definitions as JSON array: [{title, priority, slaHours, module}]
-  subtaskDefinitions  Json     @default("[]")
+  subtaskDefinitions    Json      @default("[]")
   // Dependency definitions as JSON: [{fromStep, toStep, type}]
-  dependencyDefinitions Json   @default("[]")
-  isActive            Boolean  @default(true)
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  dependencyDefinitions Json      @default("[]")
+  isActive              Boolean   @default(true)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   tenant        Tenant         @relation(fields: [tenantId], references: [id])
   recurringTask RecurringTask?
@@ -1219,13 +3141,13 @@ model TaskTemplate {
   @@map("task_templates")
 }
 
-// ── Recurring Tasks ────────────────────────────────────────────
+// â”€â”€ Recurring Tasks â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 model RecurringTask {
   id             String    @id @default(cuid())
   tenantId       String
   templateId     String    @unique
-  cronExpression String    // e.g. "0 9 * * 1" (Mon 9am)
+  cronExpression String // e.g. "0 9 * * 1" (Mon 9am)
   timezone       String    @default("Africa/Brazzaville")
   nextRunAt      DateTime?
   lastRunAt      DateTime?
@@ -1240,16 +3162,16 @@ model RecurringTask {
   @@map("recurring_tasks")
 }
 
-// ── AI Agent Execution Log ─────────────────────────────────────
+// â”€â”€ AI Agent Execution Log â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 model AgentExecution {
   id          String               @id @default(cuid())
   taskId      String
-  agentId     String               // unique agent identifier
-  agentName   String               // human-readable name
+  agentId     String // unique agent identifier
+  agentName   String // human-readable name
   status      AgentExecutionStatus @default(QUEUED)
-  input       Json?                // context passed to agent
-  output      Json?                // result from agent
+  input       Json? // context passed to agent
+  output      Json? // result from agent
   error       String?
   startedAt   DateTime?
   completedAt DateTime?
@@ -1270,7 +3192,68 @@ enum AgentExecutionStatus {
   CANCELLED
 }
 
-// ── Notifications ──────────────────────────────────────────────
+// â”€â”€ Saved Filters (Named Views) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+model SavedFilter {
+  id         String   @id @default(cuid())
+  tenantId   String
+  userId     String
+  name       String
+  entityType String   @default("tasks")
+  filters    Json     @default("{}")
+  isShared   Boolean  @default(false)
+  isDefault  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@index([tenantId, entityType])
+  @@index([userId, entityType])
+  @@map("saved_filters")
+}
+
+// â”€â”€ Goals / OKRs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+model Goal {
+  id          String    @id @default(cuid())
+  tenantId    String
+  title       String
+  description String?
+  ownerId     String?
+  status      String    @default("ON_TRACK")
+  targetDate  DateTime?
+  progress    Float     @default(0)
+  isArchived  Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id])
+  owner      User?       @relation("GoalOwner", fields: [ownerId], references: [id])
+  keyResults KeyResult[]
+
+  @@index([tenantId])
+  @@map("goals")
+}
+
+model KeyResult {
+  id        String   @id @default(cuid())
+  goalId    String
+  title     String
+  target    Float
+  current   Float    @default(0)
+  unit      String   @default("%")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  goal Goal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  @@index([goalId])
+  @@map("key_results")
+}
+
+// â”€â”€ Notifications â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 model Notification {
   id         String           @id @default(cuid())
@@ -1279,7 +3262,7 @@ model Notification {
   type       NotificationType
   title      String
   message    String?
-  entityType String?          // "task", "order", etc.
+  entityType String? // "task", "order", etc.
   entityId   String?
   read       Boolean          @default(false)
   readAt     DateTime?
@@ -1441,7 +3424,7 @@ model InboundIntent {
   category        String?
   urgency         String    @default("normal")
   budgetHint      String?
-  confidence      Decimal   @db.Decimal(3, 2) @default(0)
+  confidence      Decimal   @default(0) @db.Decimal(3, 2)
   routedTo        String?
   processedAt     DateTime?
   createdAt       DateTime  @default(now())
@@ -1549,6 +3532,11 @@ model ProductCategory {
   name      String
   slug      String?
   parentId  String?
+  averageDensityRatio       Decimal? @db.Decimal(12, 4)
+  averageRealityCoefficient Decimal? @db.Decimal(8, 4)
+  averageBufferedWeightKg   Decimal? @db.Decimal(10, 2)
+  historicalSampleCount     Int      @default(0)
+  lastMemoryUpdatedAt       DateTime?
   createdAt DateTime @default(now())
 
   tenant   Tenant            @relation(fields: [tenantId], references: [id])
@@ -1561,41 +3549,70 @@ model ProductCategory {
 }
 
 model CatalogProduct {
-  id                  String        @id @default(cuid())
-  tenantId            String
-  name                String
-  categoryId          String?
-  status              ProductStatus @default(TESTING)
-  specsJson           Json          @default("{}") // dimensions, matériaux, compatibilités, packaging
-  mediaIds            Json          @default("[]")
-  weightEstimate      Decimal?      @db.Decimal(10, 2)
-  volumeEstimate      Decimal?      @db.Decimal(10, 4)
-  qcRecommendedLevel  String?       // VIRTUAL, PRE_SHIPMENT, EXTREME
-  demandScore         Int           @default(0)
-  moqMin              Int?
-  priceMin            Decimal?      @db.Decimal(15, 2)
-  priceMax            Decimal?      @db.Decimal(15, 2)
-  priceCurrency       String        @default("RMB")
-  averageMargin       Decimal?      @db.Decimal(5, 2)
-  averageLeadTime     Int?          // en jours
-  lastOrderedAt       DateTime?
-  shippingHints       Json          @default("{}") // fragile, batteries, restrictions
-  marketingPack       Json          @default("{}") // textes, prix indicatif, hook, CTA
-  notes               String?
-  createdAt           DateTime      @default(now())
-  updatedAt           DateTime      @updatedAt
+  id                         String        @id @default(cuid())
+  tenantId                   String
+  name                       String
+  categoryId                 String?
+  status                     ProductStatus @default(TESTING)
+  aliasesJson                Json          @default("[]")
+  searchKeywordsJson         Json          @default("[]")
+  matchingFingerprint        String?
+  specsJson                  Json          @default("{}") // dimensions, mat????riaux, compatibilit????s, packaging
+  mediaIds                   Json          @default("[]")
+  weightEstimate             Decimal?      @db.Decimal(10, 2)
+  volumeEstimate             Decimal?      @db.Decimal(10, 4)
+  qcRecommendedLevel         String? // VIRTUAL, PRE_SHIPMENT, EXTREME
+  demandScore                Int           @default(0)
+  moqMin                     Int?
+  priceMin                   Decimal?      @db.Decimal(15, 2)
+  priceMax                   Decimal?      @db.Decimal(15, 2)
+  priceCurrency              String        @default("RMB")
+  averageMargin              Decimal?      @db.Decimal(5, 2)
+  averageLeadTime            Int? // en jours
+  preferredPlatform          String?
+  preferredSupplierId        String?
+  preferredSupplierProductId String?
+  weightedAverageCost        Decimal?      @db.Decimal(15, 2)
+  estimatedCost              Decimal?      @db.Decimal(15, 2)
+  lastActualCost             Decimal?      @db.Decimal(15, 2)
+  recommendedSellPrice       Decimal?      @db.Decimal(15, 2)
+  averageRealityCoefficient  Decimal?      @db.Decimal(8, 4)
+  savingsVsIndicatifPct      Decimal?      @db.Decimal(8, 2)
+  priceVolatilityPct         Decimal?      @db.Decimal(8, 2)
+  defaultRiskBufferPct       Decimal?      @db.Decimal(5, 2)
+  defaultHiddenMarginPct     Decimal?      @db.Decimal(5, 2)
+  historicalOrderCount       Int           @default(0)
+  successfulOrderCount       Int           @default(0)
+  stableOrderCount           Int           @default(0)
+  catalogConfidenceScore     Int           @default(0)
+  isCertified                Boolean       @default(false)
+  certifiedAt                DateTime?
+  lastQuotedAt               DateTime?
+  lastPurchasedAt            DateTime?
+  lastVerifiedAt             DateTime?
+  lastPriceAlertAt           DateTime?
+  lastOrderedAt              DateTime?
+  shippingHints              Json          @default("{}") // fragile, batteries, restrictions
+  marketingPack              Json          @default("{}") // textes, prix indicatif, hook, CTA
+  notes                      String?
+  createdAt                  DateTime      @default(now())
+  updatedAt                  DateTime      @updatedAt
 
-  tenant           Tenant            @relation(fields: [tenantId], references: [id])
-  category         ProductCategory?  @relation(fields: [categoryId], references: [id])
-  supplierProducts SupplierProduct[]
-  orderItems       OrderItem[]
-  offers           Offer[]
-  qcReports        QCReport[]
-  media            CatalogMedia[]
+  tenant                  Tenant                   @relation(fields: [tenantId], references: [id])
+  category                ProductCategory?         @relation(fields: [categoryId], references: [id])
+  supplierProducts        SupplierProduct[]
+  orderItems              OrderItem[]
+  offers                  Offer[]
+  qcReports               QCReport[]
+  qcRequests              QCRequest[]
+  media                   CatalogMedia[]
+  sourcingHistory         CatalogSourcingHistory[]
+  sourcingTicketsAsMatch  SourcingTicket[]         @relation("SourcingTicketProduct")
 
   @@index([tenantId])
   @@index([tenantId, status])
   @@index([tenantId, categoryId])
+  @@index([tenantId, matchingFingerprint])
   @@map("catalog_products")
 }
 
@@ -1622,8 +3639,8 @@ model SupplierProduct {
   createdAt        DateTime              @default(now())
   updatedAt        DateTime              @updatedAt
 
-  supplier Supplier        @relation(fields: [supplierId], references: [id])
-  product  CatalogProduct  @relation(fields: [productId], references: [id])
+  supplier Supplier       @relation(fields: [supplierId], references: [id])
+  product  CatalogProduct @relation(fields: [productId], references: [id])
   offers   Offer[]
 
   @@unique([supplierId, productId])
@@ -1632,24 +3649,66 @@ model SupplierProduct {
   @@map("supplier_products")
 }
 
+model CatalogSourcingHistory {
+  id                    String   @id @default(cuid())
+  tenantId              String
+  productId             String
+  supplierId            String?
+  orderId               String?
+  orderItemId           String?
+  sourceType            String   @default("DELIVERED_ORDER")
+  sourcePlatform        String?
+  quotedUnitPrice       Decimal? @db.Decimal(15, 2)
+  quotedCurrency        String?
+  actualUnitPrice       Decimal? @db.Decimal(15, 2)
+  actualCurrency        String?
+  actualUnitPriceXAF    Decimal? @db.Decimal(15, 2)
+  quotedSellPriceXAF    Decimal? @db.Decimal(15, 2)
+  quantity              Int      @default(1)
+  realityCoefficient    Decimal? @db.Decimal(8, 4)
+  savingsVsIndicatifPct Decimal? @db.Decimal(8, 2)
+  actualWeightKg        Decimal? @db.Decimal(10, 2)
+  actualVolumeCbm       Decimal? @db.Decimal(10, 4)
+  actualLengthCm        Decimal? @db.Decimal(10, 2)
+  actualWidthCm         Decimal? @db.Decimal(10, 2)
+  actualHeightCm        Decimal? @db.Decimal(10, 2)
+  volumetricWeightKg    Decimal? @db.Decimal(10, 3)
+  chargeableWeightKg    Decimal? @db.Decimal(10, 3)
+  proofImageUrl         String?
+  leadTimeDays          Int?
+  qualityOutcome        String?
+  deliveryOutcome       String?
+  wasSuccessful         Boolean  @default(true)
+  notes                 String?
+  createdAt             DateTime @default(now())
+
+  tenant  Tenant         @relation(fields: [tenantId], references: [id])
+  product CatalogProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, productId])
+  @@index([productId, createdAt])
+  @@index([supplierId])
+  @@map("catalog_sourcing_history")
+}
+
 enum SupplierProductStatus {
   ACTIVE
   PAUSED
 }
 
 model CatalogMedia {
-  id               String    @id @default(cuid())
+  id               String   @id @default(cuid())
   tenantId         String
-  type             String    // image, video, pdf, document
+  type             String // image, video, pdf, document
   url              String
   filename         String?
-  tags             Json      @default("[]")
-  linkedEntityType String    // product, supplier, order, qc_report
+  tags             Json     @default("[]")
+  linkedEntityType String // product, supplier, order, qc_report
   linkedEntityId   String
   productId        String?
   supplierId       String?
   orderId          String?
-  createdAt        DateTime  @default(now())
+  createdAt        DateTime @default(now())
 
   tenant   Tenant          @relation(fields: [tenantId], references: [id])
   product  CatalogProduct? @relation(fields: [productId], references: [id])
@@ -1663,13 +3722,13 @@ model CatalogMedia {
 }
 
 model KnowledgePack {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   tenantId    String
-  version     Int      @default(1)
-  content     Json     @default("{}") // top suppliers, top products, playbooks, benchmarks
-  status      String   @default("draft") // draft, published
+  version     Int       @default(1)
+  content     Json      @default("{}") // top suppliers, top products, playbooks, benchmarks
+  status      String    @default("draft") // draft, published
   publishedAt DateTime?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime  @default(now())
 
   @@index([tenantId])
   @@map("knowledge_packs")
@@ -1680,23 +3739,24 @@ model KnowledgePack {
 // ============================================================
 
 model CustomerFinancialMetrics {
-  id                    String   @id @default(cuid())
-  contactId             String   @unique
-  lifetimeGrossRevenue  Decimal  @db.Decimal(15, 2) @default(0)
-  lifetimeNetProfit     Decimal  @db.Decimal(15, 2) @default(0)
-  averageMarginPercent  Decimal  @db.Decimal(5, 2) @default(0)
-  cashAtRisk            Decimal  @db.Decimal(15, 2) @default(0) // money in China/transit/customs
-  daysOfCashImmobil     Int      @default(0) // DCI
-  customerAcqCost       Decimal? @db.Decimal(15, 2) // CAC
-  paybackPeriodDays     Int?
-  contributionScore     Decimal  @db.Decimal(5, 2) @default(0) // importance to cashflow (0-100)
-  totalOrdersCount      Int      @default(0)
-  avgOrderValue         Decimal  @db.Decimal(15, 2) @default(0)
-  lastOrderDate         DateTime?
-  calculatedAt          DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  id                   String    @id @default(cuid())
+  contactId            String    @unique
+  lifetimeGrossRevenue Decimal   @default(0) @db.Decimal(15, 2)
+  lifetimeNetProfit    Decimal   @default(0) @db.Decimal(15, 2)
+  averageMarginPercent Decimal   @default(0) @db.Decimal(5, 2)
+  cashAtRisk           Decimal   @default(0) @db.Decimal(15, 2) // money in China/transit/customs
+  daysOfCashImmobil    Int       @default(0) // DCI
+  customerAcqCost      Decimal?  @db.Decimal(15, 2) // CAC
+  paybackPeriodDays    Int?
+  contributionScore    Decimal   @default(0) @db.Decimal(5, 2) // importance to cashflow (0-100)
+  totalOrdersCount     Int       @default(0)
+  avgOrderValue        Decimal   @default(0) @db.Decimal(15, 2)
+  lastOrderDate        DateTime?
+  calculatedAt         DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
-  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contact         Contact          @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  whatsappIntents WhatsappIntent[]
 
   @@index([contactId])
   @@map("customer_financial_metrics")
@@ -1709,10 +3769,10 @@ model CustomerRiskProfile {
   paymentRisk           Int      @default(50) // 0-100
   logisticsRisk         Int      @default(50)
   customsRisk           Int      @default(50)
-  disputeFrequency      Decimal  @db.Decimal(5, 2) @default(0) // disputes per order
-  supplierReliability   Decimal  @db.Decimal(5, 2) @default(50)
+  disputeFrequency      Decimal  @default(0) @db.Decimal(5, 2) // disputes per order
+  supplierReliability   Decimal  @default(50) @db.Decimal(5, 2)
   countryRegulatoryRisk Int      @default(50)
-  cashExposure          Decimal  @db.Decimal(15, 2) @default(0) // Horion money at risk
+  cashExposure          Decimal  @default(0) @db.Decimal(15, 2) // Horion money at risk
   riskBadges            Json     @default("[]") // ["LOW_RISK", "CASH_RISK", "SUPPLY_RISK", etc.]
   riskFactors           Json     @default("{}") // detailed risk breakdown
   calculatedAt          DateTime @default(now())
@@ -1726,22 +3786,23 @@ model CustomerRiskProfile {
 }
 
 model CustomerPipelineIntent {
-  id                String    @id @default(cuid())
-  contactId         String
-  productCategory   String?
-  productName       String?
+  id                 String    @id @default(cuid())
+  contactId          String
+  productCategory    String?
+  productName        String?
   estimatedOrderDate DateTime?
-  estimatedSize     Decimal?  @db.Decimal(15, 2)
-  currency          String    @default("XAF")
-  probability       Decimal   @db.Decimal(3, 2) @default(0.5) // 0.0-1.0
-  expectedRevenue   Decimal   @db.Decimal(15, 2) @default(0) // size * probability
-  source            String?   // whatsapp, crm, website, etc.
-  notes             String?
-  status            String    @default("active") // active, converted, lost
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  estimatedSize      Decimal?  @db.Decimal(15, 2)
+  currency           String    @default("XAF")
+  probability        Decimal   @default(0.5) @db.Decimal(3, 2) // 0.0-1.0
+  expectedRevenue    Decimal   @default(0) @db.Decimal(15, 2) // size * probability
+  source             String? // whatsapp, crm, website, etc.
+  notes              String?
+  status             String    @default("active") // active, converted, lost
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
-  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contact         Contact          @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  whatsappIntents WhatsappIntent[]
 
   @@index([contactId])
   @@index([contactId, status])
@@ -1749,22 +3810,22 @@ model CustomerPipelineIntent {
 }
 
 model CustomerAIProfile {
-  id                       String   @id @default(cuid())
-  contactId                String   @unique
-  buyingPersonality        String?  // price_driven, quality_driven, urgent, seasonal
-  negotiationStyle         String?  // aggressive, collaborative, passive
-  sensitivityToDelays      String?  // low, medium, high
-  priceElasticity          String?  // low, medium, high
-  recommendedPricingStrategy String?
-  recommendedPaymentTerms  String?
+  id                           String   @id @default(cuid())
+  contactId                    String   @unique
+  buyingPersonality            String? // price_driven, quality_driven, urgent, seasonal
+  negotiationStyle             String? // aggressive, collaborative, passive
+  sensitivityToDelays          String? // low, medium, high
+  priceElasticity              String? // low, medium, high
+  recommendedPricingStrategy   String?
+  recommendedPaymentTerms      String?
   recommendedLogisticsStrategy String?
-  upsellSuggestions        Json     @default("[]")
-  crossSellSuggestions     Json     @default("[]")
-  behavioralInsights       Json     @default("{}")
-  predictedChurnRisk       Decimal? @db.Decimal(3, 2) // 0.0-1.0
-  predictedLTV             Decimal? @db.Decimal(15, 2)
-  calculatedAt             DateTime @default(now())
-  updatedAt                DateTime @updatedAt
+  upsellSuggestions            Json     @default("[]")
+  crossSellSuggestions         Json     @default("[]")
+  behavioralInsights           Json     @default("{}")
+  predictedChurnRisk           Decimal? @db.Decimal(3, 2) // 0.0-1.0
+  predictedLTV                 Decimal? @db.Decimal(15, 2)
+  calculatedAt                 DateTime @default(now())
+  updatedAt                    DateTime @updatedAt
 
   contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
 
@@ -1773,22 +3834,22 @@ model CustomerAIProfile {
 }
 
 model CustomerSupplyChain {
-  id                   String   @id @default(cuid())
-  contactId            String
-  supplierId           String
-  transitPartnerId     String?
-  route                String?  // e.g. "Guangzhou-Pointe-Noire"
-  ordersCount          Int      @default(0)
-  avgDelayDays         Decimal? @db.Decimal(5, 2)
-  qcIssuesCount        Int      @default(0)
-  customsIssuesCount   Int      @default(0)
-  reliabilityScore     Decimal  @db.Decimal(5, 2) @default(50)
-  lastUsedAt           DateTime?
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  id                 String    @id @default(cuid())
+  contactId          String
+  supplierId         String
+  transitPartnerId   String?
+  route              String? // e.g. "Guangzhou-Pointe-Noire"
+  ordersCount        Int       @default(0)
+  avgDelayDays       Decimal?  @db.Decimal(5, 2)
+  qcIssuesCount      Int       @default(0)
+  customsIssuesCount Int       @default(0)
+  reliabilityScore   Decimal   @default(50) @db.Decimal(5, 2)
+  lastUsedAt         DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
-  contact     Contact         @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  supplier    Supplier        @relation(fields: [supplierId], references: [id])
+  contact        Contact         @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  supplier       Supplier        @relation(fields: [supplierId], references: [id])
   transitPartner FreightPartner? @relation(fields: [transitPartnerId], references: [id])
 
   @@unique([contactId, supplierId])
@@ -1809,12 +3870,12 @@ enum CustomerSegment {
 }
 
 model CustomerSegmentation {
-  id        String          @id @default(cuid())
-  contactId String
-  segment   CustomerSegment
-  score     Decimal         @db.Decimal(5, 2) @default(0) // relevance score
-  assignedAt DateTime       @default(now())
-  notes     String?
+  id         String          @id @default(cuid())
+  contactId  String
+  segment    CustomerSegment
+  score      Decimal         @default(0) @db.Decimal(5, 2) // relevance score
+  assignedAt DateTime        @default(now())
+  notes      String?
 
   contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
 
@@ -1832,18 +3893,18 @@ model SupplierFinancialMetrics {
   id                     String    @id @default(cuid())
   supplierId             String    @unique
   totalOrdersCount       Int       @default(0)
-  lifetimeSpend          Decimal   @db.Decimal(15, 2) @default(0)
-  totalPaymentsOut       Decimal   @db.Decimal(15, 2) @default(0)
-  avgOrderValue          Decimal   @db.Decimal(15, 2) @default(0)
+  lifetimeSpend          Decimal   @default(0) @db.Decimal(15, 2)
+  totalPaymentsOut       Decimal   @default(0) @db.Decimal(15, 2)
+  avgOrderValue          Decimal   @default(0) @db.Decimal(15, 2)
   lastOrderDate          DateTime?
-  spendConcentration     Decimal   @db.Decimal(5, 2) @default(0)
-  supplierDependency     Decimal   @db.Decimal(5, 2) @default(0)
-  priceTrendDirection    String?   // INCREASING, DECREASING, STABLE
+  spendConcentration     Decimal   @default(0) @db.Decimal(5, 2)
+  supplierDependency     Decimal   @default(0) @db.Decimal(5, 2)
+  priceTrendDirection    String? // INCREASING, DECREASING, STABLE
   priceTrendPercent      Decimal?  @db.Decimal(5, 2)
-  savingsRealized        Decimal   @db.Decimal(15, 2) @default(0)
-  avgNegotiationDiscount Decimal   @db.Decimal(5, 2) @default(0)
-  costEfficiencyScore    Decimal   @db.Decimal(5, 2) @default(50)
-  totalCostOfOwnership   Decimal   @db.Decimal(15, 2) @default(0)
+  savingsRealized        Decimal   @default(0) @db.Decimal(15, 2)
+  avgNegotiationDiscount Decimal   @default(0) @db.Decimal(5, 2)
+  costEfficiencyScore    Decimal   @default(50) @db.Decimal(5, 2)
+  totalCostOfOwnership   Decimal   @default(0) @db.Decimal(15, 2)
   calculatedAt           DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
 
@@ -1854,26 +3915,26 @@ model SupplierFinancialMetrics {
 }
 
 model SupplierPerformanceProfile {
-  id                    String    @id @default(cuid())
-  supplierId            String    @unique
-  onTimeDeliveryRate    Decimal   @db.Decimal(5, 2) @default(0)
-  avgLeadTimeDays       Decimal?  @db.Decimal(5, 2)
-  leadTimeVariance      Decimal?  @db.Decimal(5, 2)
-  earlyDeliveryCount    Int       @default(0)
-  lateDeliveryCount     Int       @default(0)
-  avgDelayDays          Decimal?  @db.Decimal(5, 2)
-  qualityScore          Decimal   @db.Decimal(5, 2) @default(50)
-  qcPassRate            Decimal   @db.Decimal(5, 2) @default(0)
-  defectRate            Decimal   @db.Decimal(5, 2) @default(0)
-  qcIssuesCount         Int       @default(0)
-  disputeRate           Decimal   @db.Decimal(5, 2) @default(0)
-  disputeResolutionDays Decimal?  @db.Decimal(5, 2)
-  incidentCount         Int       @default(0)
-  responseTimeHours     Decimal?  @db.Decimal(5, 2)
-  communicationScore    Decimal   @db.Decimal(5, 2) @default(50)
-  reliabilityIndex      Decimal   @db.Decimal(5, 2) @default(50)
-  calculatedAt          DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  id                    String   @id @default(cuid())
+  supplierId            String   @unique
+  onTimeDeliveryRate    Decimal  @default(0) @db.Decimal(5, 2)
+  avgLeadTimeDays       Decimal? @db.Decimal(5, 2)
+  leadTimeVariance      Decimal? @db.Decimal(5, 2)
+  earlyDeliveryCount    Int      @default(0)
+  lateDeliveryCount     Int      @default(0)
+  avgDelayDays          Decimal? @db.Decimal(5, 2)
+  qualityScore          Decimal  @default(50) @db.Decimal(5, 2)
+  qcPassRate            Decimal  @default(0) @db.Decimal(5, 2)
+  defectRate            Decimal  @default(0) @db.Decimal(5, 2)
+  qcIssuesCount         Int      @default(0)
+  disputeRate           Decimal  @default(0) @db.Decimal(5, 2)
+  disputeResolutionDays Decimal? @db.Decimal(5, 2)
+  incidentCount         Int      @default(0)
+  responseTimeHours     Decimal? @db.Decimal(5, 2)
+  communicationScore    Decimal  @default(50) @db.Decimal(5, 2)
+  reliabilityIndex      Decimal  @default(50) @db.Decimal(5, 2)
+  calculatedAt          DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
   supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
 
@@ -1883,25 +3944,25 @@ model SupplierPerformanceProfile {
 }
 
 model SupplierRiskProfile {
-  id                     String   @id @default(cuid())
-  supplierId             String   @unique
-  globalRiskScore        Int      @default(50)
-  concentrationRisk      Int      @default(50)
-  qualityRisk            Int      @default(50)
-  deliveryRisk           Int      @default(50)
-  financialRisk          Int      @default(50)
-  geopoliticalRisk       Int      @default(50)
-  complianceRisk         Int      @default(50)
-  outstandingOrdersValue Decimal  @db.Decimal(15, 2) @default(0)
-  cashAtRisk             Decimal  @db.Decimal(15, 2) @default(0)
-  riskBadges             Json     @default("[]")
-  riskFactors            Json     @default("{}")
-  mitigationActions      Json     @default("[]")
-  blacklistHistory       Boolean  @default(false)
-  suspensionCount        Int      @default(0)
+  id                     String    @id @default(cuid())
+  supplierId             String    @unique
+  globalRiskScore        Int       @default(50)
+  concentrationRisk      Int       @default(50)
+  qualityRisk            Int       @default(50)
+  deliveryRisk           Int       @default(50)
+  financialRisk          Int       @default(50)
+  geopoliticalRisk       Int       @default(50)
+  complianceRisk         Int       @default(50)
+  outstandingOrdersValue Decimal   @default(0) @db.Decimal(15, 2)
+  cashAtRisk             Decimal   @default(0) @db.Decimal(15, 2)
+  riskBadges             Json      @default("[]")
+  riskFactors            Json      @default("{}")
+  mitigationActions      Json      @default("[]")
+  blacklistHistory       Boolean   @default(false)
+  suspensionCount        Int       @default(0)
   lastIncidentDate       DateTime?
-  calculatedAt           DateTime @default(now())
-  updatedAt              DateTime @updatedAt
+  calculatedAt           DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
 
   supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
 
@@ -1911,27 +3972,27 @@ model SupplierRiskProfile {
 }
 
 model SupplierAIProfile {
-  id                         String    @id @default(cuid())
-  supplierId                 String    @unique
-  supplierPersonality        String?   // PRICE_FLEXIBLE, RIGID, QUALITY_FOCUSED, VOLUME_DRIVEN
-  negotiationLeverage        String?   // HIGH, MEDIUM, LOW
-  responsiveness             String?   // FAST, MEDIUM, SLOW
-  strategicValue             String?   // STRATEGIC_PARTNER, COMMODITY, BOTTLENECK, LEVERAGE
-  supplierPowerScore         Decimal   @db.Decimal(5, 2) @default(50)
-  recommendedStrategy        String?   // CONSOLIDATE, DIVERSIFY, NEGOTIATE, DEVELOP, EXIT
-  consolidationOpportunities Json      @default("[]")
-  alternativeSuggestions     Json      @default("[]")
-  predictedPriceDirection    String?   // UP, DOWN, STABLE
-  predictedPriceChange       Decimal?  @db.Decimal(5, 2)
-  churnRiskScore             Decimal?  @db.Decimal(3, 2)
-  optimalOrderSize           Decimal?  @db.Decimal(15, 2)
-  optimalOrderFrequency      String?   // WEEKLY, MONTHLY, QUARTERLY
-  estimatedAnnualValue       Decimal?  @db.Decimal(15, 2)
-  strengthFactors            Json      @default("[]")
-  weaknessFactors            Json      @default("[]")
-  behavioralInsights         Json      @default("{}")
-  calculatedAt               DateTime  @default(now())
-  updatedAt                  DateTime  @updatedAt
+  id                         String   @id @default(cuid())
+  supplierId                 String   @unique
+  supplierPersonality        String? // PRICE_FLEXIBLE, RIGID, QUALITY_FOCUSED, VOLUME_DRIVEN
+  negotiationLeverage        String? // HIGH, MEDIUM, LOW
+  responsiveness             String? // FAST, MEDIUM, SLOW
+  strategicValue             String? // STRATEGIC_PARTNER, COMMODITY, BOTTLENECK, LEVERAGE
+  supplierPowerScore         Decimal  @default(50) @db.Decimal(5, 2)
+  recommendedStrategy        String? // CONSOLIDATE, DIVERSIFY, NEGOTIATE, DEVELOP, EXIT
+  consolidationOpportunities Json     @default("[]")
+  alternativeSuggestions     Json     @default("[]")
+  predictedPriceDirection    String? // UP, DOWN, STABLE
+  predictedPriceChange       Decimal? @db.Decimal(5, 2)
+  churnRiskScore             Decimal? @db.Decimal(3, 2)
+  optimalOrderSize           Decimal? @db.Decimal(15, 2)
+  optimalOrderFrequency      String? // WEEKLY, MONTHLY, QUARTERLY
+  estimatedAnnualValue       Decimal? @db.Decimal(15, 2)
+  strengthFactors            Json     @default("[]")
+  weaknessFactors            Json     @default("[]")
+  behavioralInsights         Json     @default("{}")
+  calculatedAt               DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
 
   supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
 
@@ -1957,7 +4018,7 @@ model SupplierSegmentation {
   id         String          @id @default(cuid())
   supplierId String
   segment    SupplierSegment
-  score      Decimal         @db.Decimal(5, 2) @default(0)
+  score      Decimal         @default(0) @db.Decimal(5, 2)
   assignedAt DateTime        @default(now())
   notes      String?
 
@@ -1970,7 +4031,7 @@ model SupplierSegmentation {
 }
 
 // ============================================================
-// M. PROJECT OS — Projects, Sprints, Milestones, Budget, Time
+// M. PROJECT OS â€” Projects, Sprints, Milestones, Budget, Time
 // ============================================================
 
 enum ProjectStatus {
@@ -2005,24 +4066,24 @@ enum ProjectRole {
 }
 
 model Project {
-  id          String        @id @default(cuid())
-  tenantId    String
-  name        String
-  description String?
-  status      ProjectStatus @default(PLANNING)
-  ownerId     String?
-  color       String        @default("#6366f1") // display color
-  icon        String?                           // emoji or icon key
-  startDate   DateTime?
-  endDate     DateTime?
-  completedAt DateTime?
+  id             String        @id @default(cuid())
+  tenantId       String
+  name           String
+  description    String?
+  status         ProjectStatus @default(PLANNING)
+  ownerId        String?
+  color          String        @default("#6366f1") // display color
+  icon           String? // emoji or icon key
+  startDate      DateTime?
+  endDate        DateTime?
+  completedAt    DateTime?
   // Budget
-  budgetTotal  Decimal? @db.Decimal(15, 2)
-  budgetCurrency String @default("XAF")
+  budgetTotal    Decimal?      @db.Decimal(15, 2)
+  budgetCurrency String        @default("XAF")
   // Settings
-  settings    Json     @default("{}") // { velocityTarget, sprintLength, ... }
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  settings       Json          @default("{}") // { velocityTarget, sprintLength, ... }
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
   tenant     Tenant          @relation(fields: [tenantId], references: [id])
   members    ProjectMember[]
@@ -2031,6 +4092,7 @@ model Project {
   sprints    Sprint[]
   budgets    Budget[]
   tasks      Task[]
+  orders     Order[]
 
   @@index([tenantId, status])
   @@index([ownerId])
@@ -2038,13 +4100,13 @@ model Project {
 }
 
 model ProjectMember {
-  id        String      @id @default(cuid())
-  projectId String
-  userId    String
-  role      ProjectRole @default(MEMBER)
-  hourlyRate Decimal?   @db.Decimal(10, 2)  // XAF/h for cost calculation
-  currency   String     @default("XAF")
-  joinedAt  DateTime    @default(now())
+  id         String      @id @default(cuid())
+  projectId  String
+  userId     String
+  role       ProjectRole @default(MEMBER)
+  hourlyRate Decimal?    @db.Decimal(10, 2) // XAF/h for cost calculation
+  currency   String      @default("XAF")
+  joinedAt   DateTime    @default(now())
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   user    User    @relation(fields: [userId], references: [id])
@@ -2097,7 +4159,7 @@ model Sprint {
   status    SprintStatus @default(PLANNING)
   startDate DateTime?
   endDate   DateTime?
-  velocity  Int?         // story points completed
+  velocity  Int? // story points completed
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
 
@@ -2109,16 +4171,16 @@ model Sprint {
 }
 
 model Budget {
-  id         String   @id @default(cuid())
-  projectId  String
-  category   String   // LABOR, EXTERNAL, TOOLS, TRAVEL, OTHER
-  label      String
-  planned    Decimal  @db.Decimal(15, 2)
-  actual     Decimal  @db.Decimal(15, 2) @default(0)
-  currency   String   @default("XAF")
-  notes      String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id        String   @id @default(cuid())
+  projectId String
+  category  String // LABOR, EXTERNAL, TOOLS, TRAVEL, OTHER
+  label     String
+  planned   Decimal  @db.Decimal(15, 2)
+  actual    Decimal  @default(0) @db.Decimal(15, 2)
+  currency  String   @default("XAF")
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
@@ -2126,14 +4188,14 @@ model Budget {
   @@map("budgets")
 }
 
-// ── Time Entries (per-task, per-user, with billing) ─────────────
+// â”€â”€ Time Entries (per-task, per-user, with billing) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 model TaskTimeEntry {
   id          String    @id @default(cuid())
   taskId      String
   userId      String
   description String?
-  minutes     Int       // duration in minutes
+  minutes     Int // duration in minutes
   startedAt   DateTime
   endedAt     DateTime?
   hourlyRate  Decimal?  @db.Decimal(10, 2) // snapshot of rate at time of entry
@@ -2153,4 +4215,1293 @@ model TaskTimeEntry {
   @@index([userId, startedAt])
   @@index([startedAt])
   @@map("task_time_entries")
+}
+
+// ============================================================
+// O. WHATSAPP OS Ã¢â‚¬â€ Conversations, Intents, Templates, Campaigns
+// ============================================================
+
+enum WhatsappChannelType {
+  GROUP
+  BROADCAST
+}
+
+enum WhatsappConversationStatus {
+  OPEN
+  PENDING
+  CLOSED
+}
+
+enum WhatsappConversationPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum WhatsappMessageDirection {
+  IN
+  OUT
+}
+
+enum WhatsappMessageType {
+  TEXT
+  IMAGE
+  DOCUMENT
+  VIDEO
+  AUDIO
+  TEMPLATE
+}
+
+enum WhatsappTemplateStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+}
+
+enum WhatsappCampaignStatus {
+  DRAFT
+  SCHEDULED
+  RUNNING
+  COMPLETED
+  CANCELLED
+}
+
+enum WhatsappIntentScore {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum WhatsappIntentStatus {
+  DETECTED
+  QUALIFIED
+  TRANSFERRED
+  WON
+  LOST
+}
+
+enum WhatsappLeadStage {
+  DETECTED
+  CONTACTED
+  QUALIFIED
+  TRANSFERRED
+  WON
+  LOST
+}
+
+enum WhatsappSendStatus {
+  PENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+model WhatsappAccount {
+  id             String   @id @default(cuid())
+  tenantId       String
+  provider       String   @default("waha")
+  phoneNumberId  String?
+  displayName    String?
+  wabaId         String?
+  status         String   @default("active")
+  rateLimitsJson Json     @default("{}")
+  webhookSecret  String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant        Tenant                 @relation(fields: [tenantId], references: [id])
+  channels      WhatsappChannel[]
+  conversations WhatsappConversation[]
+  webhookEvents WhatsappWebhookEvent[]
+
+  @@index([tenantId])
+  @@index([phoneNumberId])
+  @@map("whatsapp_accounts")
+}
+
+model WhatsappChannel {
+  id            String              @id @default(cuid())
+  tenantId      String
+  accountId     String
+  type          WhatsappChannelType
+  name          String
+  externalId    String?
+  category      String?
+  membersCount  Int                 @default(0)
+  status        String              @default("active")
+  lastMessageAt DateTime?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  tenant  Tenant                @relation(fields: [tenantId], references: [id])
+  account WhatsappAccount       @relation(fields: [accountId], references: [id])
+  members WhatsappGroupMember[]
+
+  @@index([tenantId, type])
+  @@index([accountId])
+  @@map("whatsapp_channels")
+}
+
+model WhatsappGroupMember {
+  id          String   @id @default(cuid())
+  channelId   String
+  waContactId String
+  role        String   @default("member")
+  joinedAt    DateTime @default(now())
+
+  channel WhatsappChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  contact WhatsappContact @relation(fields: [waContactId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, waContactId])
+  @@index([waContactId])
+  @@map("whatsapp_group_members")
+}
+
+model WhatsappContact {
+  id              String    @id @default(cuid())
+  tenantId        String
+  phone           String
+  name            String?
+  avatarUrl       String?
+  country         String    @default("CG")
+  linkedContactId String?
+  lastSeenAt      DateTime?
+  createdAt       DateTime  @default(now())
+
+  tenant           Tenant                 @relation(fields: [tenantId], references: [id])
+  linkedContact    Contact?               @relation(fields: [linkedContactId], references: [id])
+  conversations    WhatsappConversation[]
+  groupMemberships WhatsappGroupMember[]
+  campaigns        WhatsappCampaignSend[]
+  intents          WhatsappIntent[]
+  leads            WhatsappLeadPipeline[]
+
+  @@unique([tenantId, phone])
+  @@index([linkedContactId])
+  @@map("whatsapp_contacts")
+}
+
+model WhatsappConversation {
+  id             String                       @id @default(cuid())
+  tenantId       String
+  accountId      String
+  waContactId    String
+  status         WhatsappConversationStatus   @default(OPEN)
+  assignedToId   String?
+  ownerId        String?
+  priority       WhatsappConversationPriority @default(NORMAL)
+  slaDueAt       DateTime?
+  lastMessageAt  DateTime?
+  lastInboundAt  DateTime?
+  lastOutboundAt DateTime?
+  intentScore    WhatsappIntentScore?
+  tags           Json                         @default("[]")
+  createdAt      DateTime                     @default(now())
+  updatedAt      DateTime                     @updatedAt
+
+  tenant     Tenant                    @relation(fields: [tenantId], references: [id])
+  account    WhatsappAccount           @relation(fields: [accountId], references: [id])
+  contact    WhatsappContact           @relation(fields: [waContactId], references: [id])
+  assignedTo User?                     @relation("WhatsappAssigned", fields: [assignedToId], references: [id])
+  owner      User?                     @relation("WhatsappOwner", fields: [ownerId], references: [id])
+  messages   WhatsappMessage[]
+  intents    WhatsappIntent[]
+  tagsRel    WhatsappConversationTag[]
+
+  @@index([tenantId, status])
+  @@index([assignedToId])
+  @@index([waContactId])
+  @@map("whatsapp_conversations")
+}
+
+model WhatsappMessage {
+  id             String                   @id @default(cuid())
+  conversationId String
+  direction      WhatsappMessageDirection
+  type           WhatsappMessageType      @default(TEXT)
+  body           String?
+  externalId     String?
+  status         WhatsappSendStatus       @default(SENT)
+  sentAt         DateTime?
+  deliveredAt    DateTime?
+  readAt         DateTime?
+  rawJson        Json                     @default("{}")
+  createdAt      DateTime                 @default(now())
+
+  conversation WhatsappConversation   @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  media        WhatsappMessageMedia[]
+
+  @@index([conversationId])
+  @@index([externalId])
+  @@map("whatsapp_messages")
+}
+
+model WhatsappMessageMedia {
+  id        String  @id @default(cuid())
+  messageId String
+  url       String
+  mimeType  String?
+  size      Int?
+  caption   String?
+
+  message WhatsappMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+  @@map("whatsapp_message_media")
+}
+
+model WhatsappTag {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  color     String   @default("#16a34a")
+  createdAt DateTime @default(now())
+
+  tenant        Tenant                    @relation(fields: [tenantId], references: [id])
+  conversations WhatsappConversationTag[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("whatsapp_tags")
+}
+
+model WhatsappConversationTag {
+  id             String   @id @default(cuid())
+  conversationId String
+  tagId          String
+  createdAt      DateTime @default(now())
+
+  conversation WhatsappConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  tag          WhatsappTag          @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, tagId])
+  @@map("whatsapp_conversation_tags")
+}
+
+model WhatsappTemplate {
+  id        String                 @id @default(cuid())
+  tenantId  String
+  name      String
+  category  String?
+  language  String                 @default("fr")
+  status    WhatsappTemplateStatus @default(DRAFT)
+  createdAt DateTime               @default(now())
+  updatedAt DateTime               @updatedAt
+
+  tenant   Tenant                    @relation(fields: [tenantId], references: [id])
+  versions WhatsappTemplateVersion[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("whatsapp_templates")
+}
+
+model WhatsappTemplateVersion {
+  id         String                 @id @default(cuid())
+  templateId String
+  body       String
+  variables  Json                   @default("[]")
+  status     WhatsappTemplateStatus @default(DRAFT)
+  approvedAt DateTime?
+  createdAt  DateTime               @default(now())
+
+  template      WhatsappTemplate       @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  campaignSends WhatsappCampaignSend[]
+
+  @@index([templateId])
+  @@map("whatsapp_template_versions")
+}
+
+model WhatsappCampaign {
+  id          String                 @id @default(cuid())
+  tenantId    String
+  name        String
+  objective   String?
+  segment     String?
+  status      WhatsappCampaignStatus @default(DRAFT)
+  scheduledAt DateTime?
+  createdById String?
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+
+  tenant    Tenant                 @relation(fields: [tenantId], references: [id])
+  createdBy User?                  @relation("WhatsappCampaignCreator", fields: [createdById], references: [id])
+  sends     WhatsappCampaignSend[]
+
+  @@index([tenantId, status])
+  @@index([createdById])
+  @@map("whatsapp_campaigns")
+}
+
+model WhatsappCampaignSend {
+  id                String             @id @default(cuid())
+  campaignId        String
+  waContactId       String
+  templateVersionId String?
+  status            WhatsappSendStatus @default(PENDING)
+  sentAt            DateTime?
+  deliveredAt       DateTime?
+  readAt            DateTime?
+  error             String?
+
+  campaign        WhatsappCampaign         @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contact         WhatsappContact          @relation(fields: [waContactId], references: [id], onDelete: Cascade)
+  templateVersion WhatsappTemplateVersion? @relation(fields: [templateVersionId], references: [id])
+
+  @@index([campaignId])
+  @@index([waContactId])
+  @@map("whatsapp_campaign_sends")
+}
+
+model WhatsappIntent {
+  id              String               @id @default(cuid())
+  tenantId        String
+  conversationId  String
+  waContactId     String?
+  contactId       String?
+  sourceMessageId String?
+  score           WhatsappIntentScore  @default(LOW)
+  summary         String?
+  status          WhatsappIntentStatus @default(DETECTED)
+  crmIntentId     String?
+  qualifiedById   String?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  tenant                     Tenant                    @relation(fields: [tenantId], references: [id])
+  conversation               WhatsappConversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  whatsappContact            WhatsappContact?          @relation(fields: [waContactId], references: [id])
+  contact                    Contact?                  @relation(fields: [contactId], references: [id])
+  crmIntent                  CustomerPipelineIntent?   @relation(fields: [crmIntentId], references: [id])
+  qualifiedBy                User?                     @relation("WhatsappIntentQualifiedBy", fields: [qualifiedById], references: [id])
+  customerFinancialMetrics   CustomerFinancialMetrics? @relation(fields: [customerFinancialMetricsId], references: [id])
+  customerFinancialMetricsId String?
+
+  @@index([tenantId, status])
+  @@index([contactId])
+  @@map("whatsapp_intents")
+}
+
+model WhatsappLeadPipeline {
+  id           String            @id @default(cuid())
+  tenantId     String
+  waContactId  String
+  stage        WhatsappLeadStage @default(DETECTED)
+  assignedToId String?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  contact    WhatsappContact @relation(fields: [waContactId], references: [id], onDelete: Cascade)
+  assignedTo User?           @relation("WhatsappLeadAssigned", fields: [assignedToId], references: [id])
+
+  @@unique([tenantId, waContactId])
+  @@index([tenantId, stage])
+  @@index([assignedToId])
+  @@map("whatsapp_lead_pipeline")
+}
+
+model WhatsappWebhookEvent {
+  id          String    @id @default(cuid())
+  accountId   String
+  externalId  String?
+  type        String
+  payload     Json      @default("{}")
+  receivedAt  DateTime  @default(now())
+  processedAt DateTime?
+
+  account WhatsappAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, externalId])
+  @@index([accountId])
+  @@map("whatsapp_webhook_events")
+}
+
+model WhatsappAuditLog {
+  id         String   @id @default(cuid())
+  tenantId   String
+  actorId    String?
+  action     String
+  entityType String
+  entityId   String
+  payload    Json     @default("{}")
+  createdAt  DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  actor  User?  @relation(fields: [actorId], references: [id])
+
+  @@index([tenantId])
+  @@index([entityType, entityId])
+  @@map("whatsapp_audit_logs")
+}
+
+// ============================================================
+// ENTERPRISE CRM â€” Pipelines, Meetings, Nurturing
+// ============================================================
+
+model Pipeline {
+  id        String          @id @default(cuid())
+  tenantId  String
+  name      String
+  isDefault Boolean         @default(false)
+  stages    PipelineStage[]
+  leads     Lead[]
+  createdAt DateTime        @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@map("pipelines")
+}
+
+model PipelineStage {
+  id         String @id @default(cuid())
+  pipelineId String
+  name       String
+  order      Int
+  color      String @default("#6366f1")
+  leads      Lead[]
+
+  pipeline Pipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+
+  @@index([pipelineId])
+  @@map("pipeline_stages")
+}
+
+model Meeting {
+  id          String   @id @default(cuid())
+  tenantId    String
+  contactId   String
+  leadId      String?
+  title       String
+  description String?
+  startAt     DateTime
+  endAt       DateTime
+  location    String?
+  type        String   @default("CALL")
+  status      String   @default("SCHEDULED")
+  createdById String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id])
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  lead    Lead?   @relation(fields: [leadId], references: [id])
+
+  @@index([tenantId])
+  @@index([contactId])
+  @@index([startAt])
+  @@map("meetings")
+}
+
+model NurturingSequence {
+  id            String                @id @default(cuid())
+  tenantId      String
+  name          String
+  trigger       String
+  triggerStatus String?
+  isActive      Boolean               @default(true)
+  createdAt     DateTime              @default(now())
+  steps         NurturingStep[]
+  enrollments   NurturingEnrollment[]
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@map("nurturing_sequences")
+}
+
+model NurturingStep {
+  id         String  @id @default(cuid())
+  sequenceId String
+  order      Int
+  delayDays  Int     @default(0)
+  channel    String
+  subject    String?
+  body       String
+
+  sequence NurturingSequence @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+
+  @@index([sequenceId])
+  @@map("nurturing_steps")
+}
+
+model NurturingEnrollment {
+  id          String    @id @default(cuid())
+  sequenceId  String
+  leadId      String
+  currentStep Int       @default(0)
+  status      String    @default("ACTIVE")
+  enrolledAt  DateTime  @default(now())
+  nextStepAt  DateTime?
+
+  sequence NurturingSequence @relation(fields: [sequenceId], references: [id])
+  lead     Lead              @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@unique([sequenceId, leadId])
+  @@index([leadId])
+  @@map("nurturing_enrollments")
+}
+
+// ============================================================
+// Q. QUALITY CONTROL MODULE
+// ============================================================
+
+model QcPlan {
+  id              String   @id @default(cuid())
+  tenantId        String
+  name            String
+  type            String   @default("INCOMING") // INCOMING | IN_PROCESS | FINAL | AUDIT
+  productCategory String?
+  description     String?
+  checklist       Json     @default("[]") // [{id, criterion, weight, required}]
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant      Tenant         @relation(fields: [tenantId], references: [id])
+  inspections QcInspection[]
+
+  @@index([tenantId])
+  @@map("qc_plans")
+}
+
+model QcInspection {
+  id          String    @id @default(cuid())
+  tenantId    String
+  planId      String
+  orderId     String?
+  supplierId  String?
+  scheduledAt DateTime
+  completedAt DateTime?
+  inspectedBy String?
+  status      String    @default("SCHEDULED") // SCHEDULED | IN_PROGRESS | COMPLETED | CANCELLED
+  overall     String? // PASS | FAIL | CONDITIONAL
+  defectRate  Decimal?  @db.Decimal(5, 2)
+  sampleSize  Int?
+  notes       String?
+  attachments Json      @default("[]")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  plan          QcPlan            @relation(fields: [planId], references: [id], onDelete: Cascade)
+  tenant        Tenant            @relation(fields: [tenantId], references: [id])
+  inspector     User?             @relation("QcInspector", fields: [inspectedBy], references: [id])
+  order         Order?            @relation(fields: [orderId], references: [id])
+  supplier      Supplier?         @relation("SupplierQcInspections", fields: [supplierId], references: [id])
+  items         QcChecklistItem[]
+  spcDataPoints QcSpcDataPoint[]
+
+  @@index([tenantId])
+  @@index([planId])
+  @@index([orderId])
+  @@index([supplierId])
+  @@map("qc_inspections")
+}
+
+model QcChecklistItem {
+  id           String  @id @default(cuid())
+  inspectionId String
+  criterion    String
+  result       String? // PASS | FAIL | NA
+  notes        String?
+  photos       Json    @default("[]")
+  defectCount  Int?
+
+  inspection QcInspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+
+  @@index([inspectionId])
+  @@map("qc_checklist_items")
+}
+
+// ============================================================
+// R. EMAIL CAMPAIGNS (MARKETING OS)
+// ============================================================
+
+model EmailCampaign {
+  id          String    @id @default(cuid())
+  tenantId    String
+  name        String
+  subject     String
+  fromName    String?
+  htmlContent String
+  textContent String?
+  status      String    @default("DRAFT") // DRAFT | SCHEDULED | SENDING | SENT | CANCELLED
+  scheduledAt DateTime?
+  sentAt      DateTime?
+  segments    Json      @default("[]") // segment type filters
+  stats       Json      @default("{}") // {sent, opened, clicked, bounced}
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  tenant     Tenant           @relation(fields: [tenantId], references: [id])
+  createdBy  User?            @relation("EmailCampaignCreator", fields: [createdById], references: [id])
+  recipients EmailRecipient[]
+
+  @@index([tenantId])
+  @@map("email_campaigns")
+}
+
+model EmailRecipient {
+  id         String    @id @default(cuid())
+  campaignId String
+  contactId  String
+  email      String
+  status     String    @default("PENDING") // PENDING | SENT | OPENED | CLICKED | BOUNCED | UNSUBSCRIBED
+  sentAt     DateTime?
+  openedAt   DateTime?
+  clickedAt  DateTime?
+  bouncedAt  DateTime?
+  providerId String?
+
+  campaign EmailCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contact  Contact       @relation(fields: [contactId], references: [id])
+
+  @@unique([campaignId, contactId])
+  @@index([campaignId])
+  @@index([contactId])
+  @@map("email_recipients")
+}
+
+// ============================================================
+// S. WHATSAPP BOT FLOWS
+// ============================================================
+
+model BotFlow {
+  id           String   @id @default(cuid())
+  tenantId     String
+  name         String
+  trigger      String // KEYWORD | INTENT | GREETING | UNHANDLED
+  triggerValue String?
+  response     String
+  escalate     Boolean  @default(false)
+  isActive     Boolean  @default(true)
+  priority     Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@map("bot_flows")
+}
+
+// ============================================================
+// CRM EXTENSIONS
+// ============================================================
+
+enum CrmInboundSourceType {
+  EMAIL_ALIAS
+  WEB_FORM
+  API
+}
+
+enum CrmInboundSourceStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum LeadMiningStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum SalesTeamRole {
+  MANAGER
+  MEMBER
+}
+
+model CrmInboundSource {
+  id         String                 @id @default(cuid())
+  tenantId   String
+  type       CrmInboundSourceType
+  name       String
+  status     CrmInboundSourceStatus @default(ACTIVE)
+  emailAlias String?
+  formToken  String?
+  settings   Json                   @default("{}")
+  createdAt  DateTime               @default(now())
+  updatedAt  DateTime               @updatedAt
+
+  tenant Tenant            @relation(fields: [tenantId], references: [id])
+  events CrmInboundEvent[]
+
+  @@unique([tenantId, emailAlias])
+  @@unique([tenantId, formToken])
+  @@index([tenantId, type])
+  @@map("crm_inbound_sources")
+}
+
+model CrmInboundEvent {
+  id          String               @id @default(cuid())
+  tenantId    String
+  sourceId    String?
+  sourceType  CrmInboundSourceType
+  sourceRef   String
+  status      String               @default("RECEIVED")
+  payload     Json
+  contactId   String?
+  leadId      String?
+  processedAt DateTime?
+  createdAt   DateTime             @default(now())
+
+  tenant  Tenant            @relation(fields: [tenantId], references: [id])
+  source  CrmInboundSource? @relation(fields: [sourceId], references: [id])
+  contact Contact?          @relation(fields: [contactId], references: [id])
+  lead    Lead?             @relation(fields: [leadId], references: [id])
+
+  @@unique([tenantId, sourceType, sourceRef])
+  @@index([tenantId])
+  @@index([sourceId])
+  @@index([contactId])
+  @@index([leadId])
+  @@map("crm_inbound_events")
+}
+
+model LeadMiningProvider {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  provider  String
+  status    String   @default("ACTIVE")
+  apiUrl    String?
+  apiToken  String?
+  settings  Json     @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant          @relation(fields: [tenantId], references: [id])
+  jobs   LeadMiningJob[]
+
+  @@index([tenantId])
+  @@map("lead_mining_providers")
+}
+
+model LeadMiningJob {
+  id          String           @id @default(cuid())
+  tenantId    String
+  providerId  String?
+  status      LeadMiningStatus @default(QUEUED)
+  query       String
+  resultCount Int              @default(0)
+  error       String?
+  createdAt   DateTime         @default(now())
+  completedAt DateTime?
+
+  tenant   Tenant              @relation(fields: [tenantId], references: [id])
+  provider LeadMiningProvider? @relation(fields: [providerId], references: [id])
+  results  LeadMiningResult[]
+
+  @@index([tenantId])
+  @@index([providerId])
+  @@map("lead_mining_jobs")
+}
+
+model LeadMiningResult {
+  id        String   @id @default(cuid())
+  tenantId  String
+  jobId     String
+  payload   Json
+  contactId String?
+  leadId    String?
+  status    String   @default("NEW")
+  createdAt DateTime @default(now())
+
+  tenant  Tenant        @relation(fields: [tenantId], references: [id])
+  job     LeadMiningJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  contact Contact?      @relation(fields: [contactId], references: [id])
+  lead    Lead?         @relation(fields: [leadId], references: [id])
+
+  @@index([tenantId])
+  @@index([jobId])
+  @@map("lead_mining_results")
+}
+
+model SalesTerritory {
+  id           String   @id @default(cuid())
+  tenantId     String
+  name         String
+  countryCodes Json     @default("[]")
+  cityNames    Json     @default("[]")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant Tenant      @relation(fields: [tenantId], references: [id])
+  teams  SalesTeam[]
+  leads  Lead[]
+
+  @@index([tenantId])
+  @@map("sales_territories")
+}
+
+model SalesTeam {
+  id           String   @id @default(cuid())
+  tenantId     String
+  name         String
+  managerId    String?
+  territoryId  String?
+  currency     String   @default("XAF")
+  targetAmount Decimal  @default(0) @db.Decimal(15, 2)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant    Tenant            @relation(fields: [tenantId], references: [id])
+  manager   User?             @relation("SalesTeamManager", fields: [managerId], references: [id])
+  territory SalesTerritory?   @relation(fields: [territoryId], references: [id])
+  members   SalesTeamMember[]
+  quotas    SalesQuota[]
+  leads     Lead[]
+
+  @@index([tenantId])
+  @@index([managerId])
+  @@index([territoryId])
+  @@map("sales_teams")
+}
+
+model SalesTeamMember {
+  id        String        @id @default(cuid())
+  teamId    String
+  userId    String
+  role      SalesTeamRole @default(MEMBER)
+  createdAt DateTime      @default(now())
+
+  team SalesTeam @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user User      @relation(fields: [userId], references: [id])
+
+  @@unique([teamId, userId])
+  @@index([userId])
+  @@map("sales_team_members")
+}
+
+model SalesQuota {
+  id             String   @id @default(cuid())
+  tenantId       String
+  teamId         String?
+  userId         String?
+  periodStart    DateTime
+  periodEnd      DateTime
+  targetAmount   Decimal  @default(0) @db.Decimal(15, 2)
+  achievedAmount Decimal  @default(0) @db.Decimal(15, 2)
+  currency       String   @default("XAF")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant Tenant     @relation(fields: [tenantId], references: [id])
+  team   SalesTeam? @relation(fields: [teamId], references: [id])
+  user   User?      @relation(fields: [userId], references: [id])
+
+  @@index([tenantId])
+  @@index([teamId])
+  @@index([userId])
+  @@map("sales_quotas")
+}
+
+model LeadScoreModel {
+  id        String    @id @default(cuid())
+  tenantId  String
+  version   Int       @default(1)
+  status    String    @default("ACTIVE")
+  weights   Json      @default("{}")
+  metrics   Json      @default("{}")
+  trainedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  tenant    Tenant              @relation(fields: [tenantId], references: [id])
+  snapshots LeadScoreSnapshot[]
+
+  @@index([tenantId])
+  @@map("lead_score_models")
+}
+
+model LeadScoreSnapshot {
+  id          String   @id @default(cuid())
+  tenantId    String
+  leadId      String
+  modelId     String?
+  score       Int
+  probability Int
+  features    Json     @default("{}")
+  createdAt   DateTime @default(now())
+
+  tenant Tenant          @relation(fields: [tenantId], references: [id])
+  lead   Lead            @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  model  LeadScoreModel? @relation(fields: [modelId], references: [id])
+
+  @@index([tenantId])
+  @@index([leadId])
+  @@index([modelId])
+  @@map("lead_score_snapshots")
+}
+
+// ============================================================
+// PILOTAGE OS — Strategic Decisions & Execution
+// ============================================================
+
+enum StrategicDecisionPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum StrategicDecisionStatus {
+  DRAFT
+  ACTIVE
+  EXECUTING
+  COMPLETED
+  CANCELLED
+}
+
+enum StrategicDecisionHorizon {
+  MONTH
+  QUARTER
+  YEAR
+}
+
+enum DecisionActionType {
+  CREATE_PROJECT
+  CREATE_TASKS
+  UPDATE_POLICY
+  REALLOCATE_RESOURCES
+  ACTIVATE_DECISION
+  EVALUATE_RULES
+}
+
+enum DecisionActionStatus {
+  PENDING
+  EXECUTED
+  FAILED
+}
+
+enum StrategicRiskCategory {
+  FINANCIAL
+  LOGISTICS
+  SUPPLIER
+  QUALITY
+  CRM
+  OPERATIONAL
+}
+
+enum StrategicRiskStatus {
+  OPEN
+  MITIGATING
+  ESCALATED
+  RESOLVED
+  ACCEPTED
+}
+
+enum RiskTimelineType {
+  DETECTED
+  MITIGATION
+  ESCALATED
+  NOTE
+  RESOLVED
+  OWNER_CHANGED
+}
+
+model StrategicDecision {
+  id                  String                    @id @default(cuid())
+  tenantId            String
+  title               String
+  description         String?
+  objective           String?
+  targetMetric        String?
+  targetValue         Float?
+  targetUnit          String?
+  riskLevel           RiskLevel?
+  priority            StrategicDecisionPriority @default(MEDIUM)
+  status              StrategicDecisionStatus   @default(DRAFT)
+  horizon             StrategicDecisionHorizon  @default(QUARTER)
+  impactAreas         Json                      @default("[]")
+  executionPlan       Json                      @default("{}")
+  activationRules     Json                      @default("[]")
+  executionTemplateId String?
+  ownerId             String?
+  executedAt          DateTime?
+  completedAt         DateTime?
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
+
+  tenant            Tenant                     @relation(fields: [tenantId], references: [id])
+  owner             User?                      @relation("DecisionOwner", fields: [ownerId], references: [id])
+  executionTemplate DecisionExecutionTemplate? @relation(fields: [executionTemplateId], references: [id])
+  actions           DecisionAction[]
+
+  @@index([tenantId, status])
+  @@index([ownerId])
+  @@map("strategic_decisions")
+}
+
+model DecisionAction {
+  id         String               @id @default(cuid())
+  decisionId String
+  type       DecisionActionType
+  status     DecisionActionStatus @default(PENDING)
+  payload    Json                 @default("{}")
+  error      String?
+  executedAt DateTime?
+  createdAt  DateTime             @default(now())
+
+  decision StrategicDecision @relation(fields: [decisionId], references: [id], onDelete: Cascade)
+
+  @@index([decisionId])
+  @@index([status])
+  @@map("decision_actions")
+}
+
+model DecisionExecutionTemplate {
+  id                 String                    @id @default(cuid())
+  tenantId           String
+  createdById        String?
+  name               String
+  description        String?
+  impactAreas        String[]                  @default([])
+  defaultPriority    StrategicDecisionPriority @default(MEDIUM)
+  defaultHorizon     StrategicDecisionHorizon  @default(QUARTER)
+  projectName        String?
+  projectDescription String?
+  tasks              Json                      @default("[]")
+  isActive           Boolean                   @default(true)
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
+
+  tenant    Tenant              @relation(fields: [tenantId], references: [id])
+  createdBy User?               @relation(fields: [createdById], references: [id])
+  decisions StrategicDecision[]
+
+  @@index([tenantId, isActive])
+  @@map("decision_execution_templates")
+}
+
+model StrategicRisk {
+  id               String                @id @default(cuid())
+  tenantId         String
+  fingerprint      String
+  title            String
+  description      String?
+  category         StrategicRiskCategory
+  severity         RiskLevel             @default(MEDIUM)
+  status           StrategicRiskStatus   @default(OPEN)
+  sourceMetric     String?
+  sourceValue      Float?
+  thresholdValue   Float?
+  trend            String?
+  impactAreas      String[]              @default([])
+  linkedHref       String?
+  linkedEntityType String?
+  linkedEntityId   String?
+  ownerId          String?
+  mitigationPlan   Json                  @default("[]")
+  escalationRules  Json                  @default("[]")
+  lastDetectedAt   DateTime              @default(now())
+  escalatedAt      DateTime?
+  resolvedAt       DateTime?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+
+  tenant  Tenant                @relation(fields: [tenantId], references: [id])
+  owner   User?                 @relation("StrategicRiskOwner", fields: [ownerId], references: [id])
+  entries RiskMitigationEntry[]
+
+  @@unique([tenantId, fingerprint])
+  @@index([tenantId, status, severity])
+  @@index([tenantId, category])
+  @@index([ownerId])
+  @@map("strategic_risks")
+}
+
+model RiskMitigationEntry {
+  id          String           @id @default(cuid())
+  riskId      String
+  type        RiskTimelineType @default(NOTE)
+  title       String
+  detail      String?
+  meta        Json             @default("{}")
+  createdById String?
+  createdAt   DateTime         @default(now())
+
+  risk      StrategicRisk @relation(fields: [riskId], references: [id], onDelete: Cascade)
+  createdBy User?         @relation("RiskMitigationAuthor", fields: [createdById], references: [id])
+
+  @@index([riskId, createdAt])
+  @@map("risk_mitigation_entries")
+}
+
+// ============================================================
+// F. QC LABS, SPC & LOT TRACEABILITY
+// ============================================================
+
+model QcLabConnection {
+  id            String   @id @default(cuid())
+  tenantId      String
+  provider      String // "SGS" | "BUREAU_VERITAS" | "TUV" | "INTERTEK" | "CUSTOM"
+  name          String
+  apiEndpoint   String
+  apiKey        String
+  webhookSecret String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+
+  tenant Tenant      @relation(fields: [tenantId], references: [id])
+  tests  QcLabTest[]
+
+  @@index([tenantId])
+  @@map("qc_lab_connections")
+}
+
+model QcLabTest {
+  id             String    @id @default(cuid())
+  connectionId   String
+  qcRequestId    String
+  externalTestId String?
+  status         String    @default("SUBMITTED") // SUBMITTED | IN_PROGRESS | COMPLETED | FAILED
+  results        Json      @default("{}")
+  reportUrl      String?
+  submittedAt    DateTime  @default(now())
+  completedAt    DateTime?
+
+  connection QcLabConnection @relation(fields: [connectionId], references: [id])
+  qcRequest  QCRequest       @relation(fields: [qcRequestId], references: [id])
+
+  @@index([connectionId])
+  @@index([qcRequestId])
+  @@map("qc_lab_tests")
+}
+
+model QcSpcChart {
+  id        String   @id @default(cuid())
+  tenantId  String
+  productId String?
+  name      String
+  metric    String // "defect_rate" | "dimension" | "weight" | "custom"
+  ucl       Decimal? @db.Decimal(10, 4)
+  lcl       Decimal? @db.Decimal(10, 4)
+  mean      Decimal? @db.Decimal(10, 4)
+  sigma     Decimal? @db.Decimal(10, 4)
+  createdAt DateTime @default(now())
+
+  tenant     Tenant           @relation(fields: [tenantId], references: [id])
+  dataPoints QcSpcDataPoint[]
+
+  @@index([tenantId])
+  @@map("qc_spc_charts")
+}
+
+model QcSpcDataPoint {
+  id             String   @id @default(cuid())
+  chartId        String
+  inspectionId   String?
+  value          Decimal  @db.Decimal(10, 4)
+  isOutOfControl Boolean  @default(false)
+  measuredAt     DateTime @default(now())
+
+  chart      QcSpcChart    @relation(fields: [chartId], references: [id])
+  inspection QcInspection? @relation(fields: [inspectionId], references: [id])
+
+  @@index([chartId])
+  @@map("qc_spc_data_points")
+}
+
+model QcLotTrace {
+  id           String   @id @default(cuid())
+  tenantId     String
+  lotNumber    String
+  productId    String?
+  supplierId   String?
+  orderIds     Json     @default("[]")
+  qcRequestIds Json     @default("[]")
+  status       String   @default("ACTIVE") // ACTIVE | RECALLED | QUARANTINE
+  recallReason String?
+  createdAt    DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, lotNumber])
+  @@index([tenantId])
+  @@map("qc_lot_traces")
+}
+
+// ============================================================
+// Z. AGENT IA — LOGS & TRAÇABILITÉ
+// ============================================================
+
+model AgentLog {
+  id            String   @id @default(cuid())
+  tenantId      String
+  agentId       String?  // Identifiant agent IA (ex: "AUTO_INDICATIF", "QC_ANALYZER")
+  agentType     String   // Type fonctionnel de l'agent
+  action        String   // Action réalisée
+  entityType    String?  // "order" | "quote" | "sourcing_case" | etc.
+  entityId      String?  // ID de l'entité concernée
+  correlationId String?  // Regroupe les actions liées d'un même flux
+  sourceAgent   String?  // Agent déclencheur si chaîné
+  input         Json     @default("{}")
+  output        Json     @default("{}")
+  durationMs    Int?
+  status        String   @default("SUCCESS") // SUCCESS | FAILED | PARTIAL | SKIPPED
+  errorMessage  String?
+  createdAt     DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, agentType])
+  @@index([entityType, entityId])
+  @@index([correlationId])
+  @@index([createdAt])
+  @@map("agent_logs")
+}
+
+// ============================================================
+// S. WAREHOUSE RECEIPT — données internes, jamais exposées client
+// ============================================================
+
+enum WarehouseReceiptCondition {
+  OK
+  DAMAGED
+  WRONG_ITEM
+  PARTIAL
+}
+
+model WarehouseReceipt {
+  id         String   @id @default(cuid())
+  shipmentId String   @unique
+  orderId    String
+
+  receivedAt   DateTime @default(now())
+  receivedById String?  // agent en Chine (User.id)
+
+  // ── Poids RÉEL — 100% interne, jamais exposé au client ──────
+  actualWeightKg     Decimal  @db.Decimal(10, 3)
+  actualLengthCm     Decimal? @db.Decimal(10, 2)
+  actualWidthCm      Decimal? @db.Decimal(10, 2)
+  actualHeightCm     Decimal? @db.Decimal(10, 2)
+  volumetricWeightKg Decimal  @db.Decimal(10, 3) // calculé auto : (L×W×H)/6000
+  chargeableWeightKg Decimal  @db.Decimal(10, 3) // ceil(max(actual, volumetric))
+
+  // ── QC visuel ────────────────────────────────────────────────
+  condition      WarehouseReceiptCondition @default(OK)
+  conditionNotes String?
+  photoUrls      Json                      @default("[]") // [photo_ext, photo_open, photo_detail]
+
+  // ── Stockage physique ─────────────────────────────────────────
+  warehouseLocation String? // ex: "Section B-12"
+  consolidationNote String? // "Attendre CMD-1235 avant expédition"
+  readyToShip       Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  shipment   Shipment @relation(fields: [shipmentId], references: [id])
+  order      Order    @relation(fields: [orderId], references: [id])
+  receivedBy User?    @relation("WarehouseReceiptAgent", fields: [receivedById], references: [id])
+
+  @@index([orderId])
+  @@map("warehouse_receipts")
 }

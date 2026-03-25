@@ -11,6 +11,7 @@ import {
   BadgeCheck,
   Activity,
   PhoneCall,
+  Mail,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -21,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   addContactNote,
   logContactActivity,
+  sendEmailToContact,
 } from "@/lib/actions/contact.actions";
 import {
   Select,
@@ -49,6 +51,7 @@ const TYPE_CONFIG: Record<string, { icon: any; color: string; label: string }> =
   activity: { icon: PhoneCall, color: "text-sky-600", label: "Activite" },
   audit: { icon: Activity, color: "text-muted-foreground", label: "Audit" },
   message: { icon: MessageCircle, color: "text-amber-600", label: "Message" },
+  email: { icon: Mail, color: "text-emerald-600", label: "Email" },
   note: { icon: StickyNote, color: "text-indigo-600", label: "Note" },
 };
 
@@ -56,10 +59,16 @@ export function ContactTimeline({
   contactId,
   items,
   readOnly,
+  contactEmail,
+  contactPhone,
+  contactName,
 }: {
   contactId: string;
   items: TimelineItem[];
   readOnly?: boolean;
+  contactEmail?: string | null;
+  contactPhone?: string | null;
+  contactName?: string | null;
 }) {
   const router = useRouter();
   const [note, setNote] = useState("");
@@ -67,6 +76,9 @@ export function ContactTimeline({
   const [activitySummary, setActivitySummary] = useState("");
   const [activityOutcome, setActivityOutcome] = useState("");
   const [activityDuration, setActivityDuration] = useState("");
+  const [activityPhone, setActivityPhone] = useState(contactPhone ?? "");
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailBody, setEmailBody] = useState("");
   const [isPending, startTransition] = useTransition();
 
   const submitNote = () => {
@@ -93,6 +105,7 @@ export function ContactTimeline({
         summary: activitySummary.trim(),
         outcome: activityOutcome.trim() || undefined,
         durationMinutes: Number.isFinite(duration) ? duration : undefined,
+        phoneNumber: activityPhone.trim() || undefined,
       });
       if (result.error) {
         toast.error(result.error);
@@ -100,6 +113,29 @@ export function ContactTimeline({
         setActivitySummary("");
         setActivityOutcome("");
         setActivityDuration("");
+        setActivityPhone(contactPhone ?? "");
+        router.refresh();
+      }
+    });
+  };
+
+  const submitEmail = () => {
+    if (readOnly) return;
+    if (!contactEmail) {
+      toast.error("Aucun email disponible pour ce contact");
+      return;
+    }
+    if (!emailSubject.trim() || !emailBody.trim()) return;
+    startTransition(async () => {
+      const result = await sendEmailToContact(contactId, {
+        subject: emailSubject.trim(),
+        body: emailBody.trim(),
+      });
+      if (result.error) {
+        toast.error(result.error);
+      } else {
+        setEmailSubject("");
+        setEmailBody("");
         router.refresh();
       }
     });
@@ -155,6 +191,14 @@ export function ContactTimeline({
             </div>
           </div>
           <div className="space-y-1">
+            <div className="text-xs text-muted-foreground">Telephone (optionnel)</div>
+            <Input
+              value={activityPhone}
+              onChange={(e) => setActivityPhone(e.target.value)}
+              placeholder="+242 06..."
+            />
+          </div>
+          <div className="space-y-1">
             <div className="text-xs text-muted-foreground">Resume</div>
             <Textarea
               rows={2}
@@ -165,11 +209,17 @@ export function ContactTimeline({
           </div>
           <div className="space-y-1">
             <div className="text-xs text-muted-foreground">Resultat (optionnel)</div>
-            <Input
-              value={activityOutcome}
-              onChange={(e) => setActivityOutcome(e.target.value)}
-              placeholder="Ex: Devis valide"
-            />
+            <Select value={activityOutcome} onValueChange={setActivityOutcome}>
+              <SelectTrigger>
+                <SelectValue placeholder="Choisir" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="POSITIVE">Positif</SelectItem>
+                <SelectItem value="NEUTRAL">Neutre</SelectItem>
+                <SelectItem value="NEGATIVE">Negatif</SelectItem>
+                <SelectItem value="NO_ANSWER">Sans reponse</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div className="flex justify-end">
             <Button
@@ -178,6 +228,46 @@ export function ContactTimeline({
               disabled={isPending || !activitySummary.trim()}
             >
               Ajouter
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {!readOnly && (
+        <div className="rounded-lg border p-4 space-y-3">
+          <div className="text-sm font-medium">Envoyer un email</div>
+          <div className="text-xs text-muted-foreground">
+            {contactEmail ? `Destinataire: ${contactName || ""} ${contactEmail}` : "Aucun email defini"}
+          </div>
+          <div className="space-y-1">
+            <div className="text-xs text-muted-foreground">Objet</div>
+            <Input
+              value={emailSubject}
+              onChange={(e) => setEmailSubject(e.target.value)}
+              placeholder="Ex: Suivi de votre demande"
+            />
+          </div>
+          <div className="space-y-1">
+            <div className="text-xs text-muted-foreground">Message</div>
+            <Textarea
+              rows={4}
+              value={emailBody}
+              onChange={(e) => setEmailBody(e.target.value)}
+              placeholder="Bonjour..."
+            />
+          </div>
+          <div className="flex justify-end">
+            <Button
+              size="sm"
+              onClick={submitEmail}
+              disabled={
+                isPending ||
+                !contactEmail ||
+                !emailSubject.trim() ||
+                !emailBody.trim()
+              }
+            >
+              Envoyer
             </Button>
           </div>
         </div>

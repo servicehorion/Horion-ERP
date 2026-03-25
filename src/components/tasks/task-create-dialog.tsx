@@ -19,6 +19,7 @@ import { createManualTask } from "@/lib/actions/task.actions";
 
 interface TaskCreateDialogProps {
   teamMembers?: { id: string; name: string }[];
+  projects?: { id: string; name: string }[];
 }
 
 const MODULES = [
@@ -49,7 +50,7 @@ const SLA_OPTIONS = [
   { value: "72", label: "72 heures" },
 ];
 
-export function TaskCreateDialog({ teamMembers = [] }: TaskCreateDialogProps) {
+export function TaskCreateDialog({ teamMembers = [], projects = [] }: TaskCreateDialogProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -60,6 +61,7 @@ export function TaskCreateDialog({ teamMembers = [] }: TaskCreateDialogProps) {
   const [priority, setPriority] = useState("NORMAL");
   const [slaHours, setSlaHours] = useState<string>("");
   const [assigneeId, setAssigneeId] = useState<string>("");
+  const [projectId, setProjectId] = useState<string>("none");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -77,6 +79,7 @@ export function TaskCreateDialog({ teamMembers = [] }: TaskCreateDialogProps) {
         priority,
         slaHours: slaHours ? Number(slaHours) : undefined,
         assigneeId: assigneeId || undefined,
+        projectId: projectId === "none" ? undefined : projectId,
       });
 
       if (result.error) {
@@ -102,6 +105,7 @@ export function TaskCreateDialog({ teamMembers = [] }: TaskCreateDialogProps) {
     setPriority("NORMAL");
     setSlaHours("");
     setAssigneeId("");
+    setProjectId("none");
   }
 
   return (
@@ -202,6 +206,23 @@ export function TaskCreateDialog({ teamMembers = [] }: TaskCreateDialogProps) {
               </div>
             )}
           </div>
+
+          {projects.length > 0 && (
+            <div className="space-y-2">
+              <Label>Projet</Label>
+              <Select value={projectId} onValueChange={setProjectId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Aucun projet" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Aucun</SelectItem>
+                  {projects.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>

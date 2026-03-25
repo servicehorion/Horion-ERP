@@ -2,9 +2,19 @@ import { z } from "zod";
 
 export const createSourcingCaseSchema = z.object({
   orderId: z.string().min(1, "Commande obligatoire"),
+  supplierId: z.string().optional(),
+  contractId: z.string().optional(),
   requirement: z.string().min(1, "Description du besoin obligatoire"),
   budget: z.number().positive().optional(),
   currency: z.string().optional(),
+  level: z.enum(["INFORMATIF", "PROFOND"]).optional(),
+  platform: z.string().optional(),
+  sensitiveProduct: z.boolean().optional(),
+  category: z.string().optional(),
+  pipelineType: z.enum(["RETAIL", "WHOLESALE", "VIP", "STRATEGIC"]).optional(),
+  assignedToId: z.string().optional(),
+  assignedAgent: z.string().optional(),
+  qcCostEst: z.number().nonnegative().optional(),
 });
 
 export const updateSourcingStatusSchema = z.object({

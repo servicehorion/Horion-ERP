@@ -16,6 +16,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { updateLeadStatus } from "@/lib/actions/contact.actions";
 import { formatCurrency } from "@/config/currencies";
+import { LeadAssigneeSelect } from "@/components/crm/lead-assignee-select";
+import { LEAD_KANBAN_COLUMNS } from "@/config/colors";
 
 interface KanbanLead {
   id: string;
@@ -25,6 +27,7 @@ interface KanbanLead {
   estimatedValue: string | null;
   currency: string;
   category: string | null;
+  assignedTo?: string | null;
   contact: {
     name: string;
     company: string | null;
@@ -34,18 +37,12 @@ interface KanbanLead {
 
 interface LeadsKanbanProps {
   leads: KanbanLead[];
+  teamMembers?: { id: string; name: string | null; email: string }[];
 }
 
-const COLUMNS = [
-  { id: "NEW", label: "Nouveau", color: "border-t-gray-400", bgHeader: "bg-gray-50 dark:bg-gray-900" },
-  { id: "CONTACTED", label: "Contacté", color: "border-t-blue-400", bgHeader: "bg-blue-50 dark:bg-blue-950" },
-  { id: "QUALIFIED", label: "Qualifié", color: "border-t-indigo-400", bgHeader: "bg-indigo-50 dark:bg-indigo-950" },
-  { id: "QUOTED", label: "Devis envoyé", color: "border-t-yellow-400", bgHeader: "bg-yellow-50 dark:bg-yellow-950" },
-  { id: "WON", label: "Gagné", color: "border-t-green-400", bgHeader: "bg-green-50 dark:bg-green-950" },
-  { id: "LOST", label: "Perdu", color: "border-t-red-400", bgHeader: "bg-red-50 dark:bg-red-950" },
-];
+const COLUMNS = LEAD_KANBAN_COLUMNS;
 
-export function LeadsKanban({ leads: initialLeads }: LeadsKanbanProps) {
+export function LeadsKanban({ leads: initialLeads, teamMembers = [] }: LeadsKanbanProps) {
   const [leads, setLeads] = useState(initialLeads);
   const router = useRouter();
 
@@ -107,8 +104,8 @@ export function LeadsKanban({ leads: initialLeads }: LeadsKanbanProps) {
       <div className="flex gap-4 overflow-x-auto pb-4">
         {COLUMNS.map((column) => (
           <div key={column.id} className="flex-shrink-0 w-[280px]">
-            <Card className={`border-t-4 ${column.color}`}>
-              <CardHeader className={`py-3 ${column.bgHeader}`}>
+            <Card className={`border-t-4 ${column.borderColor}`}>
+              <CardHeader className={`py-3 ${column.headerBg}`}>
                 <CardTitle className="text-sm flex items-center justify-between">
                   <span>{column.label}</span>
                   <div className="flex items-center gap-2">
@@ -161,7 +158,7 @@ export function LeadsKanban({ leads: initialLeads }: LeadsKanbanProps) {
                                   <span className="truncate">{lead.contact.name}</span>
                                 </div>
                                 {lead.estimatedValue && Number(lead.estimatedValue) > 0 && (
-                                  <div className="flex items-center gap-1 mt-1 text-xs font-medium text-green-600">
+                                  <div className="flex items-center gap-1 mt-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
                                     <DollarSign className="h-3 w-3" />
                                     {formatCurrency(Number(lead.estimatedValue), lead.currency)}
                                   </div>
@@ -170,6 +167,15 @@ export function LeadsKanban({ leads: initialLeads }: LeadsKanbanProps) {
                                   <Badge variant="outline" className="mt-1 text-xs">
                                     {lead.category}
                                   </Badge>
+                                )}
+                                {teamMembers.length > 0 && (
+                                  <div className="mt-2" onClick={(e) => e.stopPropagation()}>
+                                    <LeadAssigneeSelect
+                                      leadId={lead.id}
+                                      currentAssignee={lead.assignedTo ?? null}
+                                      teamMembers={teamMembers}
+                                    />
+                                  </div>
                                 )}
                               </div>
                             </div>

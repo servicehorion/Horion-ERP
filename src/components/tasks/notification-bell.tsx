@@ -123,8 +123,14 @@ export function NotificationBell() {
   return (
     <Popover open={open} onOpenChange={handleOpen}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="sm" className="relative h-8 w-8 rounded-full">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="relative h-8 w-8 rounded-full"
+          aria-label="Ouvrir les notifications"
+        >
           <Bell className="h-4 w-4" />
+          <span className="sr-only">Notifications</span>
           {count > 0 && (
             <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white px-1 animate-in fade-in zoom-in">
               {count > 99 ? "99+" : count}
@@ -175,7 +181,7 @@ export function NotificationBell() {
                   onClick={() => handleClick(notif)}
                   className={cn(
                     "w-full text-left px-4 py-3 hover:bg-muted/50 transition-colors flex gap-3",
-                    !notif.read && "bg-blue-50/50 dark:bg-blue-950/10"
+                    !notif.read && "surface-info"
                   )}
                 >
                   <div className={cn(

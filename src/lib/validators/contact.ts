@@ -4,7 +4,7 @@ export const createContactSchema = z.object({
   name: z.string().min(1, "Nom requis"),
   type: z.enum(["CLIENT", "PROSPECT", "SUPPLIER", "FREIGHT_PARTNER", "CUSTOMS_BROKER", "QC_PARTNER", "OTHER"]),
   company: z.string().optional(),
-  phone: z.string().optional(),
+  phone: z.string().regex(/^\+?[0-9\s\-(). ]{7,20}$/, "Format téléphone invalide").optional().or(z.literal("")),
   email: z.string().email("Email invalide").optional().or(z.literal("")),
   whatsapp: z.string().optional(),
   city: z.string().optional(),
@@ -19,7 +19,7 @@ export const updateContactSchema = z.object({
   name: z.string().min(1, "Nom requis").optional(),
   type: z.enum(["CLIENT", "PROSPECT", "SUPPLIER", "FREIGHT_PARTNER", "CUSTOMS_BROKER", "QC_PARTNER", "OTHER"]).optional(),
   company: z.string().optional(),
-  phone: z.string().optional(),
+  phone: z.string().regex(/^\+?[0-9\s\-(). ]{7,20}$/, "Format téléphone invalide").optional().or(z.literal("")),
   email: z.string().email("Email invalide").optional().or(z.literal("")),
   whatsapp: z.string().optional(),
   city: z.string().optional(),
@@ -43,6 +43,8 @@ export const createLeadSchema = z.object({
   containerType: z.enum(["LCL", "FCL", "AERIEN"]).optional(),
   originCountry: z.string().optional(),
   notes: z.string().optional(),
+  salesTeamId: z.string().optional(),
+  territoryId: z.string().optional(),
 });
 
 export type CreateContactInput = z.infer<typeof createContactSchema>;

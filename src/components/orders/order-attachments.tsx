@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ExternalLink, Link2, Loader2, Plus, Trash2, File, Image, FileText } from "lucide-react";
+import { ExternalLink, Link2, Loader2, Plus, Trash2, File, Image, FileText, UploadCloud } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 
@@ -15,6 +15,7 @@ interface Attachment {
   id: string;
   name: string;
   url: string;
+  downloadUrl?: string;
   type: string;
   createdAt: Date;
   user?: { name: string | null } | null;
@@ -39,23 +40,54 @@ export function OrderAttachments({ orderId, attachments, canEdit }: OrderAttachm
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
   const [type, setType] = useState("link");
+  const [mode, setMode] = useState<"upload" | "link">("upload");
+  const [file, setFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
 
   async function handleAdd() {
-    if (!name.trim() || !url.trim()) return;
+    if (mode === "link") {
+      if (!name.trim() || !url.trim()) return;
+    }
     setSaving(true);
     try {
-      const res = await addOrderAttachment(orderId, { name: name.trim(), url: url.trim(), type });
-      if (res.error) {
-        toast.error(res.error);
+      if (mode === "link") {
+        const res = await addOrderAttachment(orderId, { name: name.trim(), url: url.trim(), type });
+        if (res.error) {
+          toast.error(res.error);
+        } else {
+          toast.success("Document ajoute");
+          setName("");
+          setUrl("");
+          setType("link");
+          setShowForm(false);
+          router.refresh();
+        }
       } else {
-        toast.success("Document ajoute");
-        setName("");
-        setUrl("");
-        setType("link");
-        setShowForm(false);
-        router.refresh();
+        if (!file) {
+          toast.error("Fichier manquant");
+          return;
+        }
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("name", name.trim() || file.name);
+        formData.append("type", type);
+        const res = await fetch(`/api/orders/${orderId}/attachments`, {
+          method: "POST",
+          body: formData,
+        });
+        const json = await res.json();
+        if (!res.ok || json?.error) {
+          toast.error(json?.error || "Erreur upload");
+        } else {
+          toast.success("Document uploadé");
+          setName("");
+          setUrl("");
+          setType("document");
+          setFile(null);
+          setShowForm(false);
+          router.refresh();
+        }
       }
     } catch {
       toast.error("Erreur lors de l'ajout");
@@ -94,7 +126,7 @@ export function OrderAttachments({ orderId, attachments, canEdit }: OrderAttachm
             >
               <span className="shrink-0">{TYPE_ICONS[att.type] ?? TYPE_ICONS.file}</span>
               <a
-                href={att.url}
+                href={(att as any).downloadUrl ?? att.url}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex-1 min-w-0 text-sm font-medium truncate hover:text-primary flex items-center gap-1"
@@ -136,16 +168,45 @@ export function OrderAttachments({ orderId, attachments, canEdit }: OrderAttachm
                 className="h-8 text-sm"
                 autoFocus
               />
-              <Input
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                placeholder="URL (https://...)"
-                className="h-8 text-sm"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && name.trim() && url.trim()) handleAdd();
-                  if (e.key === "Escape") setShowForm(false);
-                }}
-              />
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant={mode === "upload" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => {
+                    setMode("upload");
+                    if (type === "link") setType("document");
+                  }}
+                >
+                  Upload
+                </Button>
+                <Button
+                  type="button"
+                  variant={mode === "link" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setMode("link")}
+                >
+                  Lien
+                </Button>
+              </div>
+              {mode === "link" ? (
+                <Input
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  placeholder="URL (https://...)"
+                  className="h-8 text-sm"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && name.trim() && url.trim()) handleAdd();
+                    if (e.key === "Escape") setShowForm(false);
+                  }}
+                />
+              ) : (
+                <Input
+                  type="file"
+                  onChange={(e) => setFile(e.target.files?.[0] || null)}
+                  className="h-8 text-sm"
+                />
+              )}
               <Select value={type} onValueChange={setType}>
                 <SelectTrigger className="h-8 text-sm">
                   <SelectValue />
@@ -161,17 +222,21 @@ export function OrderAttachments({ orderId, attachments, canEdit }: OrderAttachm
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => { setShowForm(false); setName(""); setUrl(""); }}
+                  onClick={() => { setShowForm(false); setName(""); setUrl(""); setFile(null); setMode("upload"); }}
                 >
                   Annuler
                 </Button>
                 <Button
                   size="sm"
-                  disabled={!name.trim() || !url.trim() || saving}
+                  disabled={
+                    saving ||
+                    !name.trim() ||
+                    (mode === "link" ? !url.trim() : !file)
+                  }
                   onClick={handleAdd}
                 >
-                  {saving ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Plus className="mr-1 h-3 w-3" />}
-                  Ajouter
+                  {saving ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <UploadCloud className="mr-1 h-3 w-3" />}
+                  {mode === "link" ? "Ajouter" : "Uploader"}
                 </Button>
               </div>
             </div>

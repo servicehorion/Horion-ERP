@@ -186,6 +186,72 @@ export async function removeCustomerSegment(contactId: string, segment: Customer
   }
 }
 
+// ─── Custom Segment Rules ────────────────────────────────────────────────────
+
+export type SegmentRule = {
+  id: string;
+  segment: CustomerSegment;
+  field: "lifetimeGrossRevenue" | "totalOrdersCount" | "averageMarginPercent" | "globalRiskScore" | "contributionScore";
+  operator: "gt" | "lt" | "gte" | "lte";
+  value: number;
+  createdAt: string;
+};
+
+async function getTenantSettings(tenantId: string) {
+  const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } });
+  return (tenant?.settings as Record<string, unknown>) ?? {};
+}
+
+export async function getCustomSegmentRules(): Promise<SegmentRule[]> {
+  try {
+    const user = await getSession();
+    const settings = await getTenantSettings(user.tenantId);
+    const rules = settings.customSegmentRules as SegmentRule[] | undefined;
+    return rules ?? [];
+  } catch { return []; }
+}
+
+export async function saveCustomSegmentRule(
+  rule: Omit<SegmentRule, "id" | "createdAt">
+): Promise<{ success?: boolean; error?: string }> {
+  try {
+    const user = await getSession();
+    checkPermission(user.role, "contact.manage");
+    const settings = await getTenantSettings(user.tenantId);
+    const rules = (settings.customSegmentRules as SegmentRule[]) ?? [];
+    const newRule: SegmentRule = {
+      ...rule,
+      id: `rule-${Date.now()}`,
+      createdAt: new Date().toISOString().slice(0, 10),
+    };
+    await prisma.tenant.update({
+      where: { id: user.tenantId },
+      data: { settings: { ...settings, customSegmentRules: [...rules, newRule] } },
+    });
+    revalidatePath("/crm");
+    return { success: true };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Erreur" };
+  }
+}
+
+export async function deleteCustomSegmentRule(id: string): Promise<{ success?: boolean; error?: string }> {
+  try {
+    const user = await getSession();
+    checkPermission(user.role, "contact.manage");
+    const settings = await getTenantSettings(user.tenantId);
+    const rules = (settings.customSegmentRules as SegmentRule[]) ?? [];
+    await prisma.tenant.update({
+      where: { id: user.tenantId },
+      data: { settings: { ...settings, customSegmentRules: rules.filter((r) => r.id !== id) } },
+    });
+    revalidatePath("/crm");
+    return { success: true };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Erreur" };
+  }
+}
+
 export async function getCRMDashboardIntelligence(tenantId: string) {
   try {
     const user = await getSession();

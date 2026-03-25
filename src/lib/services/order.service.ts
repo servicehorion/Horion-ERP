@@ -4,8 +4,32 @@ import { canTransition } from "@/config/order-statuses";
 import type { OrderStatus, Priority, Prisma } from "@prisma/client";
 import type { CreateOrderInput } from "@/lib/validators/order";
 import { convertCurrency } from "@/config/currencies";
+import { RiskCalculatorService } from "@/lib/services/risk-calculator.service";
+import { serializeDecimals } from "@/lib/utils";
+import { FxService } from "@/lib/services/fx.service";
+import { OrderApprovalService } from "@/lib/services/order-approval.service";
+import { InvoiceService } from "@/lib/services/invoice.service";
+import { CatalogMemoryService } from "@/lib/services/catalog-memory.service";
 
 export class OrderService {
+  private static hasArchivedAtField() {
+    const models = (prisma as any)?._dmmf?.datamodel?.models;
+    const orderModel = Array.isArray(models) ? models.find((m: any) => m.name === "Order") : null;
+    return !!orderModel?.fields?.some((f: any) => f.name === "archivedAt");
+  }
+
+  private static async assertClientFacingContact(tenantId: string, contactId: string) {
+    const contact = await prisma.contact.findFirst({
+      where: { id: contactId, tenantId },
+      select: { id: true, type: true },
+    });
+    if (!contact) throw new Error("Contact introuvable");
+    if (!["CLIENT", "PROSPECT"].includes(contact.type)) {
+      throw new Error("Une commande client doit etre rattachée a un contact CLIENT ou PROSPECT");
+    }
+    return contact;
+  }
+
   static async generateOrderNumber(tenantId: string): Promise<string> {
     const year = new Date().getFullYear();
     const prefix = "HOR";
@@ -29,15 +53,17 @@ export class OrderService {
 
   static async create(
     tenantId: string,
-    data: CreateOrderInput & { ownerId?: string | null; onboardedById?: string | null; collaboratorIds?: string[] }
+    data: CreateOrderInput & { ownerId?: string | null; onboardedById?: string | null; collaboratorIds?: string[]; leadId?: string | null }
   ) {
-    const orderNumber = await this.generateOrderNumber(tenantId);
+      const orderNumber = await this.generateOrderNumber(tenantId);
+      const fxRates = await FxService.getLatestRates();
+      await this.assertClientFacingContact(tenantId, data.contactId);
 
     // Calculate totals
     let merchandiseTotal = 0;
     const itemsWithXAF = data.items.map((item) => {
       const totalOriginal = item.unitPrice * item.quantity;
-      const unitPriceXAF = convertCurrency(item.unitPrice, item.currency || "RMB", "XAF");
+      const unitPriceXAF = convertCurrency(item.unitPrice, item.currency || "RMB", "XAF", fxRates);
       const totalXAF = unitPriceXAF * item.quantity;
       merchandiseTotal += totalXAF;
       return {
@@ -47,15 +73,19 @@ export class OrderService {
       };
     });
 
-    const commissionRate = 0.10;
+    const commissionRate = data.commissionRate ?? 0.10;
     const commissionAmount = merchandiseTotal * commissionRate;
-    const totalClient = merchandiseTotal + commissionAmount;
+    const logisticsCost = data.logisticsCost ?? 0;
+    const insuranceAmount = data.insuranceAmount ?? 0;
+    const totalClient = merchandiseTotal + commissionAmount + logisticsCost + insuranceAmount;
+    const budgetPlannedXAF = merchandiseTotal + logisticsCost + insuranceAmount;
 
     const order = await prisma.order.create({
       data: {
         tenantId,
         orderNumber,
         contactId: data.contactId,
+        leadId: data.leadId ?? undefined,
         ownerId: data.ownerId ?? null,
         onboardedById: data.onboardedById ?? null,
         priority: data.priority as Priority,
@@ -64,8 +94,15 @@ export class OrderService {
         merchandiseTotal,
         commissionRate,
         commissionAmount,
+        logisticsCost,
+        insuranceAmount,
         totalClient,
+        budgetPlannedXAF,
+        budgetActualXAF: 0,
         currency: "XAF",
+        fxRatesSnapshot: FxService.buildSnapshot(fxRates),
+        fxImpactXAF: 0,
+        originCountry: data.originCountry || "CN",
         items: {
           create: itemsWithXAF.map((item) => ({
             description: item.description,
@@ -101,6 +138,8 @@ export class OrderService {
       },
     });
 
+    await OrderApprovalService.syncOrderApprovals(order.id);
+
     await emitEvent("order.created", "order", order.id, {
       orderNumber: order.orderNumber,
       contactId: order.contactId,
@@ -118,13 +157,14 @@ export class OrderService {
       limit?: number;
       search?: string;
       includeArchived?: boolean;
+      scopeWhere?: Prisma.OrderWhereInput;
     } = {}
   ) {
     const { status, page = 1, limit = 20, search, includeArchived } = options;
 
     const where: Prisma.OrderWhereInput = {
       tenantId,
-      ...(includeArchived ? {} : { archivedAt: null }),
+      ...(includeArchived || !OrderService.hasArchivedAtField() ? {} : { archivedAt: null }),
       ...(status && { status }),
       ...(search && {
         OR: [
@@ -133,18 +173,47 @@ export class OrderService {
           { notes: { contains: search, mode: "insensitive" as const } },
         ],
       }),
+      ...(options.scopeWhere || {}),
     };
 
-    const [orders, total] = await Promise.all([
-      prisma.order.findMany({
+    const select = {
+      id: true,
+      orderNumber: true,
+      status: true,
+      priority: true,
+      riskLevel: true,
+      estimatedDelivery: true,
+      updatedAt: true,
+      createdAt: true,
+      totalClient: true,
+      contact: { select: { name: true } },
+    };
+
+    let orders: any[] = [];
+    let total = 0;
+
+    try {
+      [orders, total] = await prisma.$transaction([
+        prisma.order.findMany({
+          where,
+          select,
+          orderBy: { createdAt: "desc" },
+          skip: (page - 1) * limit,
+          take: limit,
+        }),
+        prisma.order.count({ where }),
+      ]);
+    } catch (error) {
+      console.warn("OrderService.list timeout fallback:", error);
+      orders = await prisma.order.findMany({
         where,
-        include: { contact: true },
+        select,
         orderBy: { createdAt: "desc" },
         skip: (page - 1) * limit,
         take: limit,
-      }),
-      prisma.order.count({ where }),
-    ]);
+      });
+      total = orders.length;
+    }
 
     return {
       orders,
@@ -155,9 +224,9 @@ export class OrderService {
     };
   }
 
-  static async getById(orderId: string) {
-    return prisma.order.findUnique({
-      where: { id: orderId },
+  static async getById(orderId: string, scopeWhere?: Prisma.OrderWhereInput) {
+    return prisma.order.findFirst({
+      where: { id: orderId, ...(scopeWhere || {}) },
       include: {
         contact: true,
         items: true,
@@ -166,6 +235,10 @@ export class OrderService {
         collaborators: { include: { user: { select: { id: true, name: true, email: true } } } },
         attachments: { include: { user: { select: { id: true, name: true, email: true } } }, orderBy: { createdAt: "desc" } },
         quotes: { orderBy: { version: "desc" } },
+        approvals: { include: { rule: true, decidedBy: { select: { id: true, name: true, email: true } } }, orderBy: { createdAt: "asc" } },
+        revisions: { orderBy: { createdAt: "desc" }, take: 10 },
+        ediTransmissions: { include: { supplier: { select: { id: true, name: true } } }, orderBy: { createdAt: "desc" } },
+        portalTokens: { orderBy: { createdAt: "desc" }, take: 3 },
         timeline: { orderBy: { createdAt: "desc" } },
         tasks: {
           include: { assignments: { include: { user: true } } },
@@ -175,11 +248,13 @@ export class OrderService {
           include: {
             trackingEvents: { orderBy: { occurredAt: "asc" } },
             customsClearance: true,
+            aiInsight: true,
           },
           orderBy: { createdAt: "asc" },
         },
         payments: { orderBy: { createdAt: "desc" } },
         disputes: { orderBy: { createdAt: "desc" } },
+        returns: { include: { lines: true }, orderBy: { createdAt: "desc" } },
         qcRequests: {
           include: { reports: { include: { nonConformities: true } } },
           orderBy: { createdAt: "desc" },
@@ -205,14 +280,38 @@ export class OrderService {
       logisticsCost?: number;
       insuranceAmount?: number;
       commissionRate?: number;
-    }
-  ) {
-    const existing = await prisma.order.findUnique({
-      where: { id: orderId },
-      include: { items: true },
-    });
-    if (!existing) throw new Error("Commande introuvable");
+      budgetPlannedXAF?: number;
+    },
+    updatedById?: string,
+    revisionReason?: string
+    ) {
+      const existing = await prisma.order.findUnique({
+        where: { id: orderId },
+        include: { items: true },
+      });
+      if (!existing) throw new Error("Commande introuvable");
+      await this.assertClientFacingContact(existing.tenantId, data.contactId ?? existing.contactId);
 
+    const lastRevision = await prisma.orderRevision.findFirst({
+      where: { orderId },
+      orderBy: { revisionNumber: "desc" },
+      select: { revisionNumber: true },
+    });
+    const nextRevisionNumber = lastRevision ? lastRevision.revisionNumber + 1 : 1;
+    await prisma.orderRevision.create({
+      data: {
+        orderId,
+        revisionNumber: nextRevisionNumber,
+        reason: revisionReason || "Order update",
+        snapshot: serializeDecimals({
+          order: existing,
+          items: existing.items,
+        }),
+        createdById: updatedById || undefined,
+      },
+    });
+
+    const fxRates = await FxService.getLatestRates();
     let merchandiseTotal = Number(existing.merchandiseTotal);
     let itemsPayload: Array<{
       description: string;
@@ -230,7 +329,7 @@ export class OrderService {
     if (data.items && data.items.length > 0) {
       merchandiseTotal = 0;
       itemsPayload = data.items.map((item) => {
-        const unitPriceXAF = convertCurrency(item.unitPrice, item.currency || "RMB", "XAF");
+        const unitPriceXAF = convertCurrency(item.unitPrice, item.currency || "RMB", "XAF", fxRates);
         const totalXAF = unitPriceXAF * item.quantity;
         merchandiseTotal += totalXAF;
         return { ...item, unitPriceXAF, totalXAF };
@@ -242,6 +341,27 @@ export class OrderService {
     const logisticsCost = data.logisticsCost ?? Number(existing.logisticsCost);
     const insuranceAmount = data.insuranceAmount ?? Number(existing.insuranceAmount);
     const totalClient = merchandiseTotal + commissionAmount + logisticsCost + insuranceAmount;
+    const budgetPlannedXAF =
+      data.budgetPlannedXAF ??
+      (Number(existing.budgetPlannedXAF || 0) || (merchandiseTotal + logisticsCost + insuranceAmount));
+
+    const snapshotRates = (existing.fxRatesSnapshot as Record<string, number>) || {};
+    const computeImpact = (items: typeof existing.items) => {
+      let impact = 0;
+      for (const item of items) {
+        try {
+          const baseAmount = Number(item.unitPrice);
+          const qty = item.quantity;
+          const xafSnapshot = convertCurrency(baseAmount, item.currency || "RMB", "XAF", snapshotRates);
+          const xafLatest = convertCurrency(baseAmount, item.currency || "RMB", "XAF", fxRates);
+          impact += (xafLatest - xafSnapshot) * qty;
+        } catch {
+          continue;
+        }
+      }
+      return impact;
+    };
+    const fxImpactXAF = computeImpact(data.items && data.items.length > 0 ? (itemsPayload as any) : existing.items);
 
     const updated = await prisma.$transaction(async (tx) => {
       if (data.items && data.items.length > 0) {
@@ -269,15 +389,19 @@ export class OrderService {
           ...(data.contactId && { contactId: data.contactId }),
           ...(data.priority && { priority: data.priority as Priority }),
           ...(data.destinationCity && { destinationCity: data.destinationCity }),
+          ...(data.originCountry && { originCountry: data.originCountry }),
           ...(data.notes !== undefined && { notes: data.notes }),
           ...(data.ownerId !== undefined && { ownerId: data.ownerId }),
           ...(data.onboardedById !== undefined && { onboardedById: data.onboardedById }),
           ...(data.logisticsCost !== undefined && { logisticsCost }),
           ...(data.insuranceAmount !== undefined && { insuranceAmount }),
           ...(data.commissionRate !== undefined && { commissionRate }),
+          ...(data.budgetPlannedXAF !== undefined && { budgetPlannedXAF }),
           merchandiseTotal,
           commissionAmount,
           totalClient,
+          fxRatesSnapshot: FxService.buildSnapshot(fxRates),
+          fxImpactXAF,
         },
       });
 
@@ -293,6 +417,7 @@ export class OrderService {
       return order;
     });
 
+    await OrderApprovalService.syncOrderApprovals(orderId);
     return updated;
   }
 
@@ -321,8 +446,13 @@ export class OrderService {
         insuranceAmount: existing.insuranceAmount,
         totalClient: existing.totalClient,
         currency: existing.currency,
+        approvalStatus: "NOT_REQUIRED",
         originCountry: existing.originCountry,
         riskLevel: existing.riskLevel,
+        budgetPlannedXAF: existing.budgetPlannedXAF,
+        budgetActualXAF: existing.budgetActualXAF,
+        fxRatesSnapshot: existing.fxRatesSnapshot as any,
+        fxImpactXAF: existing.fxImpactXAF,
         items: {
           create: existing.items.map((item) => ({
             description: item.description,
@@ -352,8 +482,19 @@ export class OrderService {
   static async archive(orderId: string) {
     return prisma.order.update({
       where: { id: orderId },
-      data: { archivedAt: new Date() },
+      data: OrderService.hasArchivedAtField() ? { archivedAt: new Date() } : {},
     });
+  }
+
+  static async restore(orderId: string) {
+    return prisma.order.update({
+      where: { id: orderId },
+      data: OrderService.hasArchivedAtField() ? { archivedAt: null } : {},
+    });
+  }
+
+  static async deleteOrder(orderId: string) {
+    return prisma.order.delete({ where: { id: orderId } });
   }
 
   static async updateStatus(
@@ -367,16 +508,30 @@ export class OrderService {
     });
 
     if (!order) throw new Error("Commande introuvable");
+    if (["PENDING", "REJECTED"].includes(order.approvalStatus as any) && !["DEMANDE", "DEVIS"].includes(newStatus)) {
+      throw new Error("Commande en attente d'approbation");
+    }
     if (!canTransition(order.status, newStatus)) {
       throw new Error(
         `Transition impossible: ${order.status} -> ${newStatus}`
       );
     }
 
+    await this.assertQualityAndReturnGates(orderId, newStatus);
+
+    // Compute new risk level based on incoming status
+    const riskResult = RiskCalculatorService.computeLight({
+      status: newStatus,
+      priority: order.priority as string,
+      riskLevel: order.riskLevel as string,
+      estimatedDelivery: order.estimatedDelivery ?? null,
+    });
+
     const updated = await prisma.order.update({
       where: { id: orderId },
       data: {
         status: newStatus,
+        riskLevel: riskResult.level as any,
         ...(newStatus === "LIVRE" && { actualDelivery: new Date() }),
         timeline: {
           create: {
@@ -391,6 +546,49 @@ export class OrderService {
       include: { contact: true, timeline: { orderBy: { createdAt: "desc" }, take: 1 } },
     });
 
+    if (newStatus === "LIVRE") {
+      const existingInvoice = await prisma.invoice.findFirst({
+        where: { orderId },
+        select: { id: true },
+      });
+      if (!existingInvoice) {
+        const year = new Date().getFullYear();
+        const prefix = `INV-${year}-`;
+        const last = await prisma.invoice.findFirst({
+          where: { tenantId: order.tenantId, invoiceNumber: { startsWith: prefix } },
+          orderBy: { invoiceNumber: "desc" },
+          select: { invoiceNumber: true },
+        });
+        const lastNum = last ? parseInt(last.invoiceNumber.split("-")[2] || "0") : 0;
+        const nextNum = String(lastNum + 1).padStart(5, "0");
+        const invoiceNumber = `${prefix}${nextNum}`;
+
+        await InvoiceService.create({
+          tenantId: order.tenantId,
+          direction: "AR",
+          invoiceNumber,
+          contactId: order.contactId,
+          orderId: order.id,
+          currency: order.currency || "XAF",
+          issuedAt: new Date(),
+          notes: `Facture automatique - livraison ${order.orderNumber}`,
+          lines: [
+            {
+              description: `Commande ${order.orderNumber}`,
+              quantity: 1,
+              unitPrice: Number(order.totalClient),
+            },
+          ],
+        });
+      }
+
+      try {
+        await CatalogMemoryService.recordDeliveredOrder(orderId);
+      } catch (error) {
+        console.error("Catalog memory sync failed:", error);
+      }
+    }
+
     await emitEvent("order.status_changed", "order", orderId, {
       previousStatus: order.status,
       newStatus,
@@ -400,10 +598,58 @@ export class OrderService {
     return updated;
   }
 
-  static async getStatusCounts(tenantId: string) {
+  private static async assertQualityAndReturnGates(orderId: string, newStatus: OrderStatus) {
+    const statusesRequiringQcClearance: OrderStatus[] = [
+      "QC_VALIDE",
+      "EN_TRANSIT",
+      "DEDOUANE",
+      "LIVRE",
+      "CLOTURE",
+    ];
+
+    if (statusesRequiringQcClearance.includes(newStatus)) {
+      const [latestRequest, latestInspection] = await Promise.all([
+        prisma.qCRequest.findFirst({
+          where: { orderId, status: { in: ["FAILED", "PASSED", "CONDITIONAL"] } },
+          orderBy: [{ completedAt: "desc" }, { createdAt: "desc" }],
+          select: { status: true, completedAt: true },
+        }),
+        prisma.qcInspection.findFirst({
+          where: { orderId, status: "COMPLETED", overall: { not: null } },
+          orderBy: [{ completedAt: "desc" }, { createdAt: "desc" }],
+          select: { overall: true },
+        }),
+      ]);
+
+      if (latestRequest?.status === "FAILED" || latestInspection?.overall === "FAIL") {
+        throw new Error("Blocage qualite: un QC en echec doit etre corrige avant progression de la commande");
+      }
+    }
+
+    if (newStatus === "CLOTURE") {
+      const returnModel = (prisma as any).returnMerchandise;
+      if (returnModel) {
+        const openReturns = await returnModel.count({
+          where: {
+            orderId,
+            status: { notIn: ["RESOLVED", "CLOSED", "REJECTED"] },
+          },
+        });
+        if (openReturns > 0) {
+          throw new Error("Impossible de cloturer: des retours marchandise sont encore ouverts");
+        }
+      }
+    }
+  }
+
+  static async getStatusCounts(tenantId: string, scopeWhere?: Prisma.OrderWhereInput) {
     const counts = await prisma.order.groupBy({
       by: ["status"],
-      where: { tenantId, archivedAt: null },
+      where: {
+        tenantId,
+        ...(OrderService.hasArchivedAtField() ? { archivedAt: null } : {}),
+        ...(scopeWhere || {}),
+      },
       _count: { id: true },
     });
 

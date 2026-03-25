@@ -80,6 +80,15 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+
+  --surface-info: oklch(0.95 0.02 240);
+  --surface-info-foreground: oklch(0.35 0.12 240);
+  --surface-success: oklch(0.95 0.05 145);
+  --surface-success-foreground: oklch(0.35 0.15 145);
+  --surface-warning: oklch(0.95 0.05 75);
+  --surface-warning-foreground: oklch(0.40 0.15 75);
+  --surface-danger: oklch(0.95 0.04 25);
+  --surface-danger-foreground: oklch(0.40 0.18 25);
 }
 
 .dark {
@@ -114,82 +123,89 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+
+  --surface-info: oklch(0.20 0.04 240);
+  --surface-info-foreground: oklch(0.85 0.08 240);
+  --surface-success: oklch(0.20 0.06 145);
+  --surface-success-foreground: oklch(0.85 0.10 145);
+  --surface-warning: oklch(0.22 0.06 75);
+  --surface-warning-foreground: oklch(0.88 0.10 75);
+  --surface-danger: oklch(0.22 0.06 25);
+  --surface-danger-foreground: oklch(0.88 0.10 25);
 }
 
-:root.crm-theme {
-  --font-size: 16px;
-  --background: #f5f5f5;
-  --foreground: oklch(0.145 0 0);
-  --card: #ffffff;
-  --card-foreground: oklch(0.145 0 0);
-  --popover: #ffffff;
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: #010150;
-  --primary-foreground: #ffffff;
-  --secondary: #5f27cd;
-  --secondary-foreground: #ffffff;
-  --muted: #ececf0;
-  --muted-foreground: #717182;
-  --accent: #dba000;
-  --accent-foreground: #010150;
-  --destructive: #d4183d;
-  --border: rgba(0, 0, 0, 0.1);
-  --input: transparent;
-  --ring: oklch(0.708 0 0);
-  --chart-1: #010150;
-  --chart-2: #5f27cd;
-  --chart-3: #dba000;
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: #010150;
-  --sidebar-foreground: #ffffff;
-  --sidebar-primary: #dba000;
-  --sidebar-primary-foreground: #010150;
-  --sidebar-accent: #5f27cd;
-  --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: rgba(255, 255, 255, 0.12);
-  --sidebar-ring: oklch(0.708 0 0);
-  --input-background: #f3f3f5;
+
+
+@keyframes shimmer-slide {
+  100% {
+    transform: translateX(100%);
+  }
 }
 
-:root.crm-theme [data-slot="app-header"] {
-  background-color: var(--card);
-  border-color: var(--border);
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
-:root.crm-theme [data-slot="card"] {
-  border-color: rgba(0, 0, 0, 0.08);
-  box-shadow: 0 8px 24px -16px rgba(1, 1, 80, 0.35);
-}
+@layer utilities {
+  .skeleton-shimmer {
+    @apply relative overflow-hidden bg-accent/70;
+  }
 
-:root.crm-theme [data-slot="input"] {
-  background-color: var(--input-background);
-}
+  .skeleton-shimmer::after {
+    content: "";
+    @apply absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/60 to-transparent dark:via-white/10;
+    animation: shimmer-slide 1.6s infinite;
+  }
 
-:root.crm-theme [data-slot="data-table-surface"] {
-  border-radius: 0.875rem;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  background: #ffffff;
-}
+  .surface-info {
+    background-color: var(--surface-info);
+    color: var(--surface-info-foreground);
+  }
 
-:root.crm-theme [data-slot="table-head"] {
-  font-size: 0.75rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: #667085;
-}
+  .surface-success {
+    background-color: var(--surface-success);
+    color: var(--surface-success-foreground);
+  }
 
-:root.crm-theme [data-slot="table-row"]:hover {
-  background-color: #f3f4f6;
+  .surface-warning {
+    background-color: var(--surface-warning);
+    color: var(--surface-warning-foreground);
+  }
+
+  .surface-danger {
+    background-color: var(--surface-danger);
+    color: var(--surface-danger-foreground);
+  }
+
+  .interactive-soft {
+    @apply transition-all duration-150 ease-out motion-reduce:transition-none;
+  }
+
+  .interactive-soft:hover {
+    background-color: hsl(var(--muted, 0 0% 96%));
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.06);
+    transition: all 150ms ease;
+  }
+
+  .interactive-press {
+    @apply active:scale-[0.99] motion-reduce:active:scale-100;
+  }
+
+  .interactive-press:active {
+    transform: scale(0.98);
+  }
+
+  .animate-fade-in {
+    animation: fade-in 0.2s ease-out both;
+  }
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
-    @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
     @apply bg-background text-foreground;
   }
 }

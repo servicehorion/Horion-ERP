@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -15,7 +16,7 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { createSourcingCase } from "@/lib/actions/sourcing.actions";
-import { Loader2, Package } from "lucide-react";
+import { Loader2, Package, Zap } from "lucide-react";
 
 interface Order {
   id: string;
@@ -25,10 +26,30 @@ interface Order {
   currency: string;
 }
 
+const PLATFORMS_INDICATIF = [
+  { value: "alibaba", label: "Alibaba" },
+  { value: "amazon", label: "Amazon" },
+  { value: "aliexpress", label: "AliExpress" },
+  { value: "web", label: "Autre site web" },
+];
+
+const PLATFORMS_PROFOND = [
+  { value: "1688", label: "1688.com" },
+  { value: "taobao", label: "Taobao" },
+  { value: "pinduoduo", label: "Pinduoduo" },
+  { value: "jd", label: "JD.com" },
+  { value: "direct", label: "Contact direct fournisseur" },
+];
+
 export function SourcingCaseForm({ orders }: { orders: Order[] }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [level, setLevel] = useState<"INFORMATIF" | "PROFOND">("INFORMATIF");
+  const [sensitiveProduct, setSensitiveProduct] = useState(false);
+  const [platform, setPlatform] = useState("");
+
+  const platforms = level === "INFORMATIF" ? PLATFORMS_INDICATIF : PLATFORMS_PROFOND;
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -43,6 +64,9 @@ export function SourcingCaseForm({ orders }: { orders: Order[] }) {
       requirement: fd.get("requirement") as string,
       budget: budget ? parseFloat(budget) : undefined,
       currency: (fd.get("currency") as string) || "RMB",
+      level,
+      platform: platform || undefined,
+      sensitiveProduct,
     });
 
     if (result.error) {
@@ -64,13 +88,50 @@ export function SourcingCaseForm({ orders }: { orders: Order[] }) {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5">
           {error && (
-            <div className="rounded-md bg-red-50 p-3 text-sm text-red-600">
-              {error}
-            </div>
+            <div className="rounded-md bg-red-50 p-3 text-sm text-red-600">{error}</div>
           )}
 
+          {/* Level selector */}
+          <div className="space-y-2">
+            <Label>Niveau de sourcing *</Label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => { setLevel("INFORMATIF"); setPlatform(""); }}
+                className={`rounded-lg border-2 p-3 text-left transition-colors ${
+                  level === "INFORMATIF"
+                    ? "border-primary bg-primary/5"
+                    : "border-muted hover:border-muted-foreground/50"
+                }`}
+              >
+                <p className="font-medium text-sm">Indicatif</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  CRM — estimation rapide, prix plateforme + buffer
+                </p>
+              </button>
+              <button
+                type="button"
+                onClick={() => { setLevel("PROFOND"); setPlatform(""); }}
+                className={`rounded-lg border-2 p-3 text-left transition-colors ${
+                  level === "PROFOND"
+                    ? "border-primary bg-primary/5"
+                    : "border-muted hover:border-muted-foreground/50"
+                }`}
+              >
+                <div className="flex items-center gap-1.5 mb-0.5">
+                  <Zap className="h-3.5 w-3.5 text-primary" />
+                  <p className="font-medium text-sm">Profond</p>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Logistique — prix réels, poids confirmé, moteur de marge
+                </p>
+              </button>
+            </div>
+          </div>
+
+          {/* Order */}
           <div className="space-y-2">
             <Label htmlFor="orderId">Commande associée *</Label>
             <Select name="orderId" required>
@@ -87,6 +148,7 @@ export function SourcingCaseForm({ orders }: { orders: Order[] }) {
             </Select>
           </div>
 
+          {/* Requirement */}
           <div className="space-y-2">
             <Label htmlFor="requirement">Description du besoin *</Label>
             <Textarea
@@ -98,6 +160,42 @@ export function SourcingCaseForm({ orders }: { orders: Order[] }) {
             />
           </div>
 
+          {/* Platform + sensitive */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Plateforme source</Label>
+              <Select value={platform} onValueChange={setPlatform}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Sélectionner..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {platforms.map((p) => (
+                    <SelectItem key={p.value} value={p.value}>
+                      {p.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>&nbsp;</Label>
+              <div className="flex items-center gap-2 pt-2">
+                <Checkbox
+                  id="sensitiveProduct"
+                  checked={sensitiveProduct}
+                  onCheckedChange={(v) => setSensitiveProduct(!!v)}
+                />
+                <Label htmlFor="sensitiveProduct" className="cursor-pointer text-sm font-normal">
+                  Produit sensible
+                  <span className="block text-xs text-muted-foreground">
+                    Batteries, liquides, etc.
+                  </span>
+                </Label>
+              </div>
+            </div>
+          </div>
+
+          {/* Budget */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="budget">Budget estimé</Label>
@@ -125,6 +223,14 @@ export function SourcingCaseForm({ orders }: { orders: Order[] }) {
               </Select>
             </div>
           </div>
+
+          {level === "INFORMATIF" && (
+            <p className="text-xs text-muted-foreground bg-muted/50 rounded-lg p-3">
+              En mode Indicatif, le cas est créé avec les informations de base. Les données
+              logistiques (poids, dimensions, marge) peuvent être ajoutées après promotion
+              en Sourcing Profond depuis la fiche du cas.
+            </p>
+          )}
 
           <Button type="submit" disabled={loading} className="w-full">
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

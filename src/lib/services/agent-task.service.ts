@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import type { AgentExecutionStatus, OwnerType, Priority } from "@prisma/client";
+import { AgentPlatformService } from "@/lib/services/agent-platform.service";
 
 /**
  * AgentTaskService — API layer for AI agents to interact with the Tasks OS.
@@ -176,6 +177,18 @@ export class AgentTaskService {
     const slaDeadline = data.slaHours
       ? new Date(Date.now() + data.slaHours * 3600 * 1000)
       : undefined;
+    const resolvedAgentId =
+      data.agentId ||
+      (data.ownerType === "AI_AGENT"
+        ? AgentPlatformService.getRecommendedAgentId(data.module, {
+            entityType: data.entityType,
+            taskType: data.taskType,
+          })
+        : null);
+
+    const resolvedAgentProfile = resolvedAgentId
+      ? await AgentPlatformService.getAgentProfile(data.tenantId, resolvedAgentId)
+      : null;
 
     const task = await prisma.task.create({
       data: {
@@ -188,8 +201,8 @@ export class AgentTaskService {
         entityId: data.entityId ?? "none",
         priority: data.priority ?? "NORMAL",
         ownerType: data.ownerType ?? "SYSTEM",
-        agentId: data.agentId,
-        agentName: data.agentName,
+        agentId: resolvedAgentId ?? undefined,
+        agentName: data.agentName ?? resolvedAgentProfile?.displayName ?? undefined,
         slaDeadline,
         parentTaskId: data.parentTaskId,
         tags: data.tags ?? [],
@@ -207,6 +220,53 @@ export class AgentTaskService {
     }
 
     return task;
+  }
+
+  static async createAgentHandoff(data: {
+    tenantId: string;
+    sourceAgentId: string;
+    sourceAgentName: string;
+    targetAgentId: string;
+    targetAgentName: string;
+    title: string;
+    description?: string;
+    module: string;
+    entityType?: string;
+    entityId?: string;
+    priority?: Priority;
+    parentTaskId?: string;
+    tags?: string[];
+    summary?: string;
+    payload?: Record<string, unknown>;
+  }) {
+    return prisma.task.create({
+      data: {
+        tenantId: data.tenantId,
+        title: data.title,
+        description: data.description,
+        module: data.module,
+        taskType: "agent_handoff",
+        entityType: data.entityType ?? "manual",
+        entityId: data.entityId ?? "none",
+        priority: data.priority ?? "NORMAL",
+        ownerType: "AI_AGENT",
+        agentId: data.targetAgentId,
+        agentName: data.targetAgentName,
+        automationAllowed: true,
+        parentTaskId: data.parentTaskId,
+        tags: Array.from(new Set([...(data.tags ?? []), "agent-handoff"])),
+        customFields: {
+          handoff: {
+            sourceAgentId: data.sourceAgentId,
+            sourceAgentName: data.sourceAgentName,
+            targetAgentId: data.targetAgentId,
+            targetAgentName: data.targetAgentName,
+            summary: data.summary,
+            payload: data.payload ?? {},
+          },
+        } as any,
+      },
+    });
   }
 
   /**

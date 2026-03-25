@@ -1,4 +1,4 @@
-import { ArrowLeft } from "lucide-react";
+﻿import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -9,7 +9,7 @@ import { auth } from "@/lib/auth";
 
 export const metadata = {
   title: "Nouveau lead | Horion ERP",
-  description: "CrÃ©er un nouveau lead",
+  description: "Creer un nouveau lead",
 };
 
 export default async function NewLeadPage() {
@@ -19,7 +19,7 @@ export default async function NewLeadPage() {
     redirect("/login");
   }
 
-  const [contacts, members] = await Promise.all([
+  const [contacts, members, salesTeams, territories] = await Promise.all([
     prisma.contact.findMany({
       where: { tenantId: session.user.tenantId },
       select: { id: true, name: true },
@@ -28,6 +28,16 @@ export default async function NewLeadPage() {
     prisma.user.findMany({
       where: { tenantId: session.user.tenantId, isActive: true },
       select: { id: true, name: true, email: true, role: true },
+      orderBy: { name: "asc" },
+    }),
+    prisma.salesTeam.findMany({
+      where: { tenantId: session.user.tenantId },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
+    prisma.salesTerritory.findMany({
+      where: { tenantId: session.user.tenantId },
+      select: { id: true, name: true },
       orderBy: { name: "asc" },
     }),
   ]);
@@ -42,12 +52,18 @@ export default async function NewLeadPage() {
         </Button>
         <div>
           <h1 className="text-3xl font-bold">Nouveau lead</h1>
-          <p className="text-muted-foreground">CrÃ©er un lead dans le CRM</p>
+          <p className="text-muted-foreground">Creer un lead dans le CRM</p>
         </div>
       </div>
 
       <div className="mx-auto max-w-3xl">
-        <LeadForm contacts={contacts} teamMembers={members} currentUserId={session.user.id} />
+        <LeadForm
+          contacts={contacts}
+          teamMembers={members}
+          salesTeams={salesTeams}
+          territories={territories}
+          currentUserId={session.user.id}
+        />
       </div>
     </div>
   );

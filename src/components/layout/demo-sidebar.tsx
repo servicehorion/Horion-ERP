@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { demoNavigation } from "@/config/demo-navigation";
+import { BrandLogo } from "@/components/layout/brand-logo";
 
 export function DemoSidebar() {
   const pathname = usePathname();
@@ -28,11 +29,8 @@ export function DemoSidebar() {
     <Sidebar>
       <SidebarHeader className="border-b border-sidebar-border px-6 py-4">
         <Link href="/demo" className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-            <span className="text-lg font-bold">H</span>
-          </div>
-          <div className="flex flex-col leading-tight">
-            <span className="text-sm font-semibold tracking-wide text-sidebar-foreground">HORION</span>
+          <div className="flex flex-col gap-1">
+            <BrandLogo width={132} height={32} priority className="max-w-[132px]" />
             <span className="text-xs text-sidebar-foreground/60">DEMO</span>
           </div>
         </Link>

@@ -19,32 +19,38 @@ import { TaskDeleteDuplicate } from "@/components/tasks/task-delete-duplicate";
 import { TaskAttachments } from "@/components/tasks/task-attachments";
 import { TaskTimeEntriesPanel } from "@/components/tasks/task-time-entries-panel";
 import { TaskDependencyManager } from "@/components/tasks/task-dependency-manager";
-import { getTaskById, getTaskActivity, getTeamMembers } from "@/lib/actions/task.actions";
+import { TaskChecklist } from "@/components/tasks/task-checklist";
+import { TaskCustomFields } from "@/components/tasks/task-custom-fields";
+import { CommentReactions } from "@/components/tasks/comment-reactions";
+import { getTaskById, getTaskActivity, getTeamMembers, getTaskChecklists } from "@/lib/actions/task.actions";
 import { getTimeEntries } from "@/lib/actions/project.actions";
 import { auth } from "@/lib/auth";
 import { formatDate } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
 interface PageProps {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
 export async function generateMetadata({ params }: PageProps) {
-  const result = await getTaskById(params.id);
+  const { id } = await params;
+  const result = await getTaskById(id);
   return { title: result.data ? `${result.data.title} | Tâches` : "Tâche | Horion ERP" };
 }
 
 export default async function TaskDetailPage({ params }: PageProps) {
+  const { id } = await params;
   const session = await auth();
   const currentUserId = session?.user?.id ?? "";
   const currentUserRole = (session?.user as any)?.role ?? "OPS";
   const canApproveTime = ["ADMIN", "CEO", "DIRECTION", "FINANCE_MANAGER"].includes(currentUserRole);
 
-  const [taskResult, activityResult, membersResult, timeResult] = await Promise.all([
-    getTaskById(params.id),
-    getTaskActivity(params.id),
+  const [taskResult, activityResult, membersResult, timeResult, checklistResult] = await Promise.all([
+    getTaskById(id),
+    getTaskActivity(id),
     getTeamMembers(),
-    getTimeEntries({ taskId: params.id }),
+    getTimeEntries({ taskId: id }),
+    getTaskChecklists(id),
   ]);
 
   if (taskResult.error || !taskResult.data) notFound();
@@ -53,6 +59,7 @@ export default async function TaskDetailPage({ params }: PageProps) {
   const activity = activityResult.data ?? [];
   const teamMembers = membersResult.data ?? [];
   const timeEntries = timeResult.data?.entries ?? [];
+  const checklists = checklistResult.data ?? [];
 
   const assignees = task.assignments?.map((a: any) => a.user) ?? [];
   const approvals = task.approvals ?? [];
@@ -149,6 +156,18 @@ export default async function TaskDetailPage({ params }: PageProps) {
           </Card>
 
           {/* Subtasks */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <ListTree className="h-4 w-4 text-emerald-500" />
+                Checklist
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <TaskChecklist taskId={task.id} items={checklists as any} />
+            </CardContent>
+          </Card>
+
           {(children.length > 0 || task.parentTaskId === null) && (
             <Card>
               <CardHeader className="pb-3">
@@ -383,7 +402,14 @@ export default async function TaskDetailPage({ params }: PageProps) {
                             <span className="text-xs text-muted-foreground">{formatDate(entry.createdAt, true)}</span>
                           </div>
                           {isComment && comment ? (
-                            <div className="mt-1 text-sm bg-muted/50 rounded-lg p-2.5 border">{comment}</div>
+                            <div className="mt-1 text-sm">
+                              <div className="bg-muted/50 rounded-lg p-2.5 border">{comment}</div>
+                              <CommentReactions
+                                commentId={entry.id}
+                                currentUserId={currentUserId}
+                                initialReactions={entry.newValue?.reactions || []}
+                              />
+                            </div>
                           ) : (
                             <p className="text-sm text-muted-foreground">{entry.action}</p>
                           )}
@@ -440,6 +466,34 @@ export default async function TaskDetailPage({ params }: PageProps) {
                   <Badge variant="outline">{task.riskLevel}</Badge>
                 </div>
               )}
+              {task.estimatedHours && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Heures estimees</span>
+                  <span className="font-medium">{task.estimatedHours}h</span>
+                </div>
+              )}
+              {task.dueDate && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Echeance</span>
+                  <span className="font-medium">{formatDate(task.dueDate, true)}</span>
+                </div>
+              )}
+              {task.startedAt && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Demarre</span>
+                  <span className="font-medium">{formatDate(task.startedAt, true)}</span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Custom fields */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm text-muted-foreground">Champs personnalises</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <TaskCustomFields taskId={task.id} initialFields={(task as any).customFields ?? {}} />
             </CardContent>
           </Card>
 

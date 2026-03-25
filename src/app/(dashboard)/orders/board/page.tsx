@@ -28,6 +28,8 @@ export default async function OrdersBoardPage() {
     totalClient: Number(o.totalClient ?? 0),
     contactName: o.contact?.name ?? "—",
     createdAt: new Date(o.createdAt),
+    riskLevel: o.riskLevel ?? null,
+    estimatedDelivery: o.estimatedDelivery ? new Date(o.estimatedDelivery) : null,
   }));
 
   const total = orders.length;

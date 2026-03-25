@@ -25,6 +25,10 @@ export function serializeDecimals<T>(obj: T): T {
   return obj;
 }
 
+export function toPlainData<T>(obj: T): T {
+  return JSON.parse(JSON.stringify(serializeDecimals(obj))) as T;
+}
+
 export function formatDate(date: Date | string, includeTime = false): string {
   const d = typeof date === "string" ? new Date(date) : date;
 

@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { CheckCircle2, ClipboardCheck, Loader2, Plus, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ClipboardCheck, Loader2, Plus, XCircle } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,8 +15,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { createQcRequest, updateQcRequestStatus, addQcReport } from "@/lib/actions/order.actions";
+import { createQcRequest, updateQcRequestStatus, addQcReport, addQcNonConformity } from "@/lib/actions/order.actions";
 import { formatDate } from "@/lib/utils";
+
+export type QCNonConformity = {
+  id: string;
+  category: string;
+  severity: string;
+  description: string;
+  photoUrl?: string | null;
+  resolution?: string | null;
+};
 
 export type QcReport = {
   id: string;
@@ -24,6 +33,7 @@ export type QcReport = {
   defectRate?: any;
   recommendation?: string | null;
   createdAt: Date;
+  nonConformities?: QCNonConformity[];
 };
 
 export type QcRequest = {
@@ -70,6 +80,13 @@ const RESULT_ICON: Record<string, React.ReactNode> = {
   CONDITIONAL: <ClipboardCheck className="h-4 w-4 text-orange-500" />,
 };
 
+const NC_SEVERITY_COLORS: Record<string, string> = {
+  CRITICAL: "bg-red-100 text-red-700 border-red-200",
+  MAJOR:    "bg-orange-100 text-orange-700 border-orange-200",
+  MINOR:    "bg-yellow-100 text-yellow-700 border-yellow-200",
+  COSMETIC: "bg-gray-100 text-gray-600 border-gray-200",
+};
+
 interface OrderQcProps {
   orderId: string;
   qcRequests: QcRequest[];
@@ -96,6 +113,15 @@ export function OrderQc({ orderId, qcRequests, canManage }: OrderQcProps) {
     overallResult: "PASS",
     defectRate: "",
     recommendation: "",
+  });
+
+  // Non-conformity form
+  const [ncOpenFor, setNcOpenFor] = useState<string | null>(null); // reportId
+  const [ncForm, setNcForm] = useState({
+    category: "",
+    severity: "MAJOR",
+    description: "",
+    resolution: "",
   });
 
   const handleCreate = () => {
@@ -132,6 +158,28 @@ export function OrderQc({ orderId, qcRequests, canManage }: OrderQcProps) {
         toast.success("Rapport ajouté");
         setReportOpenFor(null);
         setReportForm({ overallResult: "PASS", defectRate: "", recommendation: "" });
+        router.refresh();
+      }
+    });
+  };
+
+  const handleAddNc = (reportId: string) => {
+    if (!ncForm.category.trim() || !ncForm.description.trim()) {
+      toast.error("Catégorie et description requis");
+      return;
+    }
+    startTransition(async () => {
+      const res = await addQcNonConformity(reportId, {
+        category: ncForm.category,
+        severity: ncForm.severity,
+        description: ncForm.description,
+        resolution: ncForm.resolution || undefined,
+      });
+      if (res.error) toast.error(res.error);
+      else {
+        toast.success("Non-conformité enregistrée");
+        setNcOpenFor(null);
+        setNcForm({ category: "", severity: "MAJOR", description: "", resolution: "" });
         router.refresh();
       }
     });
@@ -264,20 +312,109 @@ export function OrderQc({ orderId, qcRequests, canManage }: OrderQcProps) {
             <CardContent className="px-4 pb-4 space-y-3">
               {/* Reports */}
               {(req.reports ?? []).length > 0 && (
-                <div className="space-y-1.5">
+                <div className="space-y-3">
                   {(req.reports ?? []).map((report) => (
-                    <div key={report.id} className="flex items-start gap-2 p-2 rounded-md bg-muted/30 text-xs">
-                      {RESULT_ICON[report.overallResult] ?? <ClipboardCheck className="h-4 w-4" />}
-                      <div className="flex-1">
-                        <span className="font-medium">{report.overallResult}</span>
-                        {report.defectRate != null && (
-                          <span className="text-muted-foreground ml-2">Taux défaut : {report.defectRate}%</span>
-                        )}
-                        {report.recommendation && (
-                          <p className="text-muted-foreground mt-0.5">{report.recommendation}</p>
-                        )}
+                    <div key={report.id} className="rounded-md border bg-muted/20 text-xs overflow-hidden">
+                      {/* Report header */}
+                      <div className="flex items-start gap-2 p-2.5">
+                        {RESULT_ICON[report.overallResult] ?? <ClipboardCheck className="h-4 w-4" />}
+                        <div className="flex-1">
+                          <span className="font-medium">{report.overallResult}</span>
+                          {report.defectRate != null && (
+                            <span className="text-muted-foreground ml-2">Taux défaut : {Number(report.defectRate).toFixed(1)}%</span>
+                          )}
+                          {report.recommendation && (
+                            <p className="text-muted-foreground mt-0.5">{report.recommendation}</p>
+                          )}
+                        </div>
+                        <span className="text-muted-foreground shrink-0">{formatDate(report.createdAt)}</span>
                       </div>
-                      <span className="text-muted-foreground shrink-0">{formatDate(report.createdAt)}</span>
+
+                      {/* Non-conformities */}
+                      {(report.nonConformities ?? []).length > 0 && (
+                        <div className="border-t px-2.5 py-2 space-y-1.5">
+                          <p className="text-[11px] font-semibold text-muted-foreground uppercase flex items-center gap-1">
+                            <AlertTriangle className="h-3 w-3" />
+                            Non-conformités ({report.nonConformities!.length})
+                          </p>
+                          {report.nonConformities!.map((nc) => (
+                            <div key={nc.id} className={`rounded border px-2 py-1.5 ${NC_SEVERITY_COLORS[nc.severity] ?? "bg-gray-50 border-gray-200"}`}>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-semibold text-[11px] uppercase">{nc.severity}</span>
+                                <span className="font-medium">{nc.category}</span>
+                              </div>
+                              <p className="mt-0.5 text-[11px]">{nc.description}</p>
+                              {nc.resolution && (
+                                <p className="mt-0.5 text-[11px] italic">✓ {nc.resolution}</p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Add non-conformity */}
+                      {canManage && (
+                        <div className="border-t px-2.5 py-2">
+                          {ncOpenFor === report.id ? (
+                            <div className="space-y-2">
+                              <p className="text-[11px] font-semibold">Ajouter une non-conformité</p>
+                              <div className="grid grid-cols-2 gap-2">
+                                <div className="space-y-1">
+                                  <Label className="text-[11px]">Catégorie</Label>
+                                  <input
+                                    className="flex h-7 w-full rounded-md border border-input bg-background px-2 py-1 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                    value={ncForm.category}
+                                    onChange={(e) => setNcForm((f) => ({ ...f, category: e.target.value }))}
+                                    placeholder="Emballage, Dimensions..."
+                                  />
+                                </div>
+                                <div className="space-y-1">
+                                  <Label className="text-[11px]">Sévérité</Label>
+                                  <Select value={ncForm.severity} onValueChange={(v) => setNcForm((f) => ({ ...f, severity: v }))}>
+                                    <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="CRITICAL">Critique</SelectItem>
+                                      <SelectItem value="MAJOR">Majeur</SelectItem>
+                                      <SelectItem value="MINOR">Mineur</SelectItem>
+                                      <SelectItem value="COSMETIC">Cosmétique</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              </div>
+                              <Textarea
+                                value={ncForm.description}
+                                onChange={(e) => setNcForm((f) => ({ ...f, description: e.target.value }))}
+                                placeholder="Description du défaut..."
+                                rows={2}
+                                className="text-xs"
+                              />
+                              <input
+                                className="flex h-7 w-full rounded-md border border-input bg-background px-2 py-1 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                value={ncForm.resolution}
+                                onChange={(e) => setNcForm((f) => ({ ...f, resolution: e.target.value }))}
+                                placeholder="Résolution / Action corrective (optionnel)"
+                              />
+                              <div className="flex gap-2">
+                                <Button size="sm" className="h-7 text-xs" onClick={() => handleAddNc(report.id)} disabled={isPending}>
+                                  {isPending && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+                                  Enregistrer
+                                </Button>
+                                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setNcOpenFor(null)}>
+                                  Annuler
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <button
+                              className="text-[11px] text-primary hover:underline flex items-center gap-1"
+                              onClick={() => { setNcForm({ category: "", severity: "MAJOR", description: "", resolution: "" }); setNcOpenFor(report.id); }}
+                            >
+                              <Plus className="h-3 w-3" />
+                              Non-conformité
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

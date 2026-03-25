@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
-  Anchor, ChevronDown, ChevronRight, Loader2, MapPin, Plus, Ship, Truck,
+  Anchor, ChevronDown, ChevronRight, FileText, Loader2, MapPin, Plus, Ship, Truck,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -15,11 +15,16 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  createShipment, updateShipmentStatus, addTrackingEvent,
+  createShipment,
+  updateShipmentStatus,
+  addTrackingEvent,
+  upsertCustomsClearance,
+  syncShipmentTracking,
 } from "@/lib/actions/order.actions";
 import { formatDate } from "@/lib/utils";
 
@@ -37,6 +42,11 @@ export type Shipment = {
   status: string;
   origin?: string | null;
   destination?: string | null;
+  trackingProvider?: string | null;
+  trackingNumber?: string | null;
+  trackingStatus?: string | null;
+  trackingUrl?: string | null;
+  lastTrackingSyncAt?: Date | null;
   containerNumber?: string | null;
   blNumber?: string | null;
   weight?: any;
@@ -49,6 +59,11 @@ export type Shipment = {
   currency?: string | null;
   trackingEvents?: TrackingEvent[];
   customsClearance?: any;
+  aiInsight?: {
+    predictedArrival?: Date | null;
+    predictedDelayDays?: number | null;
+    riskLevel?: string | null;
+  } | null;
 };
 
 const MODE_ICONS: Record<string, React.ReactNode> = {
@@ -88,6 +103,28 @@ const MODE_LABELS: Record<string, string> = {
   RAIL: "Ferroviaire", MULTIMODAL: "Multimodal",
 };
 
+const CUSTOMS_STATUS_LABELS: Record<string, string> = {
+  PENDING:              "En attente",
+  DOCUMENTS_SUBMITTED:  "Docs soumis",
+  UNDER_REVIEW:         "En révision",
+  DUTY_ASSESSED:        "Droits évalués",
+  DUTY_PAID:            "Droits payés",
+  CLEARED:              "Dédouané",
+  HELD:                 "Retenu",
+  REJECTED:             "Rejeté",
+};
+
+const CUSTOMS_STATUS_COLORS: Record<string, string> = {
+  PENDING:              "bg-gray-100 text-gray-700",
+  DOCUMENTS_SUBMITTED:  "bg-blue-100 text-blue-700",
+  UNDER_REVIEW:         "bg-amber-100 text-amber-700",
+  DUTY_ASSESSED:        "bg-orange-100 text-orange-700",
+  DUTY_PAID:            "bg-indigo-100 text-indigo-700",
+  CLEARED:              "bg-green-100 text-green-700",
+  HELD:                 "bg-red-100 text-red-700",
+  REJECTED:             "bg-red-200 text-red-800",
+};
+
 interface OrderShipmentsProps {
   orderId: string;
   shipments: Shipment[];
@@ -100,12 +137,33 @@ export function OrderShipments({ orderId, shipments, canManage }: OrderShipments
   const [createOpen, setCreateOpen] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [trackingShipId, setTrackingShipId] = useState<string | null>(null);
+  const [customsShipId, setCustomsShipId] = useState<string | null>(null);
+  const [syncingId, setSyncingId] = useState<string | null>(null);
+  const [customsForm, setCustomsForm] = useState({
+    status: "PENDING",
+    declarationNum: "",
+    dutyAmount: "",
+    dutyCurrency: "XAF",
+    brokerName: "",
+    submittedAt: "",
+    clearedAt: "",
+  });
 
   // Create form state
   const [form, setForm] = useState({
     mode: "SEA", origin: "", destination: "",
     containerNumber: "", blNumber: "", estimatedDeparture: "", estimatedArrival: "",
     cost: "", currency: "XAF",
+    trackingProvider: "",
+    trackingNumber: "",
+    trackingUrl: "",
+    cargoCategory: "STANDARD",
+    isPureBattery: false,
+    isLiquid: false,
+    isDrone: false,
+    isUndeclared: false,
+    isFragile: false,
+    hasWoodenCratePackaging: false,
   });
 
   // Tracking event form state
@@ -125,6 +183,16 @@ export function OrderShipments({ orderId, shipments, canManage }: OrderShipments
         estimatedArrival: form.estimatedArrival || undefined,
         cost: form.cost ? Number(form.cost) : undefined,
         currency: form.currency || undefined,
+        trackingProvider: form.trackingProvider || undefined,
+        trackingNumber: form.trackingNumber || undefined,
+        trackingUrl: form.trackingUrl || undefined,
+        cargoCategory: form.cargoCategory as any,
+        isPureBattery: form.isPureBattery,
+        isLiquid: form.isLiquid,
+        isDrone: form.isDrone,
+        isUndeclared: form.isUndeclared,
+        isFragile: form.isFragile,
+        hasWoodenCratePackaging: form.hasWoodenCratePackaging,
       });
       if (res.error) toast.error(res.error);
       else { toast.success("Expédition créée"); setCreateOpen(false); router.refresh(); }
@@ -136,6 +204,47 @@ export function OrderShipments({ orderId, shipments, canManage }: OrderShipments
       const res = await updateShipmentStatus(shipmentId, status);
       if (res.error) toast.error(res.error);
       else { toast.success("Statut mis à jour"); router.refresh(); }
+    });
+  };
+
+  const openCustomsForm = (ship: Shipment) => {
+    if (ship.customsClearance) {
+      setCustomsForm({
+        status: ship.customsClearance.status ?? "PENDING",
+        declarationNum: ship.customsClearance.declarationNum ?? "",
+        dutyAmount: ship.customsClearance.dutyAmount != null ? String(Number(ship.customsClearance.dutyAmount)) : "",
+        dutyCurrency: ship.customsClearance.dutyCurrency ?? "XAF",
+        brokerName: ship.customsClearance.brokerName ?? "",
+        submittedAt: ship.customsClearance.submittedAt
+          ? new Date(ship.customsClearance.submittedAt).toISOString().slice(0, 10)
+          : "",
+        clearedAt: ship.customsClearance.clearedAt
+          ? new Date(ship.customsClearance.clearedAt).toISOString().slice(0, 10)
+          : "",
+      });
+    } else {
+      setCustomsForm({ status: "PENDING", declarationNum: "", dutyAmount: "", dutyCurrency: "XAF", brokerName: "", submittedAt: "", clearedAt: "" });
+    }
+    setCustomsShipId(ship.id);
+  };
+
+  const handleSaveCustoms = (shipmentId: string) => {
+    startTransition(async () => {
+      const res = await upsertCustomsClearance(shipmentId, {
+        status: customsForm.status || undefined,
+        declarationNum: customsForm.declarationNum || undefined,
+        dutyAmount: customsForm.dutyAmount ? Number(customsForm.dutyAmount) : undefined,
+        dutyCurrency: customsForm.dutyCurrency || undefined,
+        brokerName: customsForm.brokerName || undefined,
+        submittedAt: customsForm.submittedAt || undefined,
+        clearedAt: customsForm.clearedAt || undefined,
+      });
+      if (res.error) toast.error(res.error);
+      else {
+        toast.success("Dédouanement enregistré");
+        setCustomsShipId(null);
+        router.refresh();
+      }
     });
   };
 
@@ -155,6 +264,19 @@ export function OrderShipments({ orderId, shipments, canManage }: OrderShipments
         setTrackingShipId(null);
         router.refresh();
       }
+    });
+  };
+
+  const handleSyncTracking = (shipmentId: string) => {
+    setSyncingId(shipmentId);
+    startTransition(async () => {
+      const res = await syncShipmentTracking(shipmentId);
+      if (res.error) toast.error(res.error);
+      else {
+        toast.success("Tracking synchronise");
+        router.refresh();
+      }
+      setSyncingId(null);
     });
   };
 
@@ -235,6 +357,100 @@ export function OrderShipments({ orderId, shipments, canManage }: OrderShipments
                   <Label>Coût fret</Label>
                   <Input type="number" min="0" step="0.01" value={form.cost} onChange={(e) => setForm((f) => ({ ...f, cost: e.target.value }))} placeholder="0" />
                 </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label>Provider tracking</Label>
+                    <Input
+                      value={form.trackingProvider}
+                      onChange={(e) => setForm((f) => ({ ...f, trackingProvider: e.target.value }))}
+                      placeholder="aftership / ... "
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Tracking number</Label>
+                    <Input
+                      value={form.trackingNumber}
+                      onChange={(e) => setForm((f) => ({ ...f, trackingNumber: e.target.value }))}
+                      placeholder="Numéro"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Tracking URL</Label>
+                  <Input
+                    value={form.trackingUrl}
+                    onChange={(e) => setForm((f) => ({ ...f, trackingUrl: e.target.value }))}
+                    placeholder="https://tracking..."
+                  />
+                </div>
+                <div className="rounded-md border p-3 space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground">Compliance transport</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1.5">
+                      <Label>Categorie marchandise</Label>
+                      <Select
+                        value={form.cargoCategory}
+                        onValueChange={(v) => setForm((f) => ({ ...f, cargoCategory: v }))}
+                      >
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="STANDARD">Standard</SelectItem>
+                          <SelectItem value="SPECIAL">Special</SelectItem>
+                          <SelectItem value="MEDICAL">Medical</SelectItem>
+                          <SelectItem value="LAPTOP">Ordinateur</SelectItem>
+                          <SelectItem value="SMARTPHONE">Smartphone/Tablette</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Checks</Label>
+                      <div className="space-y-1 text-xs">
+                        <label className="flex items-center gap-2">
+                          <Checkbox
+                            checked={form.isPureBattery}
+                            onCheckedChange={(checked) => setForm((f) => ({ ...f, isPureBattery: Boolean(checked) }))}
+                          />
+                          Batterie pure
+                        </label>
+                        <label className="flex items-center gap-2">
+                          <Checkbox
+                            checked={form.isLiquid}
+                            onCheckedChange={(checked) => setForm((f) => ({ ...f, isLiquid: Boolean(checked) }))}
+                          />
+                          Liquide/cosmetique
+                        </label>
+                        <label className="flex items-center gap-2">
+                          <Checkbox
+                            checked={form.isDrone}
+                            onCheckedChange={(checked) => setForm((f) => ({ ...f, isDrone: Boolean(checked) }))}
+                          />
+                          Drone
+                        </label>
+                        <label className="flex items-center gap-2">
+                          <Checkbox
+                            checked={form.isUndeclared}
+                            onCheckedChange={(checked) => setForm((f) => ({ ...f, isUndeclared: Boolean(checked) }))}
+                          />
+                          Colis non declare (majoration 60%)
+                        </label>
+                        <label className="flex items-center gap-2">
+                          <Checkbox
+                            checked={form.isFragile}
+                            onCheckedChange={(checked) => setForm((f) => ({ ...f, isFragile: Boolean(checked) }))}
+                          />
+                          Fragile
+                        </label>
+                        <label className="flex items-center gap-2">
+                          <Checkbox
+                            checked={form.hasWoodenCratePackaging}
+                            onCheckedChange={(checked) => setForm((f) => ({ ...f, hasWoodenCratePackaging: Boolean(checked) }))}
+                          />
+                          Caisse bois
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
               <DialogFooter>
                 <Button onClick={handleCreate} disabled={isPending}>
@@ -311,6 +527,48 @@ export function OrderShipments({ orderId, shipments, canManage }: OrderShipments
 
               {isOpen && (
                 <CardContent className="border-t pt-3 pb-4 space-y-3 bg-muted/20">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="text-xs text-muted-foreground space-y-1">
+                      <div>
+                        Provider: <span className="text-foreground font-medium">{ship.trackingProvider || "Non defini"}</span>
+                        {ship.trackingNumber && <span className="ml-2 font-mono">{ship.trackingNumber}</span>}
+                      </div>
+                      {ship.trackingStatus && (
+                        <div>Statut tracking: <span className="text-foreground">{ship.trackingStatus}</span></div>
+                      )}
+                      {ship.lastTrackingSyncAt && (
+                        <div>Dernier sync: {formatDate(ship.lastTrackingSyncAt)}</div>
+                      )}
+                      {ship.aiInsight?.predictedArrival && (
+                        <div>
+                          ETA IA: <span className="text-foreground">{formatDate(ship.aiInsight.predictedArrival)}</span>
+                          {ship.aiInsight.predictedDelayDays != null && ship.aiInsight.predictedDelayDays > 0 && (
+                            <span className="ml-2 text-amber-600">+{ship.aiInsight.predictedDelayDays}j</span>
+                          )}
+                        </div>
+                      )}
+                      {ship.aiInsight?.riskLevel && (
+                        <div>Risque: <span className="text-foreground">{ship.aiInsight.riskLevel}</span></div>
+                      )}
+                      {ship.trackingUrl && (
+                        <a className="text-primary underline" href={ship.trackingUrl} target="_blank" rel="noreferrer">
+                          Ouvrir tracking
+                        </a>
+                      )}
+                    </div>
+                    {canManage && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleSyncTracking(ship.id)}
+                        disabled={syncingId === ship.id}
+                      >
+                        {syncingId === ship.id ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
+                        Sync tracking
+                      </Button>
+                    )}
+                  </div>
+
                   {/* Tracking events */}
                   <div>
                     <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Suivi</p>
@@ -329,6 +587,159 @@ export function OrderShipments({ orderId, shipments, canManage }: OrderShipments
                             <span className="text-muted-foreground shrink-0">{formatDate(ev.occurredAt)}</span>
                           </div>
                         ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Customs clearance section */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase flex items-center gap-1">
+                        <FileText className="h-3 w-3" />
+                        Dédouanement
+                      </p>
+                      {canManage && customsShipId !== ship.id && (
+                        <button
+                          className="text-xs text-primary hover:underline"
+                          onClick={() => openCustomsForm(ship)}
+                        >
+                          {ship.customsClearance ? "Modifier" : "Initier"}
+                        </button>
+                      )}
+                    </div>
+
+                    {ship.customsClearance && customsShipId !== ship.id && (
+                      <div className="text-xs space-y-1">
+                        <div className="flex items-center gap-2">
+                          <Badge className={CUSTOMS_STATUS_COLORS[ship.customsClearance.status] ?? ""}>
+                            {CUSTOMS_STATUS_LABELS[ship.customsClearance.status] ?? ship.customsClearance.status}
+                          </Badge>
+                          {ship.customsClearance.declarationNum && (
+                            <span className="font-mono text-muted-foreground">N° {ship.customsClearance.declarationNum}</span>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap gap-4 text-muted-foreground mt-1">
+                          {ship.customsClearance.brokerName && (
+                            <span>Transitaire : <span className="text-foreground font-medium">{ship.customsClearance.brokerName}</span></span>
+                          )}
+                          {ship.customsClearance.dutyAmount != null && (
+                            <span>Droits : <span className="text-foreground font-medium">{Number(ship.customsClearance.dutyAmount).toLocaleString("fr-FR")} {ship.customsClearance.dutyCurrency ?? "XAF"}</span></span>
+                          )}
+                          {ship.customsClearance.submittedAt && (
+                            <span>Soumis : {formatDate(ship.customsClearance.submittedAt)}</span>
+                          )}
+                          {ship.customsClearance.clearedAt && (
+                            <span className="text-green-600">Dédouané : {formatDate(ship.customsClearance.clearedAt)}</span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {!ship.customsClearance && customsShipId !== ship.id && (
+                      <p className="text-xs text-muted-foreground">Aucune procédure douanière enregistrée.</p>
+                    )}
+
+                    {canManage && customsShipId === ship.id && (
+                      <div className="space-y-2 pt-2 border-t">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-1">
+                            <label className="text-xs font-medium">Statut</label>
+                            <Select
+                              value={customsForm.status}
+                              onValueChange={(v) => setCustomsForm((f) => ({ ...f, status: v }))}
+                            >
+                              <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                {Object.entries(CUSTOMS_STATUS_LABELS).map(([k, v]) => (
+                                  <SelectItem key={k} value={k}>{v}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-xs font-medium">N° déclaration</label>
+                            <input
+                              className="flex h-7 w-full rounded-md border border-input bg-background px-2 py-1 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                              value={customsForm.declarationNum}
+                              onChange={(e) => setCustomsForm((f) => ({ ...f, declarationNum: e.target.value }))}
+                              placeholder="DEC-2024-..."
+                            />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-1">
+                            <label className="text-xs font-medium">Montant droits</label>
+                            <div className="flex gap-1">
+                              <input
+                                type="number"
+                                min="0"
+                                className="flex h-7 flex-1 rounded-md border border-input bg-background px-2 py-1 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                value={customsForm.dutyAmount}
+                                onChange={(e) => setCustomsForm((f) => ({ ...f, dutyAmount: e.target.value }))}
+                                placeholder="0"
+                              />
+                              <Select
+                                value={customsForm.dutyCurrency}
+                                onValueChange={(v) => setCustomsForm((f) => ({ ...f, dutyCurrency: v }))}
+                              >
+                                <SelectTrigger className="h-7 w-16 text-xs"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  {["XAF", "USD", "EUR"].map((c) => (
+                                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-xs font-medium">Transitaire / Broker</label>
+                            <input
+                              className="flex h-7 w-full rounded-md border border-input bg-background px-2 py-1 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              value={customsForm.brokerName}
+                              onChange={(e) => setCustomsForm((f) => ({ ...f, brokerName: e.target.value }))}
+                              placeholder="Bolloré, DHL..."
+                            />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-1">
+                            <label className="text-xs font-medium">Date soumission</label>
+                            <input
+                              type="date"
+                              className="flex h-7 w-full rounded-md border border-input bg-background px-2 py-1 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              value={customsForm.submittedAt}
+                              onChange={(e) => setCustomsForm((f) => ({ ...f, submittedAt: e.target.value }))}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-xs font-medium">Date dédouanement</label>
+                            <input
+                              type="date"
+                              className="flex h-7 w-full rounded-md border border-input bg-background px-2 py-1 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              value={customsForm.clearedAt}
+                              onChange={(e) => setCustomsForm((f) => ({ ...f, clearedAt: e.target.value }))}
+                            />
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            className="h-7 text-xs"
+                            onClick={() => handleSaveCustoms(ship.id)}
+                            disabled={isPending}
+                          >
+                            {isPending && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+                            Enregistrer
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 text-xs"
+                            onClick={() => setCustomsShipId(null)}
+                          >
+                            Annuler
+                          </Button>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -400,3 +811,4 @@ export function OrderShipments({ orderId, shipments, canManage }: OrderShipments
     </div>
   );
 }
+

@@ -15,6 +15,8 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { LogOut, User } from "lucide-react";
 import { NotificationBell } from "@/components/tasks/notification-bell";
+import { DashboardBreadcrumbs } from "@/components/layout/dashboard-breadcrumbs";
+import { CommandPalette } from "@/components/layout/command-palette";
 
 export function Header() {
   const { data: session } = useSession();
@@ -27,10 +29,12 @@ export function Header() {
     .slice(0, 2) || "?";
 
   return (
-    <header data-slot="app-header" className="flex h-14 items-center gap-4 border-b bg-background px-4">
-      <SidebarTrigger />
+    <header data-slot="app-header" className="flex h-14 items-center gap-3 border-b bg-background px-4">
+      <SidebarTrigger aria-label="Ouvrir le menu lateral" />
       <Separator orientation="vertical" className="h-6" />
+      <DashboardBreadcrumbs />
       <div className="flex-1" />
+      <CommandPalette />
 
       {/* Notification Bell */}
       <NotificationBell />
@@ -38,7 +42,7 @@ export function Header() {
       {/* User Menu */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+          <Button variant="ghost" className="relative h-8 w-8 rounded-full" aria-label="Menu utilisateur">
             <Avatar className="h-8 w-8">
               <AvatarFallback className="text-xs">{initials}</AvatarFallback>
             </Avatar>

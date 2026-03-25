@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { confirmSourcingSelection } from "@/lib/actions/sourcing.actions";
 import { CheckCircle2, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 export function ConfirmSelectionButton({ caseId }: { caseId: string }) {
   const router = useRouter();
@@ -16,9 +17,10 @@ export function ConfirmSelectionButton({ caseId }: { caseId: string }) {
     const result = await confirmSourcingSelection(caseId);
     setLoading(false);
     if (result.error) {
-      alert(result.error);
+      toast.error(result.error);
       return;
     }
+    toast.success("Selection confirmee");
     router.refresh();
   }
 

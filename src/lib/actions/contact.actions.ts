@@ -5,8 +5,11 @@ import { ContactService } from "@/lib/services/contact.service";
 import { LeadService } from "@/lib/services/lead.service";
 import { AuditService } from "@/lib/services/audit.service";
 import { NotificationService } from "@/lib/services/notification.service";
+import { LeadScoringService } from "@/lib/services/lead-scoring.service";
+import { CrmEmailService } from "@/lib/services/crm-email.service";
+import { LeadSlaService } from "@/lib/services/lead-sla.service";
 import { checkPermission } from "@/lib/permissions";
-import { canExportCrm, getCrmContactScope, getCrmLeadScope } from "@/lib/access-control";
+import { canExportCrm, getCrmContactScopeWithDelegation, getCrmLeadScopeWithDelegation } from "@/lib/access-control";
 import { createContactSchema, createLeadSchema, updateContactSchema } from "@/lib/validators/contact";
 import { revalidatePath } from "next/cache";
 import type { ContactType, LeadStatus } from "@prisma/client";
@@ -35,6 +38,16 @@ export async function createContact(formData: Record<string, unknown>) {
     const validated = createContactSchema.parse(formData);
     const ownerId = validated.ownerId || user.id;
     const collaboratorIds = normalizeCollaboratorIds(validated.collaboratorIds, ownerId);
+
+    if (validated.phone) {
+      const duplicate = await prisma.contact.findFirst({
+        where: { tenantId: user.tenantId, phone: validated.phone },
+        select: { name: true },
+      });
+      if (duplicate) {
+        return { error: `Doublon : le contact "${duplicate.name}" utilise déjà ce numéro` };
+      }
+    }
 
     const contact = await ContactService.create(user.tenantId, {
       ...validated,
@@ -78,9 +91,9 @@ export async function updateContact(contactId: string, formData: Record<string, 
     const user = await getSession();
     checkPermission(user.role, "contact.manage");
 
-    const scope = getCrmContactScope(user);
+    const scope = await getCrmContactScopeWithDelegation(user);
     if (!scope) {
-      return { error: "AccÃ¨s refusÃ©" };
+      return { error: "Accès refusé" };
     }
 
     const existing = await ContactService.getById(contactId, scope);
@@ -138,9 +151,9 @@ export async function deleteContact(contactId: string) {
     const user = await getSession();
     checkPermission(user.role, "contact.manage");
 
-    const scope = getCrmContactScope(user);
+    const scope = await getCrmContactScopeWithDelegation(user);
     if (!scope) {
-      return { error: "AccÃ¨s refusÃ©" };
+      return { error: "Accès refusé" };
     }
 
     const existing = await ContactService.getById(contactId, scope);
@@ -178,9 +191,9 @@ export async function getContacts(options?: {
     const user = await getSession();
     checkPermission(user.role, "contact.view");
 
-    const scope = getCrmContactScope(user);
+    const scope = await getCrmContactScopeWithDelegation(user);
     if (!scope) {
-      return { error: "AccÃ¨s refusÃ©" };
+      return { error: "Accès refusé" };
     }
     const result = await ContactService.list(user.tenantId, {
       type: options?.type as ContactType | undefined,
@@ -190,9 +203,7 @@ export async function getContacts(options?: {
       scopeWhere: scope,
     });
     return { data: result.contacts };
-  } catch (error) {
-    console.error("Error fetching contacts:", error);
-    return { error: error instanceof Error ? error.message : "Erreur lors de la récupération" };
+  } catch (error) {    return { error: error instanceof Error ? error.message : "Erreur lors de la récupération" };
   }
 }
 
@@ -201,9 +212,9 @@ export async function getContactById(contactId: string) {
     const user = await getSession();
     checkPermission(user.role, "contact.view");
 
-    const scope = getCrmContactScope(user);
+    const scope = await getCrmContactScopeWithDelegation(user);
     if (!scope) {
-      return { error: "AccÃ¨s refusÃ©" };
+      return { error: "Accès refusé" };
     }
 
     const contact = await ContactService.getById(contactId, scope);
@@ -221,9 +232,9 @@ export async function getContactTypeCount() {
   try {
     const user = await getSession();
     checkPermission(user.role, "contact.view");
-    const scope = getCrmContactScope(user);
+    const scope = await getCrmContactScopeWithDelegation(user);
     if (!scope) {
-      return { error: "AccÃ¨s refusÃ©" };
+      return { error: "Accès refusé" };
     }
     return { data: await ContactService.getTypeCount(user.tenantId, scope) };
   } catch (error) {
@@ -239,9 +250,9 @@ export async function createLead(formData: Record<string, unknown>) {
     checkPermission(user.role, "lead.manage");
 
     const validated = createLeadSchema.parse(formData);
-    const contactScope = getCrmContactScope(user);
+    const contactScope = await getCrmContactScopeWithDelegation(user);
     if (!contactScope) {
-      return { error: "AccÃ¨s refusÃ©" };
+      return { error: "Accès refusé" };
     }
     const allowedContact = await ContactService.getById(validated.contactId, contactScope);
     if (!allowedContact) {
@@ -256,6 +267,8 @@ export async function createLead(formData: Record<string, unknown>) {
       onboardedById: user.id,
       collaboratorIds,
     });
+
+    void LeadScoringService.recalculate(lead.id);
 
     await NotificationService.notifyMany(
       uniqueIds([ownerId, ...collaboratorIds]),
@@ -284,13 +297,14 @@ export async function getLeads(options?: {
   search?: string;
   page?: number;
   limit?: number;
+  includeArchived?: boolean;
 }) {
   try {
     const user = await getSession();
     checkPermission(user.role, "lead.view");
-    const scope = getCrmLeadScope(user);
+    const scope = await getCrmLeadScopeWithDelegation(user);
     if (!scope) {
-      return { error: "AccÃ¨s refusÃ©" };
+      return { error: "Accès refusé" };
     }
     const result = await LeadService.list(user.tenantId, {
       status: options?.status as LeadStatus | undefined,
@@ -298,6 +312,7 @@ export async function getLeads(options?: {
       search: options?.search,
       page: options?.page,
       limit: options?.limit,
+      includeArchived: options?.includeArchived,
       scopeWhere: scope,
     });
     return {
@@ -306,9 +321,7 @@ export async function getLeads(options?: {
       totalPages: result.totalPages,
       page: result.page,
     };
-  } catch (error) {
-    console.error("Error fetching leads:", error);
-    return { error: error instanceof Error ? error.message : "Erreur lors de la récupération" };
+  } catch (error) {    return { error: error instanceof Error ? error.message : "Erreur lors de la récupération" };
   }
 }
 
@@ -317,9 +330,9 @@ export async function updateLeadStatus(leadId: string, status: string) {
     const user = await getSession();
     checkPermission(user.role, "lead.manage");
 
-    const scope = getCrmLeadScope(user);
+    const scope = await getCrmLeadScopeWithDelegation(user);
     if (!scope) {
-      return { error: "AccÃ¨s refusÃ©" };
+      return { error: "Accès refusé" };
     }
     const existing = await LeadService.getById(leadId, scope);
     if (!existing) {
@@ -330,6 +343,10 @@ export async function updateLeadStatus(leadId: string, status: string) {
       status: status as LeadStatus,
       ...(status === "QUALIFIED" ? { ownerId: user.id } : {}),
     });
+
+    // Fire-and-forget: recalculate score + SLA
+    void LeadScoringService.recalculate(leadId);
+    void LeadSlaService.updateSla(leadId, status);
 
     if (status === "QUALIFIED") {
       await prisma.contact.update({
@@ -364,9 +381,9 @@ export async function validateLead(leadId: string) {
     const user = await getSession();
     checkPermission(user.role, "lead.manage");
 
-    const scope = getCrmLeadScope(user);
+    const scope = await getCrmLeadScopeWithDelegation(user);
     if (!scope) {
-      return { error: "AccÃ¨s refusÃ©" };
+      return { error: "Accès refusé" };
     }
     const existing = await LeadService.getById(leadId, scope);
     if (!existing) {
@@ -417,9 +434,9 @@ export async function getLeadById(leadId: string) {
   try {
     const user = await getSession();
     checkPermission(user.role, "lead.view");
-    const scope = getCrmLeadScope(user);
+    const scope = await getCrmLeadScopeWithDelegation(user);
     if (!scope) {
-      return { error: "AccÃ¨s refusÃ©" };
+      return { error: "Accès refusé" };
     }
     const lead = await LeadService.getById(leadId, scope);
     if (!lead) {
@@ -437,9 +454,9 @@ export async function updateLead(leadId: string, data: Record<string, unknown>) 
     const user = await getSession();
     checkPermission(user.role, "lead.manage");
 
-    const scope = getCrmLeadScope(user);
+    const scope = await getCrmLeadScopeWithDelegation(user);
     if (!scope) {
-      return { error: "AccÃ¨s refusÃ©" };
+      return { error: "Accès refusé" };
     }
     const existing = await LeadService.getById(leadId, scope);
     if (!existing) {
@@ -467,6 +484,11 @@ export async function updateLead(leadId: string, data: Record<string, unknown>) 
       collaboratorIds,
     });
 
+    // Fire-and-forget: recalculate score (skip if winProbability set manually)
+    if (payload.winProbability === undefined) {
+      void LeadScoringService.recalculate(leadId);
+    }
+
     await NotificationService.notifyMany(
       uniqueIds([lead.ownerId, ...extractCollaboratorIds(lead.collaborators)]),
       {
@@ -488,13 +510,47 @@ export async function updateLead(leadId: string, data: Record<string, unknown>) 
   }
 }
 
+
+export async function updateLeadWinProbability(leadId: string, winProbability: number) {
+  try {
+    const user = await getSession();
+    checkPermission(user.role, "lead.manage");
+
+    const scope = await getCrmLeadScopeWithDelegation(user);
+    if (!scope) {
+      return { error: "Acces refuse" };
+    }
+    const existing = await LeadService.getById(leadId, scope);
+    if (!existing) {
+      return { error: "Lead introuvable" };
+    }
+
+    const clamped = Math.max(0, Math.min(100, Math.round(winProbability)));
+    const lead = await LeadService.update(leadId, { winProbability: clamped });
+
+    await AuditService.log({
+      tenantId: user.tenantId,
+      userId: user.id,
+      action: "lead.win_probability_updated",
+      entityType: "lead",
+      entityId: leadId,
+      newValue: { winProbability: clamped },
+    });
+
+    revalidatePath(`/crm/leads/${leadId}`);
+    return { data: lead };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Erreur lors de la mise a jour" };
+  }
+}
+
 export async function getLeadPipeline() {
   try {
     const user = await getSession();
     checkPermission(user.role, "lead.view");
-    const scope = getCrmLeadScope(user);
+    const scope = await getCrmLeadScopeWithDelegation(user);
     if (!scope) {
-      return { error: "AccÃ¨s refusÃ©" };
+      return { error: "Accès refusé" };
     }
     return { data: await LeadService.getPipelineStats(user.tenantId, scope) };
   } catch (error) {
@@ -506,11 +562,11 @@ export async function exportContactsCSV() {
   try {
     const user = await getSession();
     if (!canExportCrm(user.role)) {
-      return { error: "AccÃ¨s refusÃ©" };
+      return { error: "Accès refusé" };
     }
-    const scope = getCrmContactScope(user);
+    const scope = await getCrmContactScopeWithDelegation(user);
     if (!scope) {
-      return { error: "AccÃ¨s refusÃ©" };
+      return { error: "Accès refusé" };
     }
     const result = await ContactService.list(user.tenantId, { limit: 10000, scopeWhere: scope });
     const contacts = result.contacts;
@@ -567,6 +623,15 @@ export async function exportContactsCSV() {
       ...rows.map((row) => row.map(escapeCsvField).join(",")),
     ].join("\n");
 
+    await AuditService.log({
+      tenantId: user.tenantId,
+      userId: user.id,
+      action: "crm.contacts.export.csv",
+      entityType: "contact",
+      entityId: "bulk",
+      newValue: { rows: contacts.length },
+    });
+
     return { data: csv };
   } catch (error) {
     console.error("Error exporting contacts:", error);
@@ -581,11 +646,26 @@ export async function addContactNote(contactId: string, note: string) {
 
     const contact = await prisma.contact.findUnique({
       where: { id: contactId },
-      select: { tenantId: true },
+      select: { tenantId: true, notes: true },
     });
     if (!contact || contact.tenantId !== user.tenantId) {
       return { error: "Contact introuvable" };
     }
+
+    const timestamp = new Date().toLocaleString("fr-FR", {
+      timeZone: "Africa/Brazzaville",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    const newNotes = (contact.notes ? contact.notes + "\n" : "") + `[${timestamp}] ${note}`;
+
+    await prisma.contact.update({
+      where: { id: contactId },
+      data: { notes: newNotes },
+    });
 
     await AuditService.log({
       tenantId: user.tenantId,
@@ -604,6 +684,131 @@ export async function addContactNote(contactId: string, note: string) {
   }
 }
 
+export async function createLeadTask(
+  leadId: string,
+  data: {
+    title: string;
+    description?: string;
+    assigneeId?: string;
+    priority?: string;
+    slaHours?: number;
+  }
+) {
+  try {
+    const user = await getSession();
+    checkPermission(user.role, "task.update");
+
+    const scope = await getCrmLeadScopeWithDelegation(user);
+    if (!scope) {
+      return { error: "Acces refuse" };
+    }
+    const lead = await LeadService.getById(leadId, scope);
+    if (!lead) {
+      return { error: "Lead introuvable" };
+    }
+
+    const title = data.title?.trim();
+    if (!title) return { error: "Titre requis" };
+
+    const slaDeadline = data.slaHours
+      ? new Date(Date.now() + Number(data.slaHours) * 3600 * 1000)
+      : null;
+
+    const assigneeId = data.assigneeId || lead.assignedTo || lead.ownerId || user.id;
+
+    const task = await prisma.task.create({
+      data: {
+        tenantId: user.tenantId,
+        entityType: "lead",
+        entityId: leadId,
+        taskType: "manual",
+        title,
+        description: data.description || undefined,
+        module: "crm",
+        priority: (data.priority as any) || "NORMAL",
+        slaDeadline,
+        ownerType: "HUMAN",
+        status: "PENDING",
+        riskLevel: "LOW",
+        tags: ["crm", "lead", leadId],
+      },
+    });
+
+    if (assigneeId) {
+      await prisma.taskAssignment.create({
+        data: { taskId: task.id, userId: assigneeId, role: "assignee" },
+      });
+      await NotificationService.onTaskAssigned(task.id, user.tenantId, assigneeId, task.title, user.name);
+    }
+
+    await AuditService.log({
+      tenantId: user.tenantId,
+      userId: user.id,
+      action: "lead.task_created",
+      entityType: "lead",
+      entityId: leadId,
+      newValue: { taskId: task.id, title: task.title },
+    });
+
+    revalidatePath(`/crm/leads/${leadId}`);
+    revalidatePath("/tasks");
+    return { data: task };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Erreur creation tache" };
+  }
+}
+
+export async function sendEmailToContact(
+  contactId: string,
+  data: { subject: string; body: string; leadId?: string | null }
+) {
+  try {
+    const user = await getSession();
+    checkPermission(user.role, "crm.manage");
+
+    const scope = await getCrmContactScopeWithDelegation(user);
+    if (!scope) {
+      return { error: "AccÃ¨s refusÃ©" };
+    }
+
+    const contact = await ContactService.getById(contactId, scope);
+    if (!contact) {
+      return { error: "Contact introuvable" };
+    }
+
+    if (!data.subject?.trim() || !data.body?.trim()) {
+      return { error: "Objet et message requis" };
+    }
+
+    if (!contact.email) {
+      return { error: "Aucun email disponible pour ce contact" };
+    }
+
+    const result = await CrmEmailService.send({
+      tenantId: contact.tenantId,
+      contactId: contact.id,
+      leadId: data.leadId ?? undefined,
+      to: contact.email,
+      subject: data.subject,
+      body: data.body,
+      contactName: contact.name,
+      actorId: user.id,
+      tag: "manual",
+    });
+
+    if (result.error) {
+      return { error: result.error };
+    }
+
+    revalidatePath(`/contacts/${contactId}`);
+    revalidatePath("/crm");
+    return { data: result.data };
+  } catch (error) {
+    console.error("Error sending email:", error);
+    return { error: error instanceof Error ? error.message : "Erreur lors de l'envoi" };
+  }
+}
+
 export async function logContactActivity(
   contactId: string,
   data: {
@@ -611,6 +816,7 @@ export async function logContactActivity(
     summary: string;
     outcome?: string;
     durationMinutes?: number;
+    phoneNumber?: string;
     channel?: string;
   }
 ) {
@@ -637,6 +843,7 @@ export async function logContactActivity(
         summary: data.summary,
         outcome: data.outcome,
         durationMinutes: data.durationMinutes,
+        phoneNumber: data.phoneNumber,
         channel: data.channel,
       },
     });
@@ -653,9 +860,9 @@ export async function getContactTimeline(contactId: string, limit = 100) {
   try {
     const user = await getSession();
     checkPermission(user.role, "contact.view");
-    const scope = getCrmContactScope(user);
+    const scope = await getCrmContactScopeWithDelegation(user);
     if (!scope) {
-      return { error: "AccÃ¨s refusÃ©" };
+      return { error: "Accès refusé" };
     }
     const contact = await ContactService.getById(contactId, scope);
     if (!contact) {
@@ -674,7 +881,7 @@ export async function getContactTimeline(contactId: string, limit = 100) {
       take: 50,
     });
 
-    const [orderTimeline, payments, disputes, auditLogs, conversations] = await Promise.all([
+    const [orderTimeline, payments, disputes, auditLogs, conversations, emailLogs] = await Promise.all([
       prisma.orderTimeline.findMany({
         where: { orderId: { in: orderIds } },
         include: { order: { select: { orderNumber: true } } },
@@ -710,6 +917,17 @@ export async function getContactTimeline(contactId: string, limit = 100) {
         where: { contactId },
         select: { id: true },
       }),
+      prisma.emailLog.findMany({
+        where: {
+          tenantId: user.tenantId,
+          OR: [
+            { contactId },
+            { leadId: { in: leads.map((l) => l.id) } },
+          ],
+        },
+        orderBy: { sentAt: "desc" },
+        take: 100,
+      }),
     ]);
 
     const conversationIds = conversations.map((c) => c.id);
@@ -739,6 +957,13 @@ export async function getContactTimeline(contactId: string, limit = 100) {
       whatsapp: "WhatsApp",
       visit: "Visite",
       task: "Tache",
+    };
+
+    const outcomeLabels: Record<string, string> = {
+      POSITIVE: "Positif",
+      NEUTRAL: "Neutre",
+      NEGATIVE: "Negatif",
+      NO_ANSWER: "Sans reponse",
     };
 
     const items: TimelineItem[] = [
@@ -784,11 +1009,17 @@ export async function getContactTimeline(contactId: string, limit = 100) {
           ? (activityLabels[String(activityValue.type)] || String(activityValue.type))
           : null;
         const activitySummary = activityValue?.summary ? String(activityValue.summary) : "";
-        const activityOutcome = activityValue?.outcome ? String(activityValue.outcome) : "";
+        const activityOutcomeRaw = activityValue?.outcome ? String(activityValue.outcome) : "";
+        const activityOutcome = outcomeLabels[activityOutcomeRaw] || activityOutcomeRaw;
         const activityDuration = activityValue?.durationMinutes
           ? `${activityValue.durationMinutes} min`
           : "";
-        const activityMeta = [activityOutcome, activityDuration].filter(Boolean).join(" | ");
+        const activityPhone = activityValue?.phoneNumber
+          ? `Tel ${String(activityValue.phoneNumber)}`
+          : "";
+        const activityMeta = [activityOutcome, activityDuration, activityPhone]
+          .filter(Boolean)
+          .join(" | ");
 
         return {
           id: `audit:${a.id}`,
@@ -815,6 +1046,14 @@ export async function getContactTimeline(contactId: string, limit = 100) {
         date: m.createdAt,
         meta: m.conversation?.platform || undefined,
       })),
+      ...emailLogs.map((e) => ({
+        id: `email:${e.id}`,
+        type: "email",
+        title: e.subject,
+        description: e.body?.slice(0, 160),
+        date: e.sentAt ?? e.createdAt,
+        meta: e.status,
+      })),
     ];
 
     items.sort((a, b) => b.date.getTime() - a.date.getTime());
@@ -824,3 +1063,321 @@ export async function getContactTimeline(contactId: string, limit = 100) {
     return { error: error instanceof Error ? error.message : "Erreur lors du chargement" };
   }
 }
+
+export async function deleteContacts(ids: string[]) {
+  try {
+    const user = await getSession();
+    checkPermission(user.role, "contact.manage");
+
+    if (!ids.length) return { error: "Aucun contact sélectionné" };
+
+    const { count } = await prisma.contact.deleteMany({
+      where: { id: { in: ids }, tenantId: user.tenantId },
+    });
+
+    await AuditService.log({
+      tenantId: user.tenantId,
+      userId: user.id,
+      action: "contact.bulk_deleted",
+      entityType: "contact",
+      entityId: ids[0],
+      newValue: { ids, count },
+    });
+
+    revalidatePath("/contacts");
+    revalidatePath("/crm");
+    return { data: { deleted: count } };
+  } catch (error) {
+    console.error("Error bulk deleting contacts:", error);
+    return { error: error instanceof Error ? error.message : "Erreur lors de la suppression" };
+  }
+}
+
+export async function importContacts(rows: Record<string, string>[]) {
+  try {
+    const user = await getSession();
+    checkPermission(user.role, "contact.manage");
+
+    const TYPE_MAP: Record<string, string> = {
+      client: "CLIENT",
+      prospect: "PROSPECT",
+      fournisseur: "SUPPLIER",
+      transitaire: "FREIGHT_PARTNER",
+      douanier: "CUSTOMS_BROKER",
+      qc: "QC_PARTNER",
+      autre: "OTHER",
+    };
+
+    let imported = 0;
+    const errors: string[] = [];
+
+    for (const [i, row] of rows.entries()) {
+      try {
+        const name = row.nom || row.name;
+        if (!name) {
+          errors.push(`Ligne ${i + 2} : nom manquant`);
+          continue;
+        }
+        const rawType = (row.type || "OTHER").toLowerCase();
+        const type = (TYPE_MAP[rawType] || "OTHER") as "CLIENT" | "PROSPECT" | "SUPPLIER" | "FREIGHT_PARTNER" | "CUSTOMS_BROKER" | "QC_PARTNER" | "OTHER";
+
+        await ContactService.create(user.tenantId, {
+          name,
+          type,
+          company: row.entreprise || row.company || undefined,
+          phone: row.telephone || row.phone || undefined,
+          email: row.email || undefined,
+          whatsapp: row.whatsapp || undefined,
+          city: row.ville || row.city || undefined,
+          country: row.pays || row.country || "CG",
+          ownerId: user.id,
+          onboardedById: user.id,
+          collaboratorIds: [],
+          tags: [],
+        });
+        imported++;
+      } catch (rowErr) {
+        errors.push(`Ligne ${i + 2} : ${rowErr instanceof Error ? rowErr.message : "erreur inconnue"}`);
+      }
+    }
+
+    revalidatePath("/contacts");
+    revalidatePath("/crm");
+    return { data: { imported, errors } };
+  } catch (error) {
+    console.error("Error importing contacts:", error);
+    return { error: error instanceof Error ? error.message : "Erreur lors de l'import" };
+  }
+}
+
+// ─── Lead Archive / Delete Actions ──────────────────────────────────────────
+
+export async function archiveLead(leadId: string): Promise<{ success?: boolean; error?: string }> {
+  try {
+    const user = await getSession();
+    checkPermission(user.role, "lead.manage");
+    const scope = await getCrmLeadScopeWithDelegation(user);
+    const existing = await LeadService.getById(leadId, scope ?? undefined);
+    if (!existing) return { error: "Lead introuvable ou accès refusé" };
+
+    await LeadService.archive(leadId);
+    await AuditService.log({
+      tenantId: user.tenantId,
+      userId: user.id,
+      action: "LEAD_ARCHIVED",
+      entityType: "Lead",
+      entityId: leadId,
+      newValue: { leadId },
+    });
+    revalidatePath("/crm/leads");
+    return { success: true };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Erreur lors de l'archivage" };
+  }
+}
+
+export async function restoreLead(leadId: string): Promise<{ success?: boolean; error?: string }> {
+  try {
+    const user = await getSession();
+    checkPermission(user.role, "lead.manage");
+
+    await LeadService.restore(leadId);
+    await AuditService.log({
+      tenantId: user.tenantId,
+      userId: user.id,
+      action: "LEAD_RESTORED",
+      entityType: "Lead",
+      entityId: leadId,
+      newValue: { leadId },
+    });
+    revalidatePath("/crm/leads");
+    return { success: true };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Erreur lors de la restauration" };
+  }
+}
+
+export async function deleteLead(leadId: string): Promise<{ success?: boolean; error?: string }> {
+  try {
+    const user = await getSession();
+    checkPermission(user.role, "lead.manage");
+    const scope = await getCrmLeadScopeWithDelegation(user);
+    const existing = await LeadService.getById(leadId, scope ?? undefined);
+    if (!existing) return { error: "Lead introuvable ou accès refusé" };
+
+    await LeadService.deleteLead(leadId);
+    await AuditService.log({
+      tenantId: user.tenantId,
+      userId: user.id,
+      action: "LEAD_DELETED",
+      entityType: "Lead",
+      entityId: leadId,
+      newValue: { leadId },
+    });
+    revalidatePath("/crm/leads");
+    revalidatePath("/crm");
+    return { success: true };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Erreur lors de la suppression" };
+  }
+}
+
+export async function bulkDeleteLeads(ids: string[]): Promise<{ deleted?: number; error?: string }> {
+  try {
+    const user = await getSession();
+    checkPermission(user.role, "lead.manage");
+    if (!ids.length) return { deleted: 0 };
+
+    const count = await prisma.lead.deleteMany({
+      where: { id: { in: ids }, contact: { tenantId: user.tenantId } },
+    });
+    await AuditService.log({
+      tenantId: user.tenantId,
+      userId: user.id,
+      action: "LEADS_BULK_DELETED",
+      entityType: "Lead",
+      entityId: "bulk",
+      newValue: { ids, count: count.count },
+    });
+    revalidatePath("/crm/leads");
+    revalidatePath("/crm");
+    return { deleted: count.count };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Erreur lors de la suppression" };
+  }
+}
+
+export async function bulkArchiveLeads(ids: string[]): Promise<{ archived?: number; error?: string }> {
+  try {
+    const user = await getSession();
+    checkPermission(user.role, "lead.manage");
+    if (!ids.length) return { archived: 0 };
+
+    const result = await prisma.lead.updateMany({
+      where: { id: { in: ids }, contact: { tenantId: user.tenantId } },
+      data: { isArchived: true, archivedAt: new Date() },
+    });
+    await AuditService.log({
+      tenantId: user.tenantId,
+      userId: user.id,
+      action: "LEADS_BULK_ARCHIVED",
+      entityType: "Lead",
+      entityId: "bulk",
+      newValue: { ids, count: result.count },
+    });
+    revalidatePath("/crm/leads");
+    return { archived: result.count };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Erreur lors de l'archivage" };
+  }
+}
+
+// ─── Contact Merge / Deduplication ──────────────────────────────────────────
+
+export async function findDuplicateContacts(contactId: string) {
+  try {
+    const user = await getSession();
+    checkPermission(user.role, "contact.view");
+
+    const target = await prisma.contact.findUnique({
+      where: { id: contactId },
+      select: { phone: true, email: true, tenantId: true },
+    });
+    if (!target || target.tenantId !== user.tenantId) return { data: [], error: "Contact introuvable" };
+
+    const orClauses: Array<{ phone?: string; email?: string }> = [];
+    if (target.phone) orClauses.push({ phone: target.phone });
+    if (target.email) orClauses.push({ email: target.email });
+    if (!orClauses.length) return { data: [] };
+
+    const duplicates = await prisma.contact.findMany({
+      where: {
+        tenantId: user.tenantId,
+        id: { not: contactId },
+        OR: orClauses,
+      },
+      select: {
+        id: true,
+        name: true,
+        company: true,
+        phone: true,
+        email: true,
+        whatsapp: true,
+        type: true,
+        tags: true,
+        _count: { select: { orders: true, leads: true } },
+      },
+      take: 10,
+    });
+
+    return { data: duplicates };
+  } catch (error) {
+    return { data: [], error: error instanceof Error ? error.message : "Erreur" };
+  }
+}
+
+export async function mergeContacts(
+  keepId: string,
+  mergeId: string
+): Promise<{ success?: boolean; error?: string }> {
+  try {
+    const user = await getSession();
+    checkPermission(user.role, "contact.manage");
+
+    const [keep, merge] = await Promise.all([
+      prisma.contact.findUnique({ where: { id: keepId }, select: { tenantId: true, phone: true, email: true, whatsapp: true, company: true, notes: true, tags: true } }),
+      prisma.contact.findUnique({ where: { id: mergeId }, select: { tenantId: true, phone: true, email: true, whatsapp: true, company: true, notes: true, tags: true } }),
+    ]);
+
+    if (!keep || !merge) return { error: "Un des contacts est introuvable" };
+    if (keep.tenantId !== user.tenantId || merge.tenantId !== user.tenantId)
+      return { error: "Accès refusé" };
+
+    // Merge tags (union without duplicates)
+    const keepTags = Array.isArray(keep.tags) ? (keep.tags as string[]) : [];
+    const mergeTags = Array.isArray(merge.tags) ? (merge.tags as string[]) : [];
+    const mergedTags = Array.from(new Set([...keepTags, ...mergeTags]));
+
+    // Concat notes
+    const mergedNotes = [keep.notes, merge.notes].filter(Boolean).join("\n---\n") || null;
+
+    // Patch missing fields from merge into keep
+    const patchData: Record<string, string | null> = {};
+    if (!keep.phone && merge.phone) patchData.phone = merge.phone;
+    if (!keep.email && merge.email) patchData.email = merge.email;
+    if (!keep.whatsapp && merge.whatsapp) patchData.whatsapp = merge.whatsapp;
+    if (!keep.company && merge.company) patchData.company = merge.company;
+
+    await prisma.$transaction([
+      prisma.order.updateMany({ where: { contactId: mergeId }, data: { contactId: keepId } }),
+      prisma.lead.updateMany({ where: { contactId: mergeId }, data: { contactId: keepId } }),
+      prisma.contact.update({
+        where: { id: keepId },
+        data: { ...patchData, notes: mergedNotes, tags: mergedTags },
+      }),
+      prisma.contact.delete({ where: { id: mergeId } }),
+    ]);
+
+    await AuditService.log({
+      tenantId: user.tenantId,
+      userId: user.id,
+      action: "CONTACT_MERGED",
+      entityType: "Contact",
+      entityId: keepId,
+      newValue: { keepId, mergeId },
+    });
+    revalidatePath("/contacts");
+    revalidatePath("/crm");
+    return { success: true };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Erreur lors de la fusion" };
+  }
+}
+
+
+
+
+
+
+
+

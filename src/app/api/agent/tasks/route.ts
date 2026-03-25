@@ -1,46 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
+
+import { authenticateAgentRequest } from "@/lib/agents/auth";
 import { AgentTaskService } from "@/lib/services/agent-task.service";
-import { prisma } from "@/lib/db";
+import { AgentPlatformService } from "@/lib/services/agent-platform.service";
 
 /**
- * Agent Task API — REST endpoints for AI agents to interact with the Tasks OS.
+ * GET  /api/agent/tasks
+ * POST /api/agent/tasks
  *
- * Authentication: x-agent-id + x-agent-secret headers (or Bearer token).
- * In production, implement proper API key management.
- *
- * GET  /api/agent/tasks — Get assigned tasks for an agent
- * POST /api/agent/tasks — Create a task (cross-OS task creation)
+ * Main work queue for Horion AI agents.
  */
 
-async function authenticateAgent(req: NextRequest) {
-  const agentId = req.headers.get("x-agent-id");
-  const agentSecret = req.headers.get("x-agent-secret");
-  const tenantId = req.headers.get("x-tenant-id");
-
-  if (!agentId || !tenantId) {
-    return null;
-  }
-
-  // In production: validate agent credentials against an AgentRegistry table
-  // For now: trust the headers if present
-  return { agentId, tenantId };
-}
-
-/**
- * GET /api/agent/tasks
- *
- * Query params:
- * - status: filter by status
- * - module: filter by module
- * - mode: "assigned" (default) | "automatable"
- * - limit: max results (default 50)
- */
 export async function GET(req: NextRequest) {
-  const agent = await authenticateAgent(req);
-  if (!agent) {
-    return NextResponse.json({ error: "Unauthorized: x-agent-id and x-tenant-id required" }, { status: 401 });
+  const auth = await authenticateAgentRequest(req);
+  if (!auth.ok) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
+  const agent = auth.agent;
   const { searchParams } = new URL(req.url);
   const mode = searchParams.get("mode") ?? "assigned";
   const status = searchParams.get("status") ?? undefined;
@@ -48,12 +25,9 @@ export async function GET(req: NextRequest) {
   const limit = Math.min(100, Number(searchParams.get("limit")) || 50);
 
   try {
-    let tasks;
-    if (mode === "automatable") {
-      tasks = await AgentTaskService.getAutomatableTasks(agent.tenantId, { module, limit });
-    } else {
-      tasks = await AgentTaskService.getAgentTasks(agent.tenantId, agent.agentId, { status, module, limit });
-    }
+    const tasks = mode === "automatable"
+      ? await AgentTaskService.getAutomatableTasks(agent.tenantId, { module, limit })
+      : await AgentTaskService.getAgentTasks(agent.tenantId, agent.agentId, { status, module, limit });
 
     return NextResponse.json({ data: tasks, count: tasks.length });
   } catch (error) {
@@ -64,18 +38,13 @@ export async function GET(req: NextRequest) {
   }
 }
 
-/**
- * POST /api/agent/tasks
- *
- * Body:
- * - action: "create" | "claim" | "report" | "delegate"
- * - ...action-specific fields
- */
 export async function POST(req: NextRequest) {
-  const agent = await authenticateAgent(req);
-  if (!agent) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await authenticateAgentRequest(req);
+  if (!auth.ok) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
+
+  const agent = auth.agent;
 
   try {
     const body = await req.json();
@@ -95,7 +64,7 @@ export async function POST(req: NextRequest) {
           slaHours: body.slaHours,
           ownerType: body.ownerType ?? "AI_AGENT",
           agentId: agent.agentId,
-          agentName: body.agentName ?? agent.agentId,
+          agentName: body.agentName ?? agent.agentName,
           parentTaskId: body.parentTaskId,
           tags: body.tags,
           requiredApproval: body.requiredApproval,
@@ -112,7 +81,7 @@ export async function POST(req: NextRequest) {
         const result = await AgentTaskService.claimTask(
           body.taskId,
           agent.agentId,
-          body.agentName ?? agent.agentId
+          body.agentName ?? agent.agentName
         );
         return NextResponse.json({ data: result });
       }
@@ -142,6 +111,37 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ data: task });
       }
 
+      case "handoff": {
+        if (!body.targetAgentId || !body.title) {
+          return NextResponse.json({ error: "targetAgentId and title required" }, { status: 400 });
+        }
+
+        const target = await AgentPlatformService.getAgentProfile(agent.tenantId, body.targetAgentId);
+        if (!target || !target.enabled) {
+          return NextResponse.json({ error: "Target agent unavailable" }, { status: 400 });
+        }
+
+        const task = await AgentTaskService.createAgentHandoff({
+          tenantId: agent.tenantId,
+          sourceAgentId: agent.agentId,
+          sourceAgentName: agent.agentName,
+          targetAgentId: target.id,
+          targetAgentName: target.displayName,
+          title: body.title,
+          description: body.description,
+          module: body.module ?? target.allowedModules[0] ?? target.modules[0] ?? "tasks",
+          entityType: body.entityType,
+          entityId: body.entityId,
+          priority: body.priority,
+          parentTaskId: body.parentTaskId,
+          tags: body.tags,
+          summary: body.summary,
+          payload: body.payload,
+        });
+
+        return NextResponse.json({ data: task }, { status: 201 });
+      }
+
       case "analytics": {
         const analytics = await AgentTaskService.getAgentAnalytics(agent.tenantId);
         return NextResponse.json({ data: analytics });
@@ -149,7 +149,7 @@ export async function POST(req: NextRequest) {
 
       default:
         return NextResponse.json(
-          { error: `Unknown action: ${action}. Use: create, claim, report, delegate, analytics` },
+          { error: `Unknown action: ${action}. Use: create, claim, report, delegate, handoff, analytics` },
           { status: 400 }
         );
     }

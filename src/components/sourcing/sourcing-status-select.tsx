@@ -10,6 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { updateSourcingStatus } from "@/lib/actions/sourcing.actions";
+import { toast } from "sonner";
 
 const STATUS_OPTIONS = [
   { value: "SEARCHING", label: "Recherche" },
@@ -36,9 +37,10 @@ export function SourcingStatusSelect({
     const result = await updateSourcingStatus(caseId, { status: value });
     setLoading(false);
     if (result.error) {
-      alert(result.error);
+      toast.error(result.error);
       return;
     }
+    toast.success("Statut sourcing mis a jour");
     router.refresh();
   }
 

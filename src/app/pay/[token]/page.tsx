@@ -27,7 +27,7 @@ export default async function PaymentPage({
   const { token } = await params;
 
   const quote = await prisma.quote.findFirst({
-    where: { paymentToken: token },
+    where: { paymentToken: token, isActive: true },
     select: {
       id: true,
       orderId: true,
@@ -37,6 +37,8 @@ export default async function PaymentPage({
       logisticsCost: true,
       commission: true,
       insuranceCost: true,
+      qcOption: true,
+      qcCost: true,
       total: true,
       paymentStatus: true,
       paymentExpiry: true,
@@ -81,7 +83,8 @@ export default async function PaymentPage({
   let aggregatedTransportOptions: TransportOption[] | null = null;
   let currentTransportKey: string | null = null;
   const baseAmount =
-    Number(quote.merchandiseTotal) + Number(quote.commission) + Number(quote.insuranceCost ?? 0);
+    Number(quote.merchandiseTotal) +
+    Number(quote.commission);
 
   if (isIndicatifQuote && items.length > 0) {
     const costByKey: Record<string, number> = {};
@@ -226,9 +229,17 @@ export default async function PaymentPage({
                   {formatPublicMoney(Number(quote.commission), quote.currency)}
                 </span>
               </div>
+              {Number(quote.qcCost ?? 0) > 0 && (
+                <div className="flex items-center justify-between text-white/60">
+                  <span>Contrôle qualité</span>
+                  <span className="font-medium text-white">
+                    {formatPublicMoney(Number(quote.qcCost ?? 0), quote.currency)}
+                  </span>
+                </div>
+              )}
               {Number(quote.insuranceCost ?? 0) > 0 && (
                 <div className="flex items-center justify-between text-white/60">
-                  <span>Assurance</span>
+                  <span>Assurance Horion</span>
                   <span className="font-medium text-white">
                     {formatPublicMoney(Number(quote.insuranceCost ?? 0), quote.currency)}
                   </span>
@@ -260,6 +271,10 @@ export default async function PaymentPage({
             transportOptions={aggregatedTransportOptions ?? undefined}
             currentTransportKey={currentTransportKey ?? undefined}
             baseAmount={baseAmount}
+            currentLogisticsCost={Number(quote.logisticsCost)}
+            currentInsuranceCost={Number(quote.insuranceCost ?? 0)}
+            currentQcOption={(quote.qcOption as any) ?? "NONE"}
+            currentQcCost={Number(quote.qcCost ?? 0)}
           />
         </div>
       </div>

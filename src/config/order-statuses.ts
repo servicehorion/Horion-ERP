@@ -1,4 +1,4 @@
-import { OrderStatus } from "@prisma/client";
+﻿import { OrderStatus } from "@prisma/client";
 
 export const ORDER_STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   DEMANDE:           [OrderStatus.RECHERCHE_PRODUIT, OrderStatus.ANNULE],
@@ -6,7 +6,8 @@ export const ORDER_STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   DEVIS:             [OrderStatus.PAIEMENT_EN_COURS, OrderStatus.RECHERCHE_PRODUIT, OrderStatus.ANNULE],
   PAIEMENT_EN_COURS: [OrderStatus.SOURCING, OrderStatus.ANNULE],
   SOURCING:          [OrderStatus.EN_PRODUCTION, OrderStatus.ANNULE],
-  EN_PRODUCTION:     [OrderStatus.QC_EN_COURS, OrderStatus.EN_TRANSIT],
+  EN_PRODUCTION:     [OrderStatus.RECU_ENTREPOT, OrderStatus.EN_TRANSIT],
+  RECU_ENTREPOT:     [OrderStatus.QC_EN_COURS, OrderStatus.QC_VALIDE, OrderStatus.EN_TRANSIT, OrderStatus.LITIGE],
   QC_EN_COURS:       [OrderStatus.QC_VALIDE, OrderStatus.EN_PRODUCTION, OrderStatus.LITIGE],
   QC_VALIDE:         [OrderStatus.EN_TRANSIT],
   EN_TRANSIT:        [OrderStatus.DEDOUANE, OrderStatus.LITIGE],
@@ -24,13 +25,14 @@ export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   PAIEMENT_EN_COURS: "Paiement en cours",
   SOURCING:          "Sourcing",
   EN_PRODUCTION:     "En production",
+  RECU_ENTREPOT:     "Reçu entrepôt",
   QC_EN_COURS:       "QC en cours",
-  QC_VALIDE:         "QC valide",
+  QC_VALIDE:         "QC validé",
   EN_TRANSIT:        "En transit",
-  DEDOUANE:          "Dedouane",
-  LIVRE:             "Livre",
-  CLOTURE:           "Cloture",
-  ANNULE:            "Annule",
+  DEDOUANE:          "Dédouané",
+  LIVRE:             "Livré",
+  CLOTURE:           "Clôturé",
+  ANNULE:            "Annulé",
   LITIGE:            "Litige",
 };
 
@@ -41,6 +43,7 @@ export const ORDER_STATUS_COLORS: Record<OrderStatus, string> = {
   PAIEMENT_EN_COURS: "bg-yellow-100 text-yellow-800",
   SOURCING:          "bg-orange-100 text-orange-800",
   EN_PRODUCTION:     "bg-amber-100 text-amber-800",
+  RECU_ENTREPOT:     "bg-orange-50 text-orange-700",
   QC_EN_COURS:       "bg-purple-100 text-purple-800",
   QC_VALIDE:         "bg-green-100 text-green-800",
   EN_TRANSIT:        "bg-cyan-100 text-cyan-800",
@@ -58,6 +61,7 @@ export const ORDER_STATUSES = [
   { value: "PAIEMENT_EN_COURS", label: "Paiement en cours" },
   { value: "SOURCING", label: "Sourcing" },
   { value: "EN_PRODUCTION", label: "En production" },
+  { value: "RECU_ENTREPOT", label: "Reçu entrepôt" },
   { value: "QC_EN_COURS", label: "QC en cours" },
   { value: "QC_VALIDE", label: "QC validé" },
   { value: "EN_TRANSIT", label: "En transit" },
@@ -71,3 +75,4 @@ export const ORDER_STATUSES = [
 export function canTransition(from: OrderStatus, to: OrderStatus): boolean {
   return ORDER_STATUS_TRANSITIONS[from]?.includes(to) ?? false;
 }
+

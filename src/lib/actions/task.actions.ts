@@ -9,7 +9,7 @@ import { TaskTemplateService } from "@/lib/services/task-template.service";
 import { AgentTaskService } from "@/lib/services/agent-task.service";
 import { NotificationService } from "@/lib/services/notification.service";
 import { AuditService } from "@/lib/services/audit.service";
-import { checkPermission } from "@/lib/permissions";
+import { checkPermission, hasPermission } from "@/lib/permissions";
 import {
   canAccessTaskModule,
   getTaskAllowedModules,
@@ -19,6 +19,7 @@ import {
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import type { TaskStatus, Priority, DependencyType } from "@prisma/client";
+import * as taskExtrasActions from "./task-extras.actions";
 
 function revalidateTask(taskId?: string) {
   revalidatePath("/tasks");
@@ -37,16 +38,33 @@ export async function getTasks(options?: {
   priority?: string;
   search?: string;
   assigneeId?: string;
+  projectId?: string;
   slaBreach?: boolean;
   tags?: string[];
   parentTaskId?: string;
+  sortBy?: string;
+  sortDir?: string;
   page?: number;
   limit?: number;
 }) {
   try {
     const user = await getSession();
     checkPermission(user.role, "task.view");
-    const { module, status, priority, search, assigneeId, slaBreach, tags, parentTaskId, page = 1, limit = 50 } = options || {};
+    const {
+      module,
+      status,
+      priority,
+      search,
+      assigneeId,
+      projectId,
+      slaBreach,
+      tags,
+      parentTaskId,
+      sortBy,
+      sortDir,
+      page = 1,
+      limit = 50,
+    } = options || {};
 
     const allowedModules = getTaskAllowedModules(user.role);
     if (allowedModules !== "*" && allowedModules.length === 0) {
@@ -65,6 +83,7 @@ export async function getTasks(options?: {
       ...(priority && priority !== "all" && { priority }),
       ...(slaBreach && { slaBreach: true }),
       ...(assigneeId && { assignments: { some: { userId: assigneeId } } }),
+      ...(projectId && { projectId }),
       ...(tags && tags.length > 0 && { tags: { hasSome: tags } }),
       ...(search && {
         OR: [
@@ -74,15 +93,28 @@ export async function getTasks(options?: {
       }),
     };
 
+    const sortDirection = sortDir === "asc" ? "asc" : "desc";
+    const orderBy: any =
+      sortBy === "priority"
+        ? [{ priority: sortDirection }, { slaDeadline: "asc" }, { createdAt: "desc" }]
+        : sortBy === "sla"
+        ? [{ slaDeadline: sortDirection }, { priority: "desc" }, { createdAt: "desc" }]
+        : sortBy === "created"
+        ? [{ createdAt: sortDirection }]
+        : sortBy === "updated"
+        ? [{ updatedAt: sortDirection }]
+        : [{ priority: "desc" }, { slaDeadline: "asc" }, { createdAt: "desc" }];
+
     const [tasks, total] = await Promise.all([
       prisma.task.findMany({
         where,
         include: {
           assignments: { include: { user: { select: { id: true, name: true } } } },
           order: { select: { orderNumber: true, contact: { select: { name: true } } } },
+          project: { select: { id: true, name: true } },
           _count: { select: { children: true, dependencies: true, comments: true } },
         },
-        orderBy: [{ priority: "desc" }, { slaDeadline: "asc" }, { createdAt: "desc" }],
+        orderBy,
         skip: (page - 1) * limit,
         take: limit,
       }),
@@ -124,6 +156,7 @@ export async function getTaskById(taskId: string) {
         },
         agentExecutions: { orderBy: { createdAt: "desc" }, take: 10 },
         attachments: { include: { user: { select: { name: true } } }, orderBy: { createdAt: "desc" } },
+        checklists: { orderBy: { position: "asc" } },
         parent: { select: { id: true, title: true } },
       },
     });
@@ -159,7 +192,10 @@ export async function getTaskActivity(taskId: string) {
       }),
       prisma.taskComment.findMany({
         where: { taskId },
-        include: { user: { select: { name: true } } },
+        include: {
+          user: { select: { id: true, name: true } },
+          reactions: { include: { user: { select: { id: true, name: true } } } },
+        },
         orderBy: { createdAt: "desc" },
         take: 50,
       }),
@@ -173,7 +209,7 @@ export async function getTaskActivity(taskId: string) {
         action: "task.comment",
         createdAt: c.createdAt,
         user: c.user,
-        newValue: { comment: c.content },
+        newValue: { comment: c.content, reactions: c.reactions },
         _type: "comment" as const,
       })),
     ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
@@ -218,18 +254,6 @@ export async function updateTaskStatus(taskId: string, newStatus: string) {
   try {
     const user = await getSession();
     checkPermission(user.role, "task.update");
-    if (!canAccessTaskModule(user.role, formData.module)) return { error: "Accès refusé" };
-
-    if (formData.assigneeId) {
-      const assignee = await prisma.user.findUnique({
-        where: { id: formData.assigneeId },
-        select: { id: true, name: true, role: true, tenantId: true },
-      });
-      if (!assignee || assignee.tenantId !== user.tenantId) return { error: "Utilisateur introuvable" };
-      if (!canAccessTaskModule(assignee.role, formData.module)) {
-        return { error: "Assignation impossible: rôle non autorisé" };
-      }
-    }
 
     const existing = await prisma.task.findUnique({ where: { id: taskId } });
     if (!existing || existing.tenantId !== user.tenantId) return { error: "TÃ¢che introuvable" };
@@ -306,6 +330,7 @@ export async function createManualTask(formData: {
   priority?: string;
   slaHours?: number;
   assigneeId?: string;
+  projectId?: string;
   tags?: string[];
   parentTaskId?: string;
 }) {
@@ -316,6 +341,14 @@ export async function createManualTask(formData: {
     const slaDeadline = formData.slaHours
       ? new Date(Date.now() + formData.slaHours * 3600 * 1000)
       : null;
+
+    if (formData.projectId) {
+      const project = await prisma.project.findFirst({
+        where: { id: formData.projectId, tenantId: user.tenantId },
+        select: { id: true },
+      });
+      if (!project) return { error: "Projet introuvable" };
+    }
 
     const task = await prisma.task.create({
       data: {
@@ -333,6 +366,7 @@ export async function createManualTask(formData: {
         riskLevel: "LOW",
         tags: formData.tags ?? [],
         parentTaskId: formData.parentTaskId,
+        projectId: formData.projectId || undefined,
       },
     });
 
@@ -365,20 +399,8 @@ export async function addTaskComment(taskId: string, content: string, mentions: 
     const user = await getSession();
     checkPermission(user.role, "task.update");
     const task = await prisma.task.findUnique({ where: { id: taskId } });
-    if (!task || task.tenantId !== user.tenantId) return { error: "TÃ¢che introuvable" };
-    if (!canAccessTaskModule(user.role, task.module)) return { error: "Accès refusé" };
-    if (!canAccessTaskModule(user.role, task.module)) return { error: "Accès refusé" };
-    if (!canAccessTaskModule(user.role, task.module)) return { error: "Accès refusé" };
-    if (data.module && !canAccessTaskModule(user.role, data.module)) return { error: "Accès refusé" };
-    if (!canAccessTaskModule(user.role, task.module)) return { error: "Accès refusé" };
-
-    const dependsOn = await prisma.task.findUnique({
-      where: { id: dependsOnId },
-      select: { tenantId: true, module: true },
-    });
-    if (!dependsOn || dependsOn.tenantId !== user.tenantId) return { error: "Tâche dépendance introuvable" };
-    if (!canAccessTaskModule(user.role, dependsOn.module)) return { error: "Accès refusé" };
-    if (!canAccessTaskModule(user.role, task.module)) return { error: "Accès refusé" };
+    if (!task || task.tenantId !== user.tenantId) return { error: "Tache introuvable" };
+    if (!canAccessTaskModule(user.role, task.module)) return { error: "Acces refuse" };
 
     const comment = await prisma.taskComment.create({
       data: { taskId, userId: user.id, content, mentions },
@@ -728,8 +750,8 @@ export async function duplicateTaskTemplate(templateId: string) {
         requiresApproval: original.requiresApproval,
         automationAllowed: original.automationAllowed,
         ownerType: original.ownerType,
-        subtaskDefinitions: original.subtaskDefinitions,
-        dependencyDefinitions: original.dependencyDefinitions,
+        subtaskDefinitions: original.subtaskDefinitions as any,
+        dependencyDefinitions: original.dependencyDefinitions as any,
         isActive: original.isActive,
       },
     });
@@ -1470,3 +1492,96 @@ export async function getGanttData(options?: { module?: string }) {
   }
 }
 
+// Bridge exports for task extras:
+// In a "use server" module, we must only export async functions.
+export async function getTaskChecklists(...args: Parameters<typeof taskExtrasActions.getTaskChecklists>) {
+  return taskExtrasActions.getTaskChecklists(...args);
+}
+
+export async function addChecklistItem(...args: Parameters<typeof taskExtrasActions.addChecklistItem>) {
+  return taskExtrasActions.addChecklistItem(...args);
+}
+
+export async function toggleChecklistItem(...args: Parameters<typeof taskExtrasActions.toggleChecklistItem>) {
+  return taskExtrasActions.toggleChecklistItem(...args);
+}
+
+export async function updateChecklistItem(...args: Parameters<typeof taskExtrasActions.updateChecklistItem>) {
+  return taskExtrasActions.updateChecklistItem(...args);
+}
+
+export async function deleteChecklistItem(...args: Parameters<typeof taskExtrasActions.deleteChecklistItem>) {
+  return taskExtrasActions.deleteChecklistItem(...args);
+}
+
+export async function toggleCommentReaction(...args: Parameters<typeof taskExtrasActions.toggleCommentReaction>) {
+  return taskExtrasActions.toggleCommentReaction(...args);
+}
+
+export async function getSavedFilters(...args: Parameters<typeof taskExtrasActions.getSavedFilters>) {
+  return taskExtrasActions.getSavedFilters(...args);
+}
+
+export async function createSavedFilter(...args: Parameters<typeof taskExtrasActions.createSavedFilter>) {
+  return taskExtrasActions.createSavedFilter(...args);
+}
+
+export async function deleteSavedFilter(...args: Parameters<typeof taskExtrasActions.deleteSavedFilter>) {
+  return taskExtrasActions.deleteSavedFilter(...args);
+}
+
+export async function getGoals(...args: Parameters<typeof taskExtrasActions.getGoals>) {
+  return taskExtrasActions.getGoals(...args);
+}
+
+export async function createGoal(...args: Parameters<typeof taskExtrasActions.createGoal>) {
+  return taskExtrasActions.createGoal(...args);
+}
+
+export async function updateGoal(...args: Parameters<typeof taskExtrasActions.updateGoal>) {
+  return taskExtrasActions.updateGoal(...args);
+}
+
+export async function deleteGoal(...args: Parameters<typeof taskExtrasActions.deleteGoal>) {
+  return taskExtrasActions.deleteGoal(...args);
+}
+
+export async function addKeyResult(...args: Parameters<typeof taskExtrasActions.addKeyResult>) {
+  return taskExtrasActions.addKeyResult(...args);
+}
+
+export async function updateKeyResult(...args: Parameters<typeof taskExtrasActions.updateKeyResult>) {
+  return taskExtrasActions.updateKeyResult(...args);
+}
+
+export async function deleteKeyResult(...args: Parameters<typeof taskExtrasActions.deleteKeyResult>) {
+  return taskExtrasActions.deleteKeyResult(...args);
+}
+
+export async function getRecurringTasks(...args: Parameters<typeof taskExtrasActions.getRecurringTasks>) {
+  return taskExtrasActions.getRecurringTasks(...args);
+}
+
+export async function createRecurringTask(...args: Parameters<typeof taskExtrasActions.createRecurringTask>) {
+  return taskExtrasActions.createRecurringTask(...args);
+}
+
+export async function updateRecurringTask(...args: Parameters<typeof taskExtrasActions.updateRecurringTask>) {
+  return taskExtrasActions.updateRecurringTask(...args);
+}
+
+export async function deleteRecurringTask(...args: Parameters<typeof taskExtrasActions.deleteRecurringTask>) {
+  return taskExtrasActions.deleteRecurringTask(...args);
+}
+
+export async function updateTaskCustomFields(...args: Parameters<typeof taskExtrasActions.updateTaskCustomFields>) {
+  return taskExtrasActions.updateTaskCustomFields(...args);
+}
+
+export async function importTasksFromCSV(...args: Parameters<typeof taskExtrasActions.importTasksFromCSV>) {
+  return taskExtrasActions.importTasksFromCSV(...args);
+}
+
+export async function getCalendarTasks(...args: Parameters<typeof taskExtrasActions.getCalendarTasks>) {
+  return taskExtrasActions.getCalendarTasks(...args);
+}

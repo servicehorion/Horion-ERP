@@ -16,6 +16,8 @@ export class LeadService {
     containerType?: ContainerType;
     originCountry?: string;
     notes?: string;
+    salesTeamId?: string;
+    territoryId?: string;
   }) {
     const collaboratorIds = (data.collaboratorIds || []).filter(Boolean);
     return prisma.lead.create({
@@ -32,6 +34,8 @@ export class LeadService {
         containerType: data.containerType,
         originCountry: data.originCountry,
         notes: data.notes,
+        salesTeamId: data.salesTeamId,
+        territoryId: data.territoryId,
         collaborators: collaboratorIds.length > 0
           ? {
               createMany: {
@@ -61,6 +65,24 @@ export class LeadService {
     });
   }
 
+  static async archive(leadId: string) {
+    return prisma.lead.update({
+      where: { id: leadId },
+      data: { isArchived: true, archivedAt: new Date() },
+    });
+  }
+
+  static async restore(leadId: string) {
+    return prisma.lead.update({
+      where: { id: leadId },
+      data: { isArchived: false, archivedAt: null },
+    });
+  }
+
+  static async deleteLead(leadId: string) {
+    return prisma.lead.delete({ where: { id: leadId } });
+  }
+
   static async list(
     tenantId: string,
     options: {
@@ -69,13 +91,15 @@ export class LeadService {
       search?: string;
       page?: number;
       limit?: number;
+      includeArchived?: boolean;
       scopeWhere?: Prisma.LeadWhereInput;
     } = {}
   ) {
-    const { status, assignedTo, search, page = 1, limit = 20, scopeWhere } = options;
+    const { status, assignedTo, search, page = 1, limit = 20, includeArchived = false, scopeWhere } = options;
 
     const where: Prisma.LeadWhereInput = {
       contact: { tenantId },
+      ...(includeArchived ? {} : { isArchived: false }),
       ...(scopeWhere || {}),
       ...(status && { status }),
       ...(assignedTo && { assignedTo }),
@@ -96,6 +120,8 @@ export class LeadService {
           contact: { select: { name: true, company: true, phone: true } },
           owner: { select: { id: true, name: true, email: true } },
           onboardedBy: { select: { id: true, name: true, email: true } },
+          salesTeam: { select: { id: true, name: true } },
+          territory: { select: { id: true, name: true } },
           collaborators: {
             select: {
               userId: true,
@@ -119,6 +145,8 @@ export class LeadService {
       include: {
         owner: { select: { id: true, name: true, email: true } },
         onboardedBy: { select: { id: true, name: true, email: true } },
+        salesTeam: { select: { id: true, name: true, currency: true, targetAmount: true } },
+        territory: { select: { id: true, name: true } },
         collaborators: {
           select: {
             userId: true,
@@ -158,6 +186,9 @@ export class LeadService {
       containerType: ContainerType | null;
       originCountry: string;
       notes: string;
+      winProbability: number;
+      salesTeamId: string | null;
+      territoryId: string | null;
     }>
   ) {
     const { collaboratorIds, ...updateData } = data;

@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { Plus, Search, Package, ArrowRight } from "lucide-react";
+import { Plus, Search, Package, ArrowRight, Zap, TrendingUp } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getSourcingCases, getSourcingPipeline } from "@/lib/actions/sourcing.actions";
 import { SourcingStatusBadge } from "@/components/sourcing/sourcing-status-badge";
 import { ExportSourcingButton } from "@/components/sourcing/export-sourcing-button";
+import { SourcingSlaService } from "@/lib/services/sourcing-sla.service";
 
 export const metadata = { title: "Cas de sourcing | Horion ERP" };
 
@@ -101,6 +102,21 @@ export default async function SourcingCasesPage() {
                         {sc.order.orderNumber}
                       </span>
                       <SourcingStatusBadge status={sc.status} />
+                      {(() => {
+                        const enteredAt = (sc as any).stageEnteredAt || sc.updatedAt || sc.createdAt;
+                        const sla = SourcingSlaService.compute(sc.status, new Date(enteredAt));
+                        const color =
+                          sla.status === "BREACHED"
+                            ? "bg-red-100 text-red-800"
+                            : sla.status === "WARNING"
+                            ? "bg-amber-100 text-amber-800"
+                            : "bg-emerald-100 text-emerald-800";
+                        return (
+                          <Badge className={`text-[10px] ${color}`}>
+                            {sla.label}
+                          </Badge>
+                        );
+                      })()}
                     </div>
                     <p className="text-sm text-muted-foreground truncate">
                       {sc.requirement}
@@ -110,13 +126,34 @@ export default async function SourcingCasesPage() {
                       {sc.supplier && ` · Fournisseur : ${sc.supplier.name}`}
                     </p>
                   </div>
-                  <div className="text-right shrink-0 hidden sm:block">
-                    {sc.budget && (
+                  <div className="text-right shrink-0 hidden sm:block space-y-1">
+                    {/* Level badge */}
+                    {(sc as any).level === "PROFOND" ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-medium bg-primary/10 text-primary rounded-full px-2 py-0.5">
+                        <Zap className="h-2.5 w-2.5" />
+                        Profond
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-medium bg-muted text-muted-foreground rounded-full px-2 py-0.5">
+                        Indicatif
+                      </span>
+                    )}
+                    {/* Margin or budget */}
+                    {(sc as any).marginPct != null ? (
+                      <p className={`text-sm font-semibold flex items-center gap-1 justify-end ${
+                        Number((sc as any).marginPct) >= 30 ? "text-green-600" :
+                        Number((sc as any).marginPct) >= 20 ? "text-orange-500" :
+                        "text-red-600"
+                      }`}>
+                        <TrendingUp className="h-3.5 w-3.5" />
+                        {Number((sc as any).marginPct).toFixed(1)}%
+                      </p>
+                    ) : sc.budget ? (
                       <p className="text-sm font-medium">
                         {Number(sc.budget).toLocaleString("fr-FR")} {sc.currency}
                       </p>
-                    )}
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                    ) : null}
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <span>{sc._count.offers} offre(s)</span>
                       <span>·</span>
                       <span>{sc._count.negotiations} échange(s)</span>

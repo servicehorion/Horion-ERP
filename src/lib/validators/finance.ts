@@ -9,7 +9,9 @@ export const createLedgerAccountSchema = z.object({
 
 export const createLedgerEntrySchema = z.object({
   accountId: z.string().min(1, "Compte obligatoire"),
+  contraAccountId: z.string().min(1, "Compte de contrepartie obligatoire"),
   orderId: z.string().optional(),
+  costCenterId: z.string().optional(),
   type: z.enum(["DEBIT", "CREDIT"]),
   amount: z.number().positive("Montant positif requis"),
   currency: z.string().default("XAF"),

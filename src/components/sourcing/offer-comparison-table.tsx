@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { selectSourcingSupplier } from "@/lib/actions/sourcing.actions";
 import { Check, Star, Clock, Package, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 interface Offer {
   id: string;
@@ -63,9 +64,10 @@ export function OfferComparisonTable({
     });
     setSelectingId(null);
     if (result.error) {
-      alert(result.error);
+      toast.error(result.error);
       return;
     }
+    toast.success("Offre selectionnee");
     router.refresh();
   }
 

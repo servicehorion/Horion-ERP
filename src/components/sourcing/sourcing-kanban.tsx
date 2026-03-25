@@ -12,6 +12,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { updateSourcingStatus } from "@/lib/actions/sourcing.actions";
 import { GripVertical, Package } from "lucide-react";
+import { toast } from "sonner";
 
 interface KanbanCase {
   id: string;
@@ -60,9 +61,10 @@ export function SourcingKanban({ cases }: { cases: KanbanCase[] }) {
     const res = await updateSourcingStatus(draggableId, { status: newStatus });
     if (res.error) {
       setItems(prev);
-      alert(res.error);
+      toast.error(res.error);
       return;
     }
+    toast.success("Statut de cas mis a jour");
     router.refresh();
   }
 

@@ -15,7 +15,7 @@ export default async function VerificationPage({
   const { token } = await params;
 
   const quote = await prisma.quote.findFirst({
-    where: { paymentToken: token },
+    where: { paymentToken: token, isActive: true },
     select: {
       version: true,
       currency: true,
@@ -128,6 +128,10 @@ function formatOrderStatus(status?: string | null) {
       return "en verification de paiement";
     case "SOURCING":
       return "en execution";
+    case "RECU_ENTREPOT":
+      return "reçue à l'entrepôt Chine";
+    case "QC_EN_COURS":
+      return "en contrôle qualité";
     default:
       return status ? status.toLowerCase() : "non renseigne";
   }

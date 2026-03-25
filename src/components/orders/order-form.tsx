@@ -62,7 +62,11 @@ export function OrderForm({
             },
           ],
       priority: (initialValues?.priority as any) || "NORMAL",
+      originCountry: initialValues?.originCountry || "CN",
       destinationCity: initialValues?.destinationCity || "Brazzaville",
+      logisticsCost: initialValues?.logisticsCost ?? 0,
+      insuranceAmount: initialValues?.insuranceAmount ?? 0,
+      commissionRate: initialValues?.commissionRate ?? 0.1,
       notes: initialValues?.notes || "",
     },
   });
@@ -160,6 +164,80 @@ export function OrderForm({
                 <FormLabel>Ville de destination</FormLabel>
                 <FormControl>
                   <Input {...field} placeholder="Brazzaville" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="originCountry"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Pays d&apos;origine</FormLabel>
+                <FormControl>
+                  <Input {...field} placeholder="CN" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-3">
+          <FormField
+            control={form.control}
+            name="logisticsCost"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Coût logistique</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={field.value ?? 0}
+                    onChange={(e) => field.onChange(Number(e.target.value))}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="insuranceAmount"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Assurance</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={field.value ?? 0}
+                    onChange={(e) => field.onChange(Number(e.target.value))}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="commissionRate"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Taux de commission</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="1"
+                    step="0.01"
+                    value={field.value ?? 0.1}
+                    onChange={(e) => field.onChange(Number(e.target.value))}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -331,4 +409,5 @@ export function OrderForm({
     </Form>
   );
 }
+
 

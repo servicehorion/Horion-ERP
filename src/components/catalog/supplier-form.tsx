@@ -34,6 +34,23 @@ type CreateSupplierInput = z.infer<typeof createSupplierSchema>;
 export function SupplierForm() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [languagesInput, setLanguagesInput] = useState("");
+  const [certificationsInput, setCertificationsInput] = useState("");
+  const [contactMeta, setContactMeta] = useState({
+    altPhone: "",
+    contactRole: "",
+    timezone: "Asia/Shanghai",
+    workingHours: "",
+  });
+  const [termsMeta, setTermsMeta] = useState({
+    incoterm: "EXW",
+    sampleAvailable: "yes",
+    packagingCapability: "",
+    qcPolicy: "",
+    refundPolicy: "",
+    exportPort: "",
+    paymentSplit: "",
+  });
 
   const form = useForm<CreateSupplierInput>({
     resolver: zodResolver(createSupplierSchema) as any,
@@ -44,12 +61,21 @@ export function SupplierForm() {
       city: "",
       contactName: "",
       phone: "",
+      whatsapp: "",
       wechat: "",
       email: "",
+      website: "",
+      storeUrl: "",
+      address: "",
       category: "",
       leadTimeDays: undefined,
+      sampleLeadTimeDays: undefined,
+      responseTimeHours: undefined,
+      productionCapacityMonthly: undefined,
       moq: "",
       paymentTerms: "",
+      languagesJson: [],
+      certificationsJson: [],
       notes: "",
     },
   });
@@ -57,7 +83,34 @@ export function SupplierForm() {
   async function onSubmit(data: CreateSupplierInput) {
     setIsSubmitting(true);
     try {
-      const result = await createCatalogSupplier(data as any);
+      const payload = {
+        ...data,
+        languagesJson: languagesInput
+          .split(",")
+          .map((value) => value.trim())
+          .filter(Boolean),
+        certificationsJson: certificationsInput
+          .split(",")
+          .map((value) => value.trim())
+          .filter(Boolean),
+        contactsJson: {
+          altPhone: contactMeta.altPhone || undefined,
+          contactRole: contactMeta.contactRole || undefined,
+          timezone: contactMeta.timezone || undefined,
+          workingHours: contactMeta.workingHours || undefined,
+        },
+        negotiatedTermsJson: {
+          incoterm: termsMeta.incoterm || undefined,
+          sampleAvailable: termsMeta.sampleAvailable === "yes",
+          packagingCapability: termsMeta.packagingCapability || undefined,
+          qcPolicy: termsMeta.qcPolicy || undefined,
+          refundPolicy: termsMeta.refundPolicy || undefined,
+          exportPort: termsMeta.exportPort || undefined,
+          paymentSplit: termsMeta.paymentSplit || undefined,
+        },
+      };
+
+      const result = await createCatalogSupplier(payload as any);
 
       if (result.error) {
         toast.error(result.error);
@@ -177,6 +230,20 @@ export function SupplierForm() {
 
           <FormField
             control={form.control}
+            name="whatsapp"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>WhatsApp</FormLabel>
+                <FormControl>
+                  <Input {...field} placeholder="+86 / +242 ..." />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
             name="wechat"
             render={({ field }) => (
               <FormItem>
@@ -209,6 +276,34 @@ export function SupplierForm() {
 
           <FormField
             control={form.control}
+            name="website"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Site web</FormLabel>
+                <FormControl>
+                  <Input {...field} placeholder="https://..." />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="storeUrl"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>URL boutique</FormLabel>
+                <FormControl>
+                  <Input {...field} placeholder="Lien 1688 / Alibaba / Taobao" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
             name="category"
             render={({ field }) => (
               <FormItem>
@@ -218,6 +313,20 @@ export function SupplierForm() {
                     {...field}
                     placeholder="Électronique, Textile..."
                   />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="address"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Adresse</FormLabel>
+                <FormControl>
+                  <Input {...field} placeholder="Adresse usine / entrepot" />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -249,12 +358,58 @@ export function SupplierForm() {
 
           <FormField
             control={form.control}
+            name="sampleLeadTimeDays"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Délai échantillon (jours)</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    placeholder="7"
+                    value={field.value ?? ""}
+                    onChange={(e) =>
+                      field.onChange(
+                        e.target.value ? Number(e.target.value) : undefined
+                      )
+                    }
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
             name="moq"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>MOQ</FormLabel>
                 <FormControl>
                   <Input {...field} placeholder="100 pièces" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="responseTimeHours"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Temps de réponse (h)</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    placeholder="12"
+                    value={field.value ?? ""}
+                    onChange={(e) =>
+                      field.onChange(
+                        e.target.value ? Number(e.target.value) : undefined
+                      )
+                    }
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -274,6 +429,162 @@ export function SupplierForm() {
               </FormItem>
             )}
           />
+
+          <FormField
+            control={form.control}
+            name="productionCapacityMonthly"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Capacité mensuelle</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    placeholder="5000"
+                    value={field.value ?? ""}
+                    onChange={(e) =>
+                      field.onChange(
+                        e.target.value ? Number(e.target.value) : undefined
+                      )
+                    }
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-2">
+          <FormItem>
+            <FormLabel>Langues</FormLabel>
+            <FormControl>
+              <Input
+                value={languagesInput}
+                onChange={(e) => setLanguagesInput(e.target.value)}
+                placeholder="Mandarin, Anglais, Français"
+              />
+            </FormControl>
+          </FormItem>
+
+          <FormItem>
+            <FormLabel>Certifications</FormLabel>
+            <FormControl>
+              <Input
+                value={certificationsInput}
+                onChange={(e) => setCertificationsInput(e.target.value)}
+                placeholder="CE, RoHS, ISO9001"
+              />
+            </FormControl>
+          </FormItem>
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-2">
+          <div className="space-y-4 rounded-lg border p-4">
+            <p className="text-sm font-medium">Coordination contact</p>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <FormLabel>Rôle du contact</FormLabel>
+                <Input
+                  value={contactMeta.contactRole}
+                  onChange={(e) => setContactMeta((prev) => ({ ...prev, contactRole: e.target.value }))}
+                  placeholder="Sales manager, owner..."
+                />
+              </div>
+              <div className="space-y-2">
+                <FormLabel>Téléphone secondaire</FormLabel>
+                <Input
+                  value={contactMeta.altPhone}
+                  onChange={(e) => setContactMeta((prev) => ({ ...prev, altPhone: e.target.value }))}
+                  placeholder="+86 ..."
+                />
+              </div>
+              <div className="space-y-2">
+                <FormLabel>Fuseau horaire</FormLabel>
+                <Input
+                  value={contactMeta.timezone}
+                  onChange={(e) => setContactMeta((prev) => ({ ...prev, timezone: e.target.value }))}
+                  placeholder="Asia/Shanghai"
+                />
+              </div>
+              <div className="space-y-2">
+                <FormLabel>Horaires de travail</FormLabel>
+                <Input
+                  value={contactMeta.workingHours}
+                  onChange={(e) => setContactMeta((prev) => ({ ...prev, workingHours: e.target.value }))}
+                  placeholder="09:00-18:00 GMT+8"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4 rounded-lg border p-4">
+            <p className="text-sm font-medium">Conditions négociées</p>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <FormLabel>Incoterm</FormLabel>
+                <Input
+                  value={termsMeta.incoterm}
+                  onChange={(e) => setTermsMeta((prev) => ({ ...prev, incoterm: e.target.value }))}
+                  placeholder="EXW, FOB..."
+                />
+              </div>
+              <div className="space-y-2">
+                <FormLabel>Disponibilité échantillon</FormLabel>
+                <Select
+                  value={termsMeta.sampleAvailable}
+                  onValueChange={(value) => setTermsMeta((prev) => ({ ...prev, sampleAvailable: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="yes">Oui</SelectItem>
+                    <SelectItem value="no">Non</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <FormLabel>Capacité packaging</FormLabel>
+                <Input
+                  value={termsMeta.packagingCapability}
+                  onChange={(e) => setTermsMeta((prev) => ({ ...prev, packagingCapability: e.target.value }))}
+                  placeholder="Private label, caisse bois..."
+                />
+              </div>
+              <div className="space-y-2">
+                <FormLabel>Port export</FormLabel>
+                <Input
+                  value={termsMeta.exportPort}
+                  onChange={(e) => setTermsMeta((prev) => ({ ...prev, exportPort: e.target.value }))}
+                  placeholder="Shenzhen, Ningbo..."
+                />
+              </div>
+              <div className="space-y-2">
+                <FormLabel>Politique QC</FormLabel>
+                <Input
+                  value={termsMeta.qcPolicy}
+                  onChange={(e) => setTermsMeta((prev) => ({ ...prev, qcPolicy: e.target.value }))}
+                  placeholder="AQL, inspection avant départ..."
+                />
+              </div>
+              <div className="space-y-2">
+                <FormLabel>Split de paiement</FormLabel>
+                <Input
+                  value={termsMeta.paymentSplit}
+                  onChange={(e) => setTermsMeta((prev) => ({ ...prev, paymentSplit: e.target.value }))}
+                  placeholder="30/70, 50/50..."
+                />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <FormLabel>Politique retour / remboursement</FormLabel>
+                <Input
+                  value={termsMeta.refundPolicy}
+                  onChange={(e) => setTermsMeta((prev) => ({ ...prev, refundPolicy: e.target.value }))}
+                  placeholder="Conditions SAV, remboursement, remplacement"
+                />
+              </div>
+            </div>
+          </div>
         </div>
 
         <FormField

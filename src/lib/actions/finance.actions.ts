@@ -5,6 +5,8 @@ import { LedgerService } from "@/lib/services/ledger.service";
 import { FXRateService } from "@/lib/services/fx-rate.service";
 import { FinanceIntelligenceService } from "@/lib/services/finance-intelligence.service";
 import { AuditService } from "@/lib/services/audit.service";
+import { AccountingService } from "@/lib/services/accounting.service";
+import { FxRevaluationService } from "@/lib/services/fx-revaluation.service";
 import { checkPermission } from "@/lib/permissions";
 import {
   createLedgerAccountSchema,
@@ -78,21 +80,70 @@ export async function createLedgerEntry(formData: Record<string, unknown>) {
 
     const validated = createLedgerEntrySchema.parse(formData);
 
-    // Verify account belongs to tenant
-    const account = await LedgerService.getAccountById(validated.accountId);
-    if (!account || account.tenantId !== user.tenantId) {
-      return { error: "Compte introuvable" };
+    if (validated.accountId === validated.contraAccountId) {
+      return { error: "La contrepartie doit etre differente du compte principal" };
     }
 
-    const entry = await LedgerService.createEntry(validated);
+    const [account, contraAccount] = await Promise.all([
+      LedgerService.getAccountById(validated.accountId),
+      LedgerService.getAccountById(validated.contraAccountId),
+    ]);
+    if (!account || account.tenantId !== user.tenantId) {
+      return { error: "Compte principal introuvable" };
+    }
+    if (!contraAccount || contraAccount.tenantId !== user.tenantId) {
+      return { error: "Compte de contrepartie introuvable" };
+    }
+
+    const journal = await AccountingService.getOrCreateJournal({
+      tenantId: user.tenantId,
+      code: "GEN",
+      name: "Journal general",
+      type: "GENERAL",
+    });
+
+    const debitAccountId = validated.type === "DEBIT" ? validated.accountId : validated.contraAccountId;
+    const creditAccountId = validated.type === "DEBIT" ? validated.contraAccountId : validated.accountId;
+
+    const entry = await AccountingService.createJournalEntry({
+      tenantId: user.tenantId,
+      journalId: journal.id,
+      reference: validated.reference,
+      memo: validated.description,
+      status: "POSTED",
+      lines: [
+        {
+          accountId: debitAccountId,
+          type: "DEBIT",
+          amount: validated.amount,
+          currency: validated.currency,
+          description: validated.description,
+          orderId: validated.orderId,
+        },
+        {
+          accountId: creditAccountId,
+          type: "CREDIT",
+          amount: validated.amount,
+          currency: validated.currency,
+          description: validated.description,
+          orderId: validated.orderId,
+        },
+      ],
+    });
 
     await AuditService.log({
       tenantId: user.tenantId,
       userId: user.id,
-      action: "ledger.entry.created",
-      entityType: "ledger_entry",
+      action: "ledger.double_entry.created",
+      entityType: "journal_entry",
       entityId: entry.id,
-      newValue: { type: validated.type, amount: validated.amount, description: validated.description },
+      newValue: {
+        amount: validated.amount,
+        currency: validated.currency,
+        debitAccountId,
+        creditAccountId,
+        reference: validated.reference || null,
+      },
     });
 
     revalidatePath("/finance/ledger");
@@ -112,12 +163,12 @@ export async function getTrialBalance() {
   }
 }
 
-export async function seedChartOfAccounts() {
+export async function seedChartOfAccounts(template?: "STANDARD" | "OHADA" | "PCG_CONGO") {
   try {
     const user = await getSession();
     checkPermission(user.role, "finance.manage");
 
-    const accounts = await LedgerService.seedChartOfAccounts(user.tenantId);
+    const accounts = await LedgerService.seedChartOfAccounts(user.tenantId, template || "STANDARD");
 
     await AuditService.log({
       tenantId: user.tenantId,
@@ -125,7 +176,7 @@ export async function seedChartOfAccounts() {
       action: "ledger.chart_seeded",
       entityType: "ledger_account",
       entityId: "bulk",
-      newValue: { count: accounts.length },
+      newValue: { count: accounts.length, template: template || "STANDARD" },
     });
 
     revalidatePath("/finance/ledger");
@@ -150,8 +201,28 @@ export async function createFXRate(formData: Record<string, unknown>) {
       effectiveAt: validated.effectiveAt ? new Date(validated.effectiveAt) : undefined,
     });
 
+    const revaluation = await FxRevaluationService.runForTenant({
+      tenantId: user.tenantId,
+      userId: user.id,
+    });
+
+    await AuditService.log({
+      tenantId: user.tenantId,
+      userId: user.id,
+      action: "finance.fx.rate_created",
+      entityType: "fx_rate",
+      entityId: rate.id,
+      newValue: {
+        fromCurrency: rate.fromCurrency,
+        toCurrency: rate.toCurrency,
+        rate: Number(rate.rate),
+        revaluation,
+      },
+    });
+
     revalidatePath("/finance/fx");
-    return { data: rate };
+    revalidatePath("/finance/ledger");
+    return { data: { rate, revaluation } };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur lors de la création" };
   }
@@ -299,8 +370,45 @@ export async function exportFinanceCSV() {
     ]);
 
     const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+
+    await AuditService.log({
+      tenantId: user.tenantId,
+      userId: user.id,
+      action: "finance.export.csv",
+      entityType: "payment",
+      entityId: "bulk",
+      newValue: { rows: payments.length },
+    });
+
     return { data: csv };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur export" };
+  }
+}
+
+export async function runFxRevaluation() {
+  try {
+    const user = await getSession();
+    checkPermission(user.role, "finance.manage");
+
+    const result = await FxRevaluationService.runForTenant({
+      tenantId: user.tenantId,
+      userId: user.id,
+    });
+
+    await AuditService.log({
+      tenantId: user.tenantId,
+      userId: user.id,
+      action: "finance.fx.revaluation.run",
+      entityType: "journal_entry",
+      entityId: "bulk",
+      newValue: result as any,
+    });
+
+    revalidatePath("/finance/ledger");
+    revalidatePath("/finance");
+    return { data: result };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Erreur revalorisation FX" };
   }
 }

@@ -11,12 +11,21 @@ export class CatalogSupplierService {
     status?: SupplierStatus;
     contactName?: string;
     phone?: string;
+    whatsapp?: string;
     wechat?: string;
     email?: string;
+    website?: string;
+    storeUrl?: string;
+    address?: string;
     category?: string;
     leadTimeDays?: number;
+    sampleLeadTimeDays?: number;
+    responseTimeHours?: number;
+    productionCapacityMonthly?: number;
     moq?: string;
     paymentTerms?: string;
+    languagesJson?: string[];
+    certificationsJson?: string[];
     contactsJson?: Record<string, unknown>;
     negotiatedTermsJson?: Record<string, unknown>;
     notes?: string;
@@ -30,12 +39,21 @@ export class CatalogSupplierService {
         status: data.status || "ACTIVE",
         contactName: data.contactName,
         phone: data.phone,
+        whatsapp: data.whatsapp,
         wechat: data.wechat,
         email: data.email,
+        website: data.website,
+        storeUrl: data.storeUrl,
+        address: data.address,
         category: data.category,
         leadTimeDays: data.leadTimeDays,
+        sampleLeadTimeDays: data.sampleLeadTimeDays,
+        responseTimeHours: data.responseTimeHours,
+        productionCapacityMonthly: data.productionCapacityMonthly,
         moq: data.moq,
         paymentTerms: data.paymentTerms,
+        languagesJson: data.languagesJson ?? undefined,
+        certificationsJson: data.certificationsJson ?? undefined,
         contactsJson: data.contactsJson ? JSON.parse(JSON.stringify(data.contactsJson)) : undefined,
         negotiatedTermsJson: data.negotiatedTermsJson ? JSON.parse(JSON.stringify(data.negotiatedTermsJson)) : undefined,
         notes: data.notes,
@@ -57,18 +75,29 @@ export class CatalogSupplierService {
     status: SupplierStatus;
     contactName: string;
     phone: string;
+    whatsapp: string;
     wechat: string;
     email: string;
+    website: string;
+    storeUrl: string;
+    address: string;
     category: string;
     leadTimeDays: number;
+    sampleLeadTimeDays: number;
+    responseTimeHours: number;
+    productionCapacityMonthly: number;
     moq: string;
     paymentTerms: string;
+    languagesJson: string[];
+    certificationsJson: string[];
     contactsJson: Record<string, unknown>;
     negotiatedTermsJson: Record<string, unknown>;
     notes: string;
     isVerified: boolean;
   }>) {
     const updateData: Record<string, unknown> = { ...data };
+    if (data.languagesJson) updateData.languagesJson = JSON.parse(JSON.stringify(data.languagesJson));
+    if (data.certificationsJson) updateData.certificationsJson = JSON.parse(JSON.stringify(data.certificationsJson));
     if (data.contactsJson) updateData.contactsJson = JSON.parse(JSON.stringify(data.contactsJson));
     if (data.negotiatedTermsJson) updateData.negotiatedTermsJson = JSON.parse(JSON.stringify(data.negotiatedTermsJson));
 

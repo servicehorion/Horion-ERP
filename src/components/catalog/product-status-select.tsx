@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/select";
 import { updateProductStatus } from "@/lib/actions/catalog.actions";
 import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 const STATUS_LABELS: Record<string, string> = {
   TESTING: "En test",
@@ -34,9 +35,10 @@ export function ProductStatusSelect({ productId, currentStatus }: Props) {
     const result = await updateProductStatus(productId, newStatus);
     setLoading(false);
     if (result.error) {
-      alert(result.error);
+      toast.error(result.error);
       return;
     }
+    toast.success("Statut produit mis a jour");
     router.refresh();
   }
 

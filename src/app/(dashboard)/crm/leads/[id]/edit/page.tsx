@@ -1,4 +1,4 @@
-import { ArrowLeft } from "lucide-react";
+﻿import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
@@ -31,7 +31,7 @@ export default async function EditLeadPage({
 
   const lead = serializeDecimals(leadResult.data);
 
-  const [contacts, members] = await Promise.all([
+  const [contacts, members, salesTeams, territories] = await Promise.all([
     prisma.contact.findMany({
       where: { tenantId: session.user.tenantId },
       select: { id: true, name: true },
@@ -40,6 +40,16 @@ export default async function EditLeadPage({
     prisma.user.findMany({
       where: { tenantId: session.user.tenantId, isActive: true },
       select: { id: true, name: true, email: true, role: true },
+      orderBy: { name: "asc" },
+    }),
+    prisma.salesTeam.findMany({
+      where: { tenantId: session.user.tenantId },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
+    prisma.salesTerritory.findMany({
+      where: { tenantId: session.user.tenantId },
+      select: { id: true, name: true },
       orderBy: { name: "asc" },
     }),
   ]);
@@ -54,7 +64,7 @@ export default async function EditLeadPage({
         </Button>
         <div>
           <h1 className="text-3xl font-bold">Modifier lead</h1>
-          <p className="text-muted-foreground">{lead.contact.name}</p>
+          <p className="text-muted-foreground">{(lead as any).contact?.name}</p>
         </div>
       </div>
 
@@ -73,9 +83,16 @@ export default async function EditLeadPage({
             collaboratorIds: Array.isArray((lead as any).collaborators)
               ? (lead as any).collaborators.map((c: any) => c.userId || c.user?.id).filter(Boolean)
               : [],
+            containerType: lead.containerType,
+            originCountry: lead.originCountry,
+            notes: lead.notes,
+            salesTeamId: (lead as any).salesTeamId || undefined,
+            territoryId: (lead as any).territoryId || undefined,
           }}
           contacts={contacts}
           teamMembers={members}
+          salesTeams={salesTeams}
+          territories={territories}
           currentUserId={session.user.id}
         />
       </div>

@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 import {
   ArrowLeft,
   Package,
-  Clock,
   MessageSquare,
   CheckCircle2,
   XCircle,
@@ -11,9 +10,11 @@ import {
   FileText,
   Send,
   Inbox,
+  Zap,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { getSession } from "@/lib/session";
 import { getSourcingCaseById, getSuppliersForSourcing } from "@/lib/actions/sourcing.actions";
 import { SourcingStatusBadge } from "@/components/sourcing/sourcing-status-badge";
 import { SourcingStatusSelect } from "@/components/sourcing/sourcing-status-select";
@@ -21,6 +22,8 @@ import { OfferComparisonTable } from "@/components/sourcing/offer-comparison-tab
 import { AddOfferForm } from "@/components/sourcing/add-offer-form";
 import { NegotiationForm } from "@/components/sourcing/negotiation-form";
 import { ConfirmSelectionButton } from "@/components/sourcing/confirm-selection-button";
+import { ProfondPanel } from "@/components/sourcing/profond-panel";
+import { SourcingSlaService } from "@/lib/services/sourcing-sla.service";
 
 export const metadata = { title: "Détail cas sourcing | Horion ERP" };
 
@@ -37,20 +40,47 @@ function getStepIndex(status: string) {
   return PIPELINE_STEPS.findIndex((s) => s.status === status);
 }
 
+const LOGISTICS_ROLES = [
+  "ADMIN",
+  "CEO",
+  "DIRECTION",
+  "LOGISTICS_MANAGER",
+  "SOURCING_ASSISTANT",
+];
+const CEO_ROLES = ["ADMIN", "CEO", "DIRECTION"];
+
 export default async function SourcingCaseDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [caseResult, suppliersResult] = await Promise.all([
+  const [caseResult, suppliersResult, session] = await Promise.all([
     getSourcingCaseById(id),
     getSuppliersForSourcing(),
+    getSession().catch(() => null),
   ]);
 
   if (caseResult.error || !caseResult.data) return notFound();
 
-  const sc = caseResult.data;
+  const sc = caseResult.data as typeof caseResult.data & {
+    level?: string;
+    weightKg?: number | null;
+    lengthCm?: number | null;
+    widthCm?: number | null;
+    heightCm?: number | null;
+    cartonCount?: number | null;
+    sensitiveProduct?: boolean;
+    taxableWeightKg?: number | null;
+    transportCostEst?: number | null;
+    unitPriceRmb?: number | null;
+    quantity?: number | null;
+    totalCostXAF?: number | null;
+    prixFinalXAF?: number | null;
+    marginPct?: number | null;
+    marginApprovedByCeo?: boolean;
+  };
+
   const suppliers = suppliersResult.data || [];
   const currentStep = getStepIndex(sc.status);
   const isCancelled = sc.status === "CANCELLED";
@@ -58,6 +88,22 @@ export default async function SourcingCaseDetailPage({
   const canAddOffer = !isConfirmed && !isCancelled;
   const canSelect =
     ["OFFERS_RECEIVED", "NEGOTIATING"].includes(sc.status) && sc.offers.length > 0;
+
+  const userRole = session?.role ?? "VIEWER";
+  const level = sc.level ?? "INFORMATIF";
+  const canPromote = LOGISTICS_ROLES.includes(userRole);
+  const canApproveCeo = CEO_ROLES.includes(userRole);
+  const canCapitalize = LOGISTICS_ROLES.includes(userRole);
+  const sla = SourcingSlaService.compute(
+    sc.status,
+    sc.stageEnteredAt || sc.updatedAt || sc.createdAt
+  );
+  const slaColor =
+    sla.status === "BREACHED"
+      ? "bg-red-100 text-red-800"
+      : sla.status === "WARNING"
+      ? "bg-amber-100 text-amber-800"
+      : "bg-emerald-100 text-emerald-800";
 
   return (
     <div className="space-y-6">
@@ -74,6 +120,14 @@ export default async function SourcingCaseDetailPage({
           <h1 className="text-3xl font-bold flex items-center gap-3">
             <Package className="h-7 w-7" />
             {sc.order.orderNumber}
+            <Badge
+              variant={level === "PROFOND" ? "default" : "secondary"}
+              className="text-xs font-normal"
+            >
+              <Zap className="h-3 w-3 mr-1" />
+              {level === "PROFOND" ? "Sourcing Profond" : "Indicatif"}
+            </Badge>
+            <Badge className={`text-xs font-normal ${slaColor}`}>{sla.label}</Badge>
           </h1>
           <p className="text-muted-foreground">{sc.requirement}</p>
         </div>
@@ -106,9 +160,7 @@ export default async function SourcingCaseDetailPage({
                 </div>
                 {index < PIPELINE_STEPS.length - 1 && (
                   <div
-                    className={`h-0.5 w-2 shrink-0 ${
-                      isDone ? "bg-green-500" : "bg-muted"
-                    }`}
+                    className={`h-0.5 w-2 shrink-0 ${isDone ? "bg-green-500" : "bg-muted"}`}
                   />
                 )}
               </div>
@@ -125,7 +177,7 @@ export default async function SourcingCaseDetailPage({
       )}
 
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Left: Info + Offers */}
+        {/* Left: Info + Profond Panel + Offers */}
         <div className="lg:col-span-2 space-y-6">
           {/* Case Info */}
           <Card>
@@ -198,6 +250,40 @@ export default async function SourcingCaseDetailPage({
               </div>
             </CardContent>
           </Card>
+
+          {/* Profond Panel */}
+          <ProfondPanel
+            caseId={sc.id}
+            level={level}
+            status={sc.status}
+            weightKg={sc.weightKg}
+            lengthCm={sc.lengthCm}
+            widthCm={sc.widthCm}
+            heightCm={sc.heightCm}
+            cartonCount={sc.cartonCount}
+            sensitiveProduct={sc.sensitiveProduct}
+            taxableWeightKg={sc.taxableWeightKg}
+            transportCostEst={
+              sc.transportCostEst != null ? Number(sc.transportCostEst) : null
+            }
+            unitPriceRmb={
+              sc.unitPriceRmb != null ? Number(sc.unitPriceRmb) : null
+            }
+            quantity={sc.quantity}
+            totalCostXAF={
+              sc.totalCostXAF != null ? Number(sc.totalCostXAF) : null
+            }
+            prixFinalXAF={
+              sc.prixFinalXAF != null ? Number(sc.prixFinalXAF) : null
+            }
+            marginPct={
+              sc.marginPct != null ? Number(sc.marginPct) : null
+            }
+            marginApprovedByCeo={sc.marginApprovedByCeo ?? false}
+            canPromote={canPromote}
+            canApproveCeo={canApproveCeo}
+            canCapitalize={canCapitalize}
+          />
 
           {/* Offers Comparison */}
           <div className="space-y-3">

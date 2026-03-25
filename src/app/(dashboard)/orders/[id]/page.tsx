@@ -37,6 +37,8 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
   const canArchive = hasPermission(session.user.role, "order.delete");
   const canCreateQuote = hasPermission(session.user.role, "quote.create");
   const canSendQuote = hasPermission(session.user.role, "quote.send");
+  const canApproveQuote = hasPermission(session.user.role, "quote.approve");
+  const canApproveOrder = hasPermission(session.user.role, "order.approve");
   const canViewPayments = hasPermission(session.user.role, "finance.view");
   const canCreatePayment = hasPermission(session.user.role, "payment.create");
   const canManageLogistics = hasPermission(session.user.role, "logistics.manage");
@@ -55,19 +57,21 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
         </Button>
       </div>
 
-      <OrderDetail
-        order={order}
-        canUpdateStatus={canUpdateStatus}
-        canEdit={canEdit}
-        canArchive={canArchive}
-        canCreateQuote={canCreateQuote}
-        canSendQuote={canSendQuote}
-        canViewPayments={canViewPayments}
-        canCreatePayment={canCreatePayment}
-        canManageLogistics={canManageLogistics}
-        canManageQc={canManageQc}
-        teamMembers={teamMembers}
-      />
+        <OrderDetail
+          order={order}
+          canUpdateStatus={canUpdateStatus}
+          canEdit={canEdit}
+          canArchive={canArchive}
+          canCreateQuote={canCreateQuote}
+          canSendQuote={canSendQuote}
+          canApproveQuote={canApproveQuote}
+          canApproveOrder={canApproveOrder}
+          canViewPayments={canViewPayments}
+          canCreatePayment={canCreatePayment}
+          canManageLogistics={canManageLogistics}
+          canManageQc={canManageQc}
+          teamMembers={teamMembers}
+        />
     </div>
   );
 }

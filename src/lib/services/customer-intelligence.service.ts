@@ -22,7 +22,7 @@ export class CustomerIntelligenceService {
     const ordersAtRisk = await prisma.order.findMany({
       where: {
         contactId,
-        status: { in: ["EN_PRODUCTION", "EN_TRANSIT", "DEDOUANE", "QC_EN_COURS"] },
+        status: { in: ["EN_PRODUCTION", "RECU_ENTREPOT", "EN_TRANSIT", "DEDOUANE", "QC_EN_COURS"] },
       },
       select: { totalClient: true, createdAt: true },
     });

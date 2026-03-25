@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { AlertTriangle, CheckSquare, Download, Loader2, Square, X } from "lucide-react";
@@ -16,6 +16,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { TaskStatusBadge, PriorityBadge } from "@/components/shared/status-badge";
+import { TaskImportDialog } from "@/components/tasks/task-import-dialog";
 import { bulkUpdateTaskStatus, bulkAssignTasks, exportTasksData } from "@/lib/actions/task.actions";
 import { formatDate } from "@/lib/utils";
 import { cn } from "@/lib/utils";
@@ -28,7 +29,11 @@ interface Task {
   status: string;
   priority: string;
   slaBreach: boolean;
-  slaDeadline?: Date | null;
+  slaDeadline?: Date | string | null;
+  dueDate?: Date | string | null;
+  startedAt?: Date | string | null;
+  estimatedHours?: number | null;
+  project?: { id: string; name: string } | null;
   assignments?: { user: { name: string } }[];
 }
 
@@ -39,9 +44,9 @@ interface TaskTableClientProps {
 
 const STATUS_OPTIONS = [
   { value: "IN_PROGRESS", label: "En cours" },
-  { value: "COMPLETED", label: "Terminé" },
-  { value: "BLOCKED", label: "Bloqué" },
-  { value: "CANCELLED", label: "Annulé" },
+  { value: "COMPLETED", label: "Termine" },
+  { value: "BLOCKED", label: "Bloque" },
+  { value: "CANCELLED", label: "Annule" },
   { value: "PENDING", label: "En attente" },
 ];
 
@@ -72,12 +77,15 @@ export function TaskTableClient({ tasks, teamMembers }: TaskTableClientProps) {
       const res = await bulkUpdateTaskStatus(Array.from(selected), status);
       if (res.error) toast.error(res.error);
       else {
-        toast.success(`${selected.size} tâche(s) mise(s) à jour`);
+        toast.success(`${selected.size} tache(s) mise(s) a jour`);
         setSelected(new Set());
         router.refresh();
       }
-    } catch { toast.error("Erreur"); }
-    finally { setLoading(false); }
+    } catch {
+      toast.error("Erreur");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleBulkAssign = async (userId: string) => {
@@ -87,12 +95,15 @@ export function TaskTableClient({ tasks, teamMembers }: TaskTableClientProps) {
       const res = await bulkAssignTasks(Array.from(selected), userId);
       if (res.error) toast.error(res.error);
       else {
-        toast.success(`${selected.size} tâche(s) assignée(s)`);
+        toast.success(`${selected.size} tache(s) assignee(s)`);
         setSelected(new Set());
         router.refresh();
       }
-    } catch { toast.error("Erreur"); }
-    finally { setLoading(false); }
+    } catch {
+      toast.error("Erreur");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleExport = async () => {
@@ -109,19 +120,22 @@ export function TaskTableClient({ tasks, teamMembers }: TaskTableClientProps) {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      toast.success("Export CSV téléchargé");
-    } catch { toast.error("Erreur export"); }
-    finally { setExporting(false); }
+      toast.success("Export CSV telecharge");
+    } catch {
+      toast.error("Erreur export");
+    } finally {
+      setExporting(false);
+    }
   };
 
   return (
     <div className="space-y-2">
-      {/* Bulk toolbar — appears when items selected */}
+      {/* Bulk toolbar */}
       {selected.size > 0 && (
         <div className="flex items-center gap-3 p-3 rounded-lg bg-primary/5 border border-primary/20 animate-in slide-in-from-top-1">
           <div className="flex items-center gap-2 text-sm font-medium text-primary">
             <CheckSquare className="h-4 w-4" />
-            <span>{selected.size} sélectionnée{selected.size > 1 ? "s" : ""}</span>
+            <span>{selected.size} selectionnee{selected.size > 1 ? "s" : ""}</span>
           </div>
           <div className="flex items-center gap-2 flex-1">
             <Select onValueChange={handleBulkStatus} disabled={loading}>
@@ -137,7 +151,7 @@ export function TaskTableClient({ tasks, teamMembers }: TaskTableClientProps) {
             {teamMembers.length > 0 && (
               <Select onValueChange={handleBulkAssign} disabled={loading}>
                 <SelectTrigger className="w-44 h-8 text-xs">
-                  <SelectValue placeholder="Assigner à..." />
+                  <SelectValue placeholder="Assigner a..." />
                 </SelectTrigger>
                 <SelectContent>
                   {teamMembers.map((m) => (
@@ -154,13 +168,16 @@ export function TaskTableClient({ tasks, teamMembers }: TaskTableClientProps) {
         </div>
       )}
 
-      {/* Export button + count */}
+      {/* Export + Import */}
       <div className="flex items-center justify-between">
-        <span className="text-xs text-muted-foreground">{tasks.length} tâche{tasks.length > 1 ? "s" : ""}</span>
-        <Button variant="outline" size="sm" onClick={handleExport} disabled={exporting} className="h-7 text-xs">
-          {exporting ? <Loader2 className="mr-1.5 h-3 w-3 animate-spin" /> : <Download className="mr-1.5 h-3 w-3" />}
-          Export CSV
-        </Button>
+        <span className="text-xs text-muted-foreground">{tasks.length} tache{tasks.length > 1 ? "s" : ""}</span>
+        <div className="flex items-center gap-2">
+          <TaskImportDialog />
+          <Button variant="outline" size="sm" onClick={handleExport} disabled={exporting} className="h-7 text-xs">
+            {exporting ? <Loader2 className="mr-1.5 h-3 w-3 animate-spin" /> : <Download className="mr-1.5 h-3 w-3" />}
+            Export CSV
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -168,9 +185,9 @@ export function TaskTableClient({ tasks, teamMembers }: TaskTableClientProps) {
           {tasks.length === 0 ? (
             <div className="py-16 text-center">
               <CheckSquare className="h-12 w-12 text-muted-foreground mx-auto mb-3 opacity-30" />
-              <h3 className="text-lg font-semibold">Aucune tâche</h3>
+              <h3 className="text-lg font-semibold">Aucune tache</h3>
               <p className="text-muted-foreground text-sm mt-1">
-                Modifiez vos filtres ou créez une nouvelle tâche
+                Modifiez vos filtres ou creez une nouvelle tache
               </p>
             </div>
           ) : (
@@ -188,12 +205,16 @@ export function TaskTableClient({ tasks, teamMembers }: TaskTableClientProps) {
                       }
                     </button>
                   </TableHead>
-                  <TableHead className="w-[36%]">Tâche</TableHead>
+                  <TableHead className="w-[30%]">Tache</TableHead>
                   <TableHead>Module</TableHead>
+                  <TableHead>Projet</TableHead>
                   <TableHead>Statut</TableHead>
-                  <TableHead>Priorité</TableHead>
-                  <TableHead>Assigné à</TableHead>
-                  <TableHead>Échéance SLA</TableHead>
+                  <TableHead>Priorite</TableHead>
+                  <TableHead>Assigne a</TableHead>
+                  <TableHead>Demarrage</TableHead>
+                  <TableHead>Echeance</TableHead>
+                  <TableHead>Estime</TableHead>
+                  <TableHead>Echeance SLA</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -202,10 +223,7 @@ export function TaskTableClient({ tasks, teamMembers }: TaskTableClientProps) {
                   return (
                     <TableRow
                       key={task.id}
-                      className={cn(
-                        "group",
-                        isSelected && "bg-primary/5"
-                      )}
+                      className={cn("group", isSelected && "bg-primary/5")}
                     >
                       <TableCell>
                         <button
@@ -233,20 +251,53 @@ export function TaskTableClient({ tasks, teamMembers }: TaskTableClientProps) {
                       <TableCell>
                         <Badge variant="outline" className="text-xs capitalize">{task.module}</Badge>
                       </TableCell>
+                      <TableCell className="max-w-[200px]">
+                        {task.project ? (
+                          <Link
+                            href={`/projects/${task.project.id}`}
+                            className="text-sm text-blue-600 hover:underline line-clamp-1"
+                          >
+                            {task.project.name}
+                          </Link>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
                       <TableCell><TaskStatusBadge status={task.status} /></TableCell>
                       <TableCell><PriorityBadge priority={task.priority} /></TableCell>
                       <TableCell className="text-sm">
                         {task.assignments?.[0]?.user?.name ?? (
-                          <span className="text-muted-foreground">—</span>
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {task.startedAt ? (
+                          <span className="text-sm">{formatDate(new Date(task.startedAt), true)}</span>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {task.dueDate ? (
+                          <span className="text-sm">{formatDate(new Date(task.dueDate), true)}</span>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {task.estimatedHours ? (
+                          <span className="text-sm">{task.estimatedHours}h</span>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
                         )}
                       </TableCell>
                       <TableCell>
                         {task.slaDeadline ? (
                           <span className={cn("text-sm", task.slaBreach && "text-red-600 font-semibold")}>
-                            {formatDate(task.slaDeadline, true)}
+                            {formatDate(new Date(task.slaDeadline), true)}
                           </span>
                         ) : (
-                          <span className="text-muted-foreground">—</span>
+                          <span className="text-muted-foreground">-</span>
                         )}
                       </TableCell>
                     </TableRow>

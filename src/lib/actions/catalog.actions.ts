@@ -18,9 +18,20 @@ import {
   createMediaSchema,
   createCategorySchema,
 } from "@/lib/validators/catalog";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { prisma } from "@/lib/db";
 import type { ProductStatus, SupplierStatus } from "@prisma/client";
+import { getTenantCacheTags, runTenantCached } from "@/lib/server-cache";
+import { toPlainData } from "@/lib/utils";
+
+function revalidateCatalogCaches(tenantId: string) {
+  for (const tag of [
+    ...getTenantCacheTags("catalog-dashboard-stats", tenantId),
+    ...getTenantCacheTags("catalog-analytics", tenantId),
+  ]) {
+    revalidateTag(tag, "max");
+  }
+}
 
 // ============================================================
 // PRODUCTS
@@ -45,6 +56,7 @@ export async function createProduct(formData: Record<string, unknown>) {
 
     revalidatePath("/catalog/products");
     revalidatePath("/catalog");
+    revalidateCatalogCaches(user.tenantId);
     return { data: product };
   } catch (error) {
     console.error("Error creating product:", error);
@@ -68,6 +80,7 @@ export async function updateProduct(productId: string, formData: Record<string, 
     revalidatePath(`/catalog/products/${productId}`);
     revalidatePath("/catalog/products");
     revalidatePath("/catalog");
+    revalidateCatalogCaches(user.tenantId);
     return { data: product };
   } catch (error) {
     console.error("Error updating product:", error);
@@ -155,6 +168,7 @@ export async function createCatalogSupplier(formData: Record<string, unknown>) {
 
     revalidatePath("/catalog/suppliers");
     revalidatePath("/catalog");
+    revalidateCatalogCaches(user.tenantId);
     return { data: supplier };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur lors de la création du fournisseur" };
@@ -171,6 +185,7 @@ export async function updateCatalogSupplier(supplierId: string, formData: Record
 
     revalidatePath(`/catalog/suppliers/${supplierId}`);
     revalidatePath("/catalog/suppliers");
+    revalidateCatalogCaches(user.tenantId);
     return { data: supplier };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur lors de la mise à jour" };
@@ -272,6 +287,8 @@ export async function createOffer(formData: Record<string, unknown>) {
     });
 
     revalidatePath("/catalog/offers");
+    revalidatePath("/catalog");
+    revalidateCatalogCaches(user.tenantId);
     return { data: offer };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur lors de la création de l'offre" };
@@ -332,6 +349,7 @@ export async function linkSupplierProduct(formData: Record<string, unknown>) {
 
     revalidatePath(`/catalog/products/${validated.productId}`);
     revalidatePath(`/catalog/suppliers/${validated.supplierId}`);
+    revalidateCatalogCaches(user.tenantId);
     return { data: sp };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur lors de la liaison" };
@@ -351,6 +369,8 @@ export async function createMedia(formData: Record<string, unknown>) {
     const media = await CatalogMediaService.create(user.tenantId, validated);
 
     revalidatePath("/catalog/vault");
+    revalidatePath("/catalog");
+    revalidateCatalogCaches(user.tenantId);
     return { data: media };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur lors de l'ajout" };
@@ -394,6 +414,8 @@ export async function createCategory(formData: Record<string, unknown>) {
     });
 
     revalidatePath("/catalog/products");
+    revalidatePath("/catalog");
+    revalidateCatalogCaches(user.tenantId);
     return { data: category };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur lors de la création" };
@@ -440,6 +462,7 @@ export async function updateProductStatus(productId: string, status: string) {
     revalidatePath(`/catalog/products/${productId}`);
     revalidatePath("/catalog/products");
     revalidatePath("/catalog");
+    revalidateCatalogCaches(user.tenantId);
     return { data: product };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur lors de la mise à jour du statut" };
@@ -486,37 +509,91 @@ export async function getCatalogDashboardStats() {
   try {
     const user = await getSession();
     checkPermission(user.role, "catalog.view");
-    const tenantId = user.tenantId;
+    const data = await runTenantCached(
+      "catalog-dashboard-stats",
+      user.tenantId,
+      async () => {
+        const tenantId = user.tenantId;
 
-    const [productCounts, supplierCounts, topProducts, topSuppliers, recentOffers, mediaCounts, categoryStats] = await Promise.all([
-      CatalogProductService.getStatusCounts(tenantId),
-      CatalogSupplierService.getStatusCounts(),
-      CatalogProductService.getTopByDemand(tenantId, 8),
-      CatalogSupplierService.getTopByRating(5),
-      CatalogOfferService.list({ page: 1, limit: 10 }),
-      CatalogMediaService.getCountsByType(tenantId),
-      CatalogProductService.getCategoryStats(tenantId),
-    ]);
+        const [productCounts, supplierCounts] = await Promise.all([
+          CatalogProductService.getStatusCounts(tenantId),
+          CatalogSupplierService.getStatusCounts(),
+        ]);
 
-    // Avg demand score from top products
-    const avgDemandScore = topProducts.length > 0
-      ? Math.round(topProducts.reduce((s: number, p: any) => s + p.demandScore, 0) / topProducts.length)
-      : 0;
+        const [topProducts, mediaCounts, categoryStats] = await Promise.all([
+          CatalogProductService.getTopByDemand(tenantId, 8),
+          CatalogMediaService.getCountsByType(tenantId),
+          CatalogProductService.getCategoryStats(tenantId),
+        ]);
 
-    return {
-      data: {
-        productCounts,
-        supplierCounts,
-        topProducts,
-        topSuppliers,
-        recentOffers: recentOffers.offers,
-        mediaCounts,
-        categoryStats,
-        avgDemandScore,
+        const [topSuppliers, recentOffers] = await Promise.all([
+          CatalogSupplierService.getTopByRating(5),
+          CatalogOfferService.list({ page: 1, limit: 10 }),
+        ]);
+
+        const avgDemandScore = topProducts.length > 0
+          ? Math.round(topProducts.reduce((s: number, p: any) => s + p.demandScore, 0) / topProducts.length)
+          : 0;
+
+        return {
+          productCounts,
+          supplierCounts,
+          topProducts,
+          topSuppliers,
+          recentOffers: recentOffers.offers,
+          mediaCounts,
+          categoryStats,
+          avgDemandScore,
+        };
       },
-    };
+      45
+    );
+
+    return { data };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur" };
+  }
+}
+
+export async function searchCatalogMemoryMatches(input: {
+  query: string;
+  categoryName?: string;
+  weightKg?: number;
+  limit?: number;
+}) {
+  try {
+    const user = await getSession();
+    checkPermission(user.role, "quote.create");
+    const query = String(input.query || "").trim();
+    if (query.length < 3) return { data: [] };
+
+    const matches = await CatalogProductService.searchMemoryMatches(user.tenantId, {
+      query,
+      categoryName: input.categoryName,
+      weightKg: input.weightKg,
+      limit: input.limit,
+    });
+
+    return { data: toPlainData(matches) };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Erreur lors de la recherche catalogue" };
+  }
+}
+
+export async function getCatalogCategoryMemoryHint(input: {
+  categoryName?: string;
+  categoryId?: string;
+}) {
+  try {
+    const user = await getSession();
+    checkPermission(user.role, "quote.create");
+    const hint = await CatalogProductService.getCategoryMemoryHint(user.tenantId, {
+      categoryName: input.categoryName,
+      categoryId: input.categoryId,
+    });
+    return { data: toPlainData(hint) };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Erreur mémoire catégorie" };
   }
 }
 
@@ -528,16 +605,28 @@ export async function getCatalogAnalytics() {
   try {
     const user = await getSession();
     checkPermission(user.role, "catalog.view");
-    const tenantId = user.tenantId;
+    const data = await runTenantCached(
+      "catalog-analytics",
+      user.tenantId,
+      async () => {
+        const tenantId = user.tenantId;
 
-    const [categoryPerformance, topByRevenue, priceSpread, healthMetrics] = await Promise.all([
-      CatalogIntelligenceService.getCategoryPerformance(tenantId),
-      CatalogIntelligenceService.getTopByRevenue(tenantId, 10),
-      CatalogIntelligenceService.getPriceSpread(tenantId, 10),
-      CatalogIntelligenceService.getCatalogHealthMetrics(tenantId),
-    ]);
+        const [categoryPerformance, healthMetrics] = await Promise.all([
+          CatalogIntelligenceService.getCategoryPerformance(tenantId),
+          CatalogIntelligenceService.getCatalogHealthMetrics(tenantId),
+        ]);
 
-    return { data: { categoryPerformance, topByRevenue, priceSpread, healthMetrics } };
+        const [topByRevenue, priceSpread] = await Promise.all([
+          CatalogIntelligenceService.getTopByRevenue(tenantId, 10),
+          CatalogIntelligenceService.getPriceSpread(tenantId, 10),
+        ]);
+
+        return { categoryPerformance, topByRevenue, priceSpread, healthMetrics };
+      },
+      60
+    );
+
+    return { data };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur analytics" };
   }
@@ -593,6 +682,7 @@ export async function bulkUpdateProductStatus(productIds: string[], status: stri
 
     revalidatePath("/catalog/products");
     revalidatePath("/catalog");
+    revalidateCatalogCaches(user.tenantId);
     return { data: { updated: products.length } };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur lors de la mise à jour" };

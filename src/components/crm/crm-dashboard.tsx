@@ -16,12 +16,14 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Checkbox } from "@/components/ui/checkbox";
-import { 
-  Search, Plus, MessageSquare, Eye, Filter, Download, Users, UserPlus, TrendingUp, X, 
-  Edit, Trash2, Upload, ArrowUpDown, MoreVertical, Tag, FileText, Clock, 
+import {
+  Search, Plus, MessageSquare, Eye, Filter, Download, Users, UserPlus, TrendingUp, X,
+  Edit, Trash2, Upload, ArrowUpDown, MoreVertical, Tag, FileText, Clock,
   UserCheck, UserX, CheckCircle, XCircle, AlertCircle, Mail, Phone, Copy, Archive,
   Sparkles, Target, Activity
 } from "lucide-react";
+import { PageHeader } from "@/components/shared/page-header";
+import { KpiCard, KpiGrid } from "@/components/shared/kpi-card";
 import Link from "next/link";
 import { toast } from "sonner";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -972,151 +974,108 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
   }, [customers, leads, prospects, currentUserName]);
 
   return (
-    <div className="-m-6">
-      <div className="bg-white border-b border-gray-200 px-8 py-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-[#010150]">CRM - Customer Management</h1>
-              {demoMode && <Badge variant="secondary">DEMO</Badge>}
-            </div>
-            <p className="text-sm text-gray-600 mt-1">Manage customer relationships, leads and prospects</p>
-          </div>
-          <div className="flex gap-3">
-            <Button variant="outline" className="gap-2" onClick={() => setShowImportDialog(true)}>
-              <Upload className="w-4 h-4" />
-              Import
-            </Button>
-            <Button variant="outline" className="gap-2" onClick={handleExport}>
-              <Download className="w-4 h-4" />
-              Export
-            </Button>
-            <Button 
-              className="bg-[#DBA000] hover:bg-[#DBA000]/90 text-[#010150] gap-2"
-              onClick={() => setShowAddCustomerDialog(true)}
-            >
-              <Plus className="w-4 h-4" />
-              Add Customer
-            </Button>
-          </div>
-        </div>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="CRM — Relation Clients"
+        description="Pilotage clients, leads et prospects"
+      >
+        {demoMode && <Badge variant="secondary">DEMO</Badge>}
+        <Button variant="outline" size="sm" className="gap-2" onClick={() => setShowImportDialog(true)}>
+          <Upload className="w-4 h-4" />
+          Importer
+        </Button>
+        <Button variant="outline" size="sm" className="gap-2" onClick={handleExport}>
+          <Download className="w-4 h-4" />
+          Exporter
+        </Button>
+        <Button size="sm" className="gap-2" onClick={() => setShowAddCustomerDialog(true)}>
+          <Plus className="w-4 h-4" />
+          Nouveau client
+        </Button>
+      </PageHeader>
 
-      <div className="p-8">
-        {/* KPI Cards */}
-        <div className="grid gap-4 mb-6 sm:grid-cols-2 xl:grid-cols-4">
-          <Card className="p-6 border-gray-200">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Total Customers</p>
-                <p className="text-3xl font-bold mt-2 text-gray-900">{totalCustomers}</p>
-                <p className="text-xs text-gray-500 mt-1">{filteredCustomers.length} filtered</p>
-              </div>
-              <Users className="w-8 h-8 text-[#5F27CD]" />
-            </div>
-          </Card>
-          <Card className="p-6 border-gray-200">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Active Leads</p>
-                <p className="text-3xl font-bold mt-2 text-gray-900">{activeLeads}</p>
-                <p className="text-xs text-green-600 mt-1">+{visibleProspects.filter(p => p.status === "New").length} new</p>
-              </div>
-              <UserPlus className="w-8 h-8 text-[#DBA000]" />
-            </div>
-          </Card>
-          <Card className="p-6 border-gray-200">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-gray-600">WhatsApp Connected</p>
-                <p className="text-3xl font-bold mt-2 text-gray-900">{whatsappConnected}</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  {totalCustomers > 0 ? Math.round((whatsappConnected / totalCustomers) * 100) : 0}% of customers
-                </p>
-              </div>
-              <MessageSquare className="w-8 h-8 text-green-600" />
-            </div>
-          </Card>
-          <Card className="p-6 border-gray-200">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Total LTV</p>
-                <p className="text-3xl font-bold mt-2 text-gray-900">${(totalLTV / 1000000).toFixed(1)}M</p>
-                <p className="text-xs text-green-600 mt-1">+15% vs last month</p>
-              </div>
-              <TrendingUp className="w-8 h-8 text-green-600" />
-            </div>
-          </Card>
-        </div>
+      <KpiGrid cols={4}>
+        <KpiCard
+          label="Clients totaux"
+          value={totalCustomers}
+          sub={filteredCustomers.length + " filtrés"}
+          icon={<Users className="h-4 w-4 text-muted-foreground" />}
+        />
+        <KpiCard
+          label="Leads actifs"
+          value={activeLeads}
+          sub={"+" + visibleProspects.filter(p => p.status === "New").length + " nouveaux"}
+          icon={<UserPlus className="h-4 w-4 text-muted-foreground" />}
+        />
+        <KpiCard
+          label="WhatsApp actif"
+          value={whatsappConnected}
+          sub={(totalCustomers > 0 ? Math.round((whatsappConnected / totalCustomers) * 100) : 0) + "% des clients"}
+          icon={<MessageSquare className="h-4 w-4 text-muted-foreground" />}
+        />
+        <KpiCard
+          label="Valeur client (LTV)"
+          value={"$" + (totalLTV / 1_000_000).toFixed(1) + "M"}
+          sub="total portefeuille"
+          icon={<TrendingUp className="h-4 w-4 text-muted-foreground" />}
+          variant="success"
+        />
+      </KpiGrid>
 
-        {/* AI Intelligence Highlights */}
-        <div className="grid gap-4 mb-8 sm:grid-cols-2 xl:grid-cols-4">
-          <Card className="p-4 border-[#5F27CD]/30 bg-[#5F27CD]/5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-gray-600">AI Portfolio Score</p>
-                <p className="text-2xl font-bold text-[#010150]">{avgAiScore}/100</p>
-                <p className="text-xs text-gray-500">Health across accounts</p>
-              </div>
-              <Sparkles className="w-6 h-6 text-[#5F27CD]" />
-            </div>
-          </Card>
-          <Card className="p-4 border-green-200 bg-green-50">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-gray-600">High-Intent Leads</p>
-                <p className="text-2xl font-bold text-[#010150]">{highIntentLeads}</p>
-                <p className="text-xs text-green-700">AI score ≥ 75</p>
-              </div>
-              <Target className="w-6 h-6 text-green-600" />
-            </div>
-          </Card>
-          <Card className="p-4 border-red-200 bg-red-50">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-gray-600">At-Risk Customers</p>
-                <p className="text-2xl font-bold text-[#010150]">{atRiskCustomers}</p>
-                <p className="text-xs text-red-700">Needs retention</p>
-              </div>
-              <AlertCircle className="w-6 h-6 text-red-600" />
-            </div>
-          </Card>
-          <Card className="p-4 border-blue-200 bg-blue-50">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-gray-600">Next Actions</p>
-                <p className="text-2xl font-bold text-[#010150]">{nextActions}</p>
-                <p className="text-xs text-blue-700">Follow-ups pending</p>
-              </div>
-              <Activity className="w-6 h-6 text-blue-600" />
-            </div>
-          </Card>
-        </div>
+      <KpiGrid cols={4}>
+        <KpiCard
+          label="Score IA portefeuille"
+          value={avgAiScore + "/100"}
+          sub="Santé globale"
+          icon={<Sparkles className="h-4 w-4 text-muted-foreground" />}
+        />
+        <KpiCard
+          label="Leads forte intention"
+          value={highIntentLeads}
+          sub="Score IA ≥ 75"
+          icon={<Target className="h-4 w-4 text-muted-foreground" />}
+          variant="success"
+        />
+        <KpiCard
+          label="Clients à risque"
+          value={atRiskCustomers}
+          sub="Rétention à lancer"
+          icon={<AlertCircle className="h-4 w-4 text-muted-foreground" />}
+          variant={atRiskCustomers > 0 ? "danger" : "default"}
+        />
+        <KpiCard
+          label="Actions à faire"
+          value={nextActions}
+          sub="Relances en attente"
+          icon={<Activity className="h-4 w-4 text-muted-foreground" />}
+          variant={nextActions > 0 ? "warning" : "default"}
+        />
+      </KpiGrid>
 
-        <Card className="p-5 border-gray-200 mb-8">
+      <Card className="mb-2">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="text-sm font-bold text-[#010150]">Priority Actions</h3>
-              <p className="text-xs text-gray-500">AI-ranked next steps across your portfolio</p>
+              <h3 className="text-sm font-semibold">Priority Actions</h3>
+              <p className="text-xs text-muted-foreground">AI-ranked next steps across your portfolio</p>
             </div>
-            <Badge className="bg-[#010150] text-white">{priorityActions.length} actions</Badge>
+            <Badge className="bg-primary text-primary-foreground">{priorityActions.length} actions</Badge>
           </div>
           {priorityActions.length === 0 ? (
-            <p className="text-sm text-gray-500">No priority actions available.</p>
+            <p className="text-sm text-muted-foreground">No priority actions available.</p>
           ) : (
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {priorityActions.map((action) => (
-                <div key={`${action.type}-${action.id}`} className="rounded-lg border border-gray-200 p-3">
+                <div key={`${action.type}-${action.id}`} className="rounded-lg border border-border p-3">
                   <div className="flex items-start justify-between">
                     <div>
-                      <p className="text-sm font-semibold text-[#010150]">{action.name}</p>
-                      <p className="text-xs text-gray-500">{action.type} · Owner: {action.owner}</p>
+                      <p className="text-sm font-semibold text-foreground">{action.name}</p>
+                      <p className="text-xs text-muted-foreground">{action.type} · Owner: {action.owner}</p>
                     </div>
                     <Badge variant="outline" className="text-xs">
                       {action.tag}
                     </Badge>
                   </div>
-                  <p className="text-xs text-gray-600 mt-2">{action.nextAction}</p>
+                  <p className="text-xs text-muted-foreground mt-2">{action.nextAction}</p>
                 </div>
               ))}
             </div>
@@ -1124,18 +1083,18 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
         </Card>
 
         <Tabs defaultValue="customers" className="space-y-6">
-          <TabsList className="bg-white border border-gray-200">
-            <TabsTrigger value="customers">Customers ({totalCustomers})</TabsTrigger>
+          <TabsList>
+            <TabsTrigger value="customers">Clients ({totalCustomers})</TabsTrigger>
             <TabsTrigger value="leads">Leads ({visibleLeads.length})</TabsTrigger>
             <TabsTrigger value="prospects">Prospects ({visibleProspects.length})</TabsTrigger>
           </TabsList>
 
           <TabsContent value="customers" className="space-y-4">
             {/* Search and Actions Bar */}
-            <Card className="p-4 border-gray-200">
+            <Card className="p-4 border-border">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
                 <div className="flex-1 relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input 
                     placeholder="Search by name, phone, email, country..." 
                     className="pl-10"
@@ -1147,7 +1106,7 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
                   <Button
                     size="sm"
                     variant={portfolioScope === "mine" ? "default" : "outline"}
-                    className={portfolioScope === "mine" ? "bg-[#010150] text-white" : ""}
+                    className={portfolioScope === "mine" ? "bg-primary text-primary-foreground" : ""}
                     onClick={() => setPortfolioScope("mine")}
                   >
                     Mon portefeuille
@@ -1155,7 +1114,7 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
                   <Button
                     size="sm"
                     variant={portfolioScope === "all" ? "default" : "outline"}
-                    className={portfolioScope === "all" ? "bg-[#010150] text-white" : ""}
+                    className={portfolioScope === "all" ? "bg-primary text-primary-foreground" : ""}
                     onClick={() => setPortfolioScope("all")}
                   >
                     Équipe
@@ -1177,9 +1136,9 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
                     onClick={() => setShowFiltersSheet(true)}
                   >
                     <Filter className="w-4 h-4" />
-                    Filters
+                    Filtres
                     {(selectedCountry !== "all" || selectedRiskScore !== "all" || selectedWhatsappStatus !== "all" || selectedTags.length > 0 || selectedOwner !== "all") && (
-                      <Badge className="ml-2 bg-[#DBA000] text-[#010150]">Active</Badge>
+                      <Badge className="ml-2 bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">Active</Badge>
                     )}
                   </Button>
                   {selectedCustomers.length > 0 && (
@@ -1197,7 +1156,7 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
             </Card>
 
             {/* Customers Table */}
-            <Card className="border-gray-200">
+            <Card className="border-border">
               <Table>
                 <TableHeader>
                   <TableRow className="bg-gray-50">
@@ -1209,21 +1168,21 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
                     </TableHead>
                     <TableHead className="cursor-pointer" onClick={() => handleSort("name")}>
                       <div className="flex items-center gap-2">
-                        Name
+                        Nom
                         <ArrowUpDown className="w-4 h-4" />
                       </div>
                     </TableHead>
                     <TableHead>Contact</TableHead>
                     <TableHead className="cursor-pointer" onClick={() => handleSort("country")}>
                       <div className="flex items-center gap-2">
-                        Country
+                        Pays
                         <ArrowUpDown className="w-4 h-4" />
                       </div>
                     </TableHead>
                     <TableHead>WhatsApp</TableHead>
                     <TableHead className="cursor-pointer" onClick={() => handleSort("orders")}>
                       <div className="flex items-center gap-2">
-                        Orders
+                        Commandes
                         <ArrowUpDown className="w-4 h-4" />
                       </div>
                     </TableHead>
@@ -1234,22 +1193,29 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
                       </div>
                     </TableHead>
                     <TableHead>Tags</TableHead>
-                    <TableHead>AI Score</TableHead>
-                    <TableHead>Next Action</TableHead>
-                    <TableHead>Risk</TableHead>
+                    <TableHead>Score IA</TableHead>
+                    <TableHead>Prochaine action</TableHead>
+                    <TableHead>Risque</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {paginatedCustomers.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={12} className="text-center py-8 text-gray-500">
-                        No customers found matching your criteria
+                      <TableCell colSpan={12} className="text-center py-8 text-muted-foreground">
+                        Aucun client ne correspond Ã  vos filtres
                       </TableCell>
                     </TableRow>
                   ) : (
-                    paginatedCustomers.map((customer) => (
-                      <TableRow key={customer.id} className="hover:bg-gray-50">
+                    paginatedCustomers.map((customer) => {
+                      const rowClass =
+                        customer.riskScore === "High"
+                          ? "bg-red-50/40 hover:bg-red-50/60"
+                          : customer.riskScore === "Medium"
+                          ? "bg-amber-50/30 hover:bg-amber-50/50"
+                          : "hover:bg-gray-50";
+                      return (
+                      <TableRow key={customer.id} className={rowClass}>
                         <TableCell>
                           <Checkbox 
                             checked={selectedCustomers.includes(customer.id)}
@@ -1265,10 +1231,10 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
                         <TableCell>
                           <div>
                             <p className="font-medium">{customer.name}</p>
-                            {customer.city && <p className="text-xs text-gray-500">{customer.city}</p>}
-                            <p className="text-xs text-gray-400 mt-1">
-                              Owner: <span className="text-gray-600">{customer.owner}</span> · Onboarded:{" "}
-                              <span className="text-gray-600">{customer.onboardedBy}</span>
+                            {customer.city && <p className="text-xs text-muted-foreground">{customer.city}</p>}
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Owner: <span className="text-muted-foreground">{customer.owner}</span> · Onboarded:{" "}
+                              <span className="text-muted-foreground">{customer.onboardedBy}</span>
                             </p>
                             {customer.collaborators.length > 0 && (
                               <div className="mt-2 flex flex-wrap gap-1">
@@ -1289,16 +1255,16 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
                         <TableCell>
                           <div className="space-y-1 text-sm">
                             <div className="flex items-center gap-2">
-                              <Phone className="w-3 h-3 text-gray-400" />
-                              <span className="text-gray-600">{customer.phone}</span>
+                              <Phone className="w-3 h-3 text-muted-foreground" />
+                              <span className="text-muted-foreground">{customer.phone}</span>
                               <button onClick={() => handleCopy(customer.phone, "Phone")}>
-                                <Copy className="w-3 h-3 text-gray-400 hover:text-gray-600" />
+                                <Copy className="w-3 h-3 text-muted-foreground hover:text-muted-foreground" />
                               </button>
                             </div>
                             {customer.email && (
                               <div className="flex items-center gap-2">
-                                <Mail className="w-3 h-3 text-gray-400" />
-                                <span className="text-gray-600">{customer.email}</span>
+                                <Mail className="w-3 h-3 text-muted-foreground" />
+                                <span className="text-muted-foreground">{customer.email}</span>
                               </div>
                             )}
                           </div>
@@ -1306,7 +1272,7 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
                         <TableCell className="text-sm">{customer.country}</TableCell>
                         <TableCell>
                           <Badge 
-                            className={customer.whatsapp === "Active" ? "bg-green-100 text-green-700 cursor-pointer" : "bg-gray-100 text-gray-700 cursor-pointer"}
+                            variant="secondary" className={customer.whatsapp === "Active" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300" : "bg-muted text-muted-foreground"}
                             onClick={() => handleToggleWhatsApp(customer.id)}
                           >
                             {customer.whatsapp}
@@ -1352,8 +1318,14 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
                             {customer.aiScore}/100
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-xs text-gray-600">
-                          {customer.nextAction}
+                        <TableCell className="text-xs text-muted-foreground">
+                          {customer.nextAction ? (
+                            <Badge variant="outline" className="text-[10px]">
+                              {customer.nextAction}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground">Aucune</span>
+                          )}
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-col gap-1">
@@ -1433,7 +1405,7 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
                           </DropdownMenu>
                         </TableCell>
                       </TableRow>
-                    ))
+                    )})
                   )}
                 </TableBody>
               </Table>
@@ -1441,7 +1413,7 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
               {/* Pagination */}
               {totalPages > 1 && (
                 <div className="flex items-center justify-between p-4 border-t">
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-muted-foreground">
                     Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, sortedCustomers.length)} of {sortedCustomers.length} customers
                   </p>
                   <div className="flex gap-2">
@@ -1459,7 +1431,7 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
                         variant={currentPage === page ? "default" : "outline"}
                         size="sm"
                         onClick={() => setCurrentPage(page)}
-                        className={currentPage === page ? "bg-[#010150]" : ""}
+                        className={currentPage === page ? "bg-primary" : ""}
                       >
                         {page}
                       </Button>
@@ -1479,14 +1451,14 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
           </TabsContent>
 
           <TabsContent value="leads" className="space-y-4">
-            <Card className="border-gray-200">
-              <div className="p-6 border-b border-gray-200">
+            <Card className="border-border">
+              <div className="p-6 border-b border-border">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="font-bold text-gray-900">Active Leads</h2>
-                    <p className="text-sm text-gray-600 mt-0.5">Qualified sales opportunities</p>
+                    <h2 className="font-semibold">Active Leads</h2>
+                    <p className="text-sm text-muted-foreground mt-0.5">Qualified sales opportunities</p>
                   </div>
-                  <Badge className="bg-[#DBA000] text-[#010150]">{visibleLeads.length}</Badge>
+                  <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">{visibleLeads.length}</Badge>
                 </div>
               </div>
               <div className="divide-y divide-gray-100">
@@ -1494,11 +1466,11 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
                   <div key={lead.id} className="p-4 hover:bg-gray-50 transition-colors">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1">
-                        <p className="font-medium text-gray-900">{lead.name}</p>
-                        <p className="text-xs text-gray-500 mt-0.5">{lead.country} • {lead.phone}</p>
-                        <p className="text-xs text-gray-400 mt-1">
-                          Owner: <span className="text-gray-600">{lead.owner}</span> · Onboarded:{" "}
-                          <span className="text-gray-600">{lead.onboardedBy}</span>
+                        <p className="font-medium text-foreground">{lead.name}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{lead.country} • {lead.phone}</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Owner: <span className="text-muted-foreground">{lead.owner}</span> · Onboarded:{" "}
+                          <span className="text-muted-foreground">{lead.onboardedBy}</span>
                         </p>
                         {lead.collaborators.length > 0 && (
                           <div className="mt-2 flex flex-wrap gap-1">
@@ -1530,20 +1502,20 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
                     </div>
                     <div className="flex items-center justify-between text-sm mb-3">
                       <div>
-                        <p className="text-gray-600">Product: <span className="font-medium text-gray-900">{lead.product}</span></p>
-                        <p className="text-gray-600 mt-1">Estimated: <span className="font-medium text-green-600">{lead.estimatedValue}</span></p>
-                        <p className="text-gray-600 mt-1">
-                          Source: <span className="font-medium text-gray-900">{lead.source}</span> · AI Score:{" "}
-                          <span className="font-semibold text-[#5F27CD]">{lead.aiScore}/100</span>
+                        <p className="text-muted-foreground">Product: <span className="font-medium text-foreground">{lead.product}</span></p>
+                        <p className="text-muted-foreground mt-1">Estimated: <span className="font-medium text-green-600">{lead.estimatedValue}</span></p>
+                        <p className="text-muted-foreground mt-1">
+                          Source: <span className="font-medium text-foreground">{lead.source}</span> · AI Score:{" "}
+                          <span className="font-semibold text-violet-600 dark:text-violet-400">{lead.aiScore}/100</span>
                         </p>
                         {(lead.containerType || lead.originCountry) && (
-                          <p className="text-gray-600 mt-1">
-                            {lead.containerType && <span className="font-medium text-[#010150] mr-2">{lead.containerType}</span>}
-                            {lead.originCountry && <span className="text-gray-500">Origine: {lead.originCountry}</span>}
+                          <p className="text-muted-foreground mt-1">
+                            {lead.containerType && <span className="font-medium text-foreground mr-2">{lead.containerType}</span>}
+                            {lead.originCountry && <span className="text-muted-foreground">Origine: {lead.originCountry}</span>}
                           </p>
                         )}
-                        <p className="text-gray-600 mt-1">
-                          Next action: <span className="font-medium text-[#010150]">{lead.nextAction}</span>
+                        <p className="text-muted-foreground mt-1">
+                          Next action: <span className="font-medium text-foreground">{lead.nextAction}</span>
                         </p>
                         <div className="mt-1.5 flex gap-1.5 flex-wrap">
                           <LeadSLABadge updatedAtTs={lead.updatedAtTs} status={lead.status} />
@@ -1560,7 +1532,7 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
                             <SelectItem value="Sales Manager">Sales Manager</SelectItem>
                           </SelectContent>
                         </Select>
-                        <p className="text-xs text-gray-400 mt-1">{lead.lastContact}</p>
+                        <p className="text-xs text-muted-foreground mt-1">{lead.lastContact}</p>
                       </div>
                     </div>
                     <div className="flex gap-2">
@@ -1586,7 +1558,7 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
                       </Button>
                       <Button 
                         size="sm" 
-                        className="flex-1 gap-2 bg-[#5F27CD] hover:bg-[#5F27CD]/90"
+                        className="flex-1 gap-2 bg-primary hover:bg-primary/90"
                         onClick={() => {
                           setSelectedLead(lead);
                           setShowConvertLeadDialog(true);
@@ -1603,12 +1575,12 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
           </TabsContent>
 
           <TabsContent value="prospects" className="space-y-4">
-            <Card className="border-gray-200">
-              <div className="p-6 border-b border-gray-200">
+            <Card className="border-border">
+              <div className="p-6 border-b border-border">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="font-bold text-gray-900">New Prospects</h2>
-                    <p className="text-sm text-gray-600 mt-0.5">Unqualified inquiries</p>
+                    <h2 className="font-semibold">New Prospects</h2>
+                    <p className="text-sm text-muted-foreground mt-0.5">Unqualified inquiries</p>
                   </div>
                   <Badge variant="outline">{visibleProspects.length}</Badge>
                 </div>
@@ -1618,11 +1590,11 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
                   <div key={prospect.id} className="p-4 hover:bg-gray-50 transition-colors">
                     <div className="flex items-start justify-between mb-2">
                       <div>
-                        <p className="font-medium text-gray-900">{prospect.name}</p>
-                        <p className="text-xs text-gray-500 mt-0.5">{prospect.country} • {prospect.phone}</p>
-                        <p className="text-xs text-gray-400 mt-1">
-                          Owner: <span className="text-gray-600">{prospect.owner}</span> · Onboarded:{" "}
-                          <span className="text-gray-600">{prospect.onboardedBy}</span>
+                        <p className="font-medium text-foreground">{prospect.name}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{prospect.country} • {prospect.phone}</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Owner: <span className="text-muted-foreground">{prospect.owner}</span> · Onboarded:{" "}
+                          <span className="text-muted-foreground">{prospect.onboardedBy}</span>
                         </p>
                         {prospect.collaborators.length > 0 && (
                           <div className="mt-2 flex flex-wrap gap-1">
@@ -1652,13 +1624,13 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
                       </Badge>
                     </div>
                     <div className="text-sm mb-3">
-                      <p className="text-gray-600">Inquiry: <span className="font-medium text-gray-900">{prospect.inquiry}</span></p>
-                      <p className="text-xs text-gray-500 mt-1">Source: {prospect.source}</p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        Intent score: <span className="font-semibold text-[#5F27CD]">{prospect.intentScore}/100</span>
+                      <p className="text-muted-foreground">Inquiry: <span className="font-medium text-foreground">{prospect.inquiry}</span></p>
+                      <p className="text-xs text-muted-foreground mt-1">Source: {prospect.source}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Intent score: <span className="font-semibold text-violet-600 dark:text-violet-400">{prospect.intentScore}/100</span>
                       </p>
                       {prospect.notes && (
-                        <p className="text-xs text-gray-500 mt-1 italic">Note: {prospect.notes}</p>
+                        <p className="text-xs text-muted-foreground mt-1 italic">Note: {prospect.notes}</p>
                       )}
                     </div>
                     {prospect.status !== "Rejected" && prospect.status !== "Qualified" && (
@@ -1674,7 +1646,7 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
                         </Button>
                         <Button 
                           size="sm" 
-                          className="flex-1 gap-2 bg-[#5F27CD] hover:bg-[#5F27CD]/90 text-white"
+                          className="flex-1 gap-2 bg-primary hover:bg-primary/90 text-primary-foreground"
                           onClick={() => {
                             setSelectedProspect(prospect);
                             setQualifyEstimatedValue("");
@@ -1707,7 +1679,6 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
             </Card>
           </TabsContent>
         </Tabs>
-      </div>
 
       {/* Add Customer Dialog */}
       <Dialog open={showAddCustomerDialog} onOpenChange={setShowAddCustomerDialog}>
@@ -1820,7 +1791,7 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
               Cancel
             </Button>
             <Button 
-              className="bg-[#DBA000] hover:bg-[#DBA000]/90 text-[#010150]"
+              className="bg-amber-500 hover:bg-amber-600 text-white"
               onClick={handleAddCustomer}
             >
               Add Customer
@@ -1931,7 +1902,7 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
               Cancel
             </Button>
             <Button 
-              className="bg-[#DBA000] hover:bg-[#DBA000]/90 text-[#010150]"
+              className="bg-amber-500 hover:bg-amber-600 text-white"
               onClick={handleEditCustomer}
             >
               Save Changes
@@ -2045,15 +2016,15 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
           {selectedLead ? (
             <div className="space-y-4">
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div className="rounded-lg border border-gray-200 p-4">
-                  <p className="text-xs text-gray-500">Lead</p>
-                  <p className="text-lg font-semibold text-[#010150]">{selectedLead.name}</p>
-                  <p className="text-xs text-gray-500 mt-1">
+                <div className="rounded-lg border border-border p-4">
+                  <p className="text-xs text-muted-foreground">Lead</p>
+                  <p className="text-lg font-semibold text-foreground">{selectedLead.name}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
                     {selectedLead.country} • {selectedLead.phone}
                   </p>
-                  <p className="text-xs text-gray-400 mt-2">
-                    Owner: <span className="text-gray-600">{selectedLead.owner}</span> · Onboarded:{" "}
-                    <span className="text-gray-600">{selectedLead.onboardedBy}</span>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Owner: <span className="text-muted-foreground">{selectedLead.owner}</span> · Onboarded:{" "}
+                    <span className="text-muted-foreground">{selectedLead.onboardedBy}</span>
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <Button
@@ -2076,16 +2047,16 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
                     </Button>
                   </div>
                 </div>
-                <div className="rounded-lg border border-gray-200 p-4">
-                  <p className="text-xs text-gray-500">Opportunity</p>
-                  <p className="text-lg font-semibold text-[#010150]">{selectedLead.product}</p>
+                <div className="rounded-lg border border-border p-4">
+                  <p className="text-xs text-muted-foreground">Opportunity</p>
+                  <p className="text-lg font-semibold text-foreground">{selectedLead.product}</p>
                   <p className="text-sm font-medium text-green-600">{selectedLead.estimatedValue}</p>
-                  <p className="text-xs text-gray-500 mt-2">Source: {selectedLead.source}</p>
+                  <p className="text-xs text-muted-foreground mt-2">Source: {selectedLead.source}</p>
                   <div className="mt-2 flex items-center gap-2">
-                    <Badge className="bg-[#5F27CD]/10 text-[#5F27CD] border border-[#5F27CD]/20">
+                    <Badge className="bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300 border border-violet-200 dark:border-violet-800">
                       AI {selectedLead.aiScore}/100
                     </Badge>
-                    <span className="text-xs text-gray-500">Last contact: {selectedLead.lastContact}</span>
+                    <span className="text-xs text-muted-foreground">Last contact: {selectedLead.lastContact}</span>
                   </div>
                 </div>
               </div>
@@ -2157,9 +2128,9 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
                   rows={4}
                 />
               </div>
-              <div className="rounded-lg border border-gray-200 p-4">
-                <p className="text-xs font-semibold text-gray-500 mb-2">Activity Timeline</p>
-                <ul className="space-y-2 text-sm text-gray-600">
+              <div className="rounded-lg border border-border p-4">
+                <p className="text-xs font-semibold text-muted-foreground mb-2">Activity Timeline</p>
+                <ul className="space-y-2 text-sm text-muted-foreground">
                   <li>• Lead onboarded by {selectedLead.onboardedBy} ({selectedLead.source})</li>
                   <li>• Status set to {leadStatus} · Last contact {selectedLead.lastContact}</li>
                   <li>• Next action: {leadNextAction || selectedLead.nextAction}</li>
@@ -2167,7 +2138,7 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
               </div>
             </div>
           ) : (
-            <p className="text-sm text-gray-600">No lead selected.</p>
+            <p className="text-sm text-muted-foreground">No lead selected.</p>
           )}
           <DialogFooter className="gap-2 sm:gap-0">
             <Button variant="outline" onClick={() => setShowLeadDetailsDialog(false)}>
@@ -2175,13 +2146,13 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
             </Button>
             <Button
               variant="outline"
-              className="border-[#010150] text-[#010150] hover:bg-[#010150]/10"
+              className="border-border text-foreground hover:bg-accent"
               onClick={handleSaveLeadDetails}
             >
               Save Updates
             </Button>
             <Button
-              className="bg-[#5F27CD] hover:bg-[#5F27CD]/90"
+              className="bg-primary hover:bg-primary/90"
               onClick={() => {
                 setShowLeadDetailsDialog(false);
                 setShowConvertLeadDialog(true);
@@ -2203,7 +2174,7 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-muted-foreground">
               This will create a new customer record and remove this lead from the leads list.
             </p>
           </div>
@@ -2212,7 +2183,7 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
               Cancel
             </Button>
             <Button 
-              className="bg-[#5F27CD] hover:bg-[#5F27CD]/90"
+              className="bg-primary hover:bg-primary/90"
               onClick={handleConvertLead}
             >
               Convert to Customer
@@ -2231,7 +2202,7 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2">
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-muted-foreground">
               This will create a new lead and mark this prospect as qualified.
             </p>
             <div className="grid grid-cols-2 gap-4">
@@ -2286,7 +2257,7 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
               Cancel
             </Button>
             <Button 
-              className="bg-[#5F27CD] hover:bg-[#5F27CD]/90"
+              className="bg-primary hover:bg-primary/90"
               onClick={handleQualifyProspect}
             >
               Qualify as Lead
@@ -2451,8 +2422,8 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
           </DialogHeader>
           <div className="py-4 space-y-4">
             <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-              <Upload className="w-12 h-12 mx-auto text-gray-400 mb-4" />
-              <p className="text-sm text-gray-600 mb-2">Drag and drop your CSV file here, or click to browse</p>
+              <Upload className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+              <p className="text-sm text-muted-foreground mb-2">Drag and drop your CSV file here, or click to browse</p>
               <Button variant="outline" size="sm">
                 Choose File
               </Button>
@@ -2466,7 +2437,7 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
             <Button variant="outline" onClick={() => setShowImportDialog(false)}>
               Cancel
             </Button>
-            <Button className="bg-[#DBA000] hover:bg-[#DBA000]/90 text-[#010150]">
+            <Button className="bg-amber-500 hover:bg-amber-600 text-white">
               Import
             </Button>
           </DialogFooter>
@@ -2475,5 +2446,3 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
     </div>
   );
 }
-
-

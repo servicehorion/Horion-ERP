@@ -62,6 +62,12 @@ export default async function ProductDetailPage({ params }: { params: { id: stri
   const offerPrices = p.offers.map((o: any) => Number(o.unitPrice)).filter((v: number) => v > 0);
   const offerMin = offerPrices.length > 0 ? Math.min(...offerPrices) : null;
   const offerMax = offerPrices.length > 0 ? Math.max(...offerPrices) : null;
+  const weightedAverageCost = p.weightedAverageCost != null ? Number(p.weightedAverageCost) : null;
+  const estimatedCost = p.estimatedCost != null ? Number(p.estimatedCost) : null;
+  const recommendedSellPrice = p.recommendedSellPrice != null ? Number(p.recommendedSellPrice) : null;
+  const avgReality = p.averageRealityCoefficient != null ? Number(p.averageRealityCoefficient) : null;
+  const savingsVsIndicatif = p.savingsVsIndicatifPct != null ? Number(p.savingsVsIndicatifPct) : null;
+  const volatility = p.priceVolatilityPct != null ? Number(p.priceVolatilityPct) : null;
 
   return (
     <div className="space-y-6">
@@ -237,6 +243,65 @@ export default async function ProductDetailPage({ params }: { params: { id: stri
               </CardContent>
             </Card>
           </div>
+
+          <Card>
+            <CardHeader><CardTitle className="text-base">Mémoire historique</CardTitle></CardHeader>
+            <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <div>
+                <p className="text-xs text-muted-foreground">Coût moyen pondéré</p>
+                <p className="font-semibold">
+                  {weightedAverageCost != null ? `${weightedAverageCost} ${p.priceCurrency}` : "N/A"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Coût estimé maison</p>
+                <p className="font-semibold">
+                  {estimatedCost != null ? `${estimatedCost} ${p.priceCurrency}` : "N/A"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Prix Horion recommandé</p>
+                <p className="font-semibold text-green-600">
+                  {recommendedSellPrice != null ? `${recommendedSellPrice} ${p.priceCurrency}` : "N/A"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Confiance mémoire</p>
+                <p className="font-semibold">
+                  {p.catalogConfidenceScore ?? 0}/100 {p.isCertified ? "• Certifié" : ""}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Commandes réussies</p>
+                <p className="font-semibold">
+                  {p.successfulOrderCount ?? 0} / {p.historicalOrderCount ?? 0}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Coefficient de réalité</p>
+                <p className="font-semibold">{avgReality != null ? avgReality.toFixed(2) : "N/A"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Économie vs indicatif</p>
+                <p className="font-semibold">{savingsVsIndicatif != null ? `${savingsVsIndicatif}%` : "N/A"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Volatilité prix</p>
+                <p className="font-semibold">{volatility != null ? `${volatility}%` : "N/A"}</p>
+              </div>
+              <div className="md:col-span-2 xl:col-span-4">
+                <p className="text-xs text-muted-foreground">Alias & mots-clés</p>
+                <p className="text-sm">
+                  {[
+                    ...(Array.isArray(p.aliasesJson) ? p.aliasesJson : []),
+                    ...(Array.isArray(p.searchKeywordsJson) ? p.searchKeywordsJson : []),
+                  ]
+                    .filter(Boolean)
+                    .join(", ") || "Aucun mot-clé mémoire renseigné"}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Logistics + Notes */}
           <div className="grid gap-4 md:grid-cols-2">

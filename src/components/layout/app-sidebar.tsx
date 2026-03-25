@@ -18,22 +18,29 @@ import {
 } from "@/components/ui/sidebar";
 import { sidebarNavigation } from "@/config/navigation";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { BrandLogo } from "@/components/layout/brand-logo";
 import { ChevronRight } from "lucide-react";
 
-export function AppSidebar() {
+function SidebarBadge({ value }: { value?: number | "dot" }) {
+  if (!value) return null;
+
+  return value === "dot" ? (
+    <span className="ml-auto inline-flex h-2.5 w-2.5 rounded-full bg-destructive" />
+  ) : (
+    <span className="ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 py-0.5 text-[10px] font-semibold text-destructive-foreground">
+      {value > 99 ? "99+" : value}
+    </span>
+  );
+}
+
+export function AppSidebar({ badges = {} }: { badges?: Record<string, number | "dot"> }) {
   const pathname = usePathname();
 
   return (
     <Sidebar>
       <SidebarHeader className="border-b border-sidebar-border px-6 py-4">
         <Link href="/dashboard" className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-            <span className="text-lg font-bold">H</span>
-          </div>
-          <div className="flex flex-col leading-tight">
-            <span className="text-sm font-semibold tracking-wide text-sidebar-foreground">HORION</span>
-            <span className="text-xs text-sidebar-foreground/60">ERP</span>
-          </div>
+          <BrandLogo width={132} height={32} priority className="max-w-[132px]" />
         </Link>
       </SidebarHeader>
       <SidebarContent>
@@ -41,8 +48,14 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {sidebarNavigation.map((item) => {
-                const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+                const hasActiveChild =
+                  item.children?.some(
+                    (child) => pathname === child.href || pathname.startsWith(child.href + "/")
+                  ) ?? false;
+                const isActive =
+                  pathname === item.href || pathname.startsWith(item.href + "/") || hasActiveChild;
                 const Icon = item.icon;
+                const badge = badges[item.href] ?? item.badge;
 
                 if (item.children) {
                   return (
@@ -52,16 +65,19 @@ export function AppSidebar() {
                           <SidebarMenuButton className={cn(isActive && "bg-accent")}>
                             <Icon className="h-4 w-4" />
                             <span>{item.title}</span>
-                            <ChevronRight className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-90" />
+                            <SidebarBadge value={badge} />
+                            <ChevronRight className="h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-90" />
                           </SidebarMenuButton>
                         </CollapsibleTrigger>
                         <CollapsibleContent>
                           <SidebarMenuSub>
                             {item.children.map((child) => (
-                              <SidebarMenuSubItem key={child.href}>
+                              <SidebarMenuSubItem key={`${item.href}:${child.href}:${child.title}`}>
                                 <SidebarMenuSubButton
                                   asChild
-                                  isActive={pathname === child.href}
+                                  isActive={
+                                    pathname === child.href || pathname.startsWith(child.href + "/")
+                                  }
                                 >
                                   <Link href={child.href}>{child.title}</Link>
                                 </SidebarMenuSubButton>
@@ -80,6 +96,7 @@ export function AppSidebar() {
                       <Link href={item.href}>
                         <Icon className="h-4 w-4" />
                         <span>{item.title}</span>
+                        <SidebarBadge value={badge} />
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

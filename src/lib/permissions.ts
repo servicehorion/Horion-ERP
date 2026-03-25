@@ -1,7 +1,7 @@
 import type { UserRole } from "@prisma/client";
 
 /**
- * RBAC — Role-Based Access Control
+ * RBAC â€” Role-Based Access Control
  *
  * Permissions keys (module.action):
  *  order.*          commandes
@@ -10,29 +10,31 @@ import type { UserRole } from "@prisma/client";
  *  lead.*           leads (granular)
  *  sourcing.*       Sourcing OS
  *  logistics.*      Logistique OS
- *  qc.view/manage   Contrôle Qualité
+ *  qc.view/manage   ContrÃ´le QualitÃ©
  *  finance.*        Finance OS
  *  marketing.*      Marketing OS
+ *  whatsapp.*       WhatsApp OS
  *  ai.*             AI OS
  *  operations.*     Operations OS
- *  task.*           Tâches (view / update / assign / manage)
+ *  task.*           TÃ¢ches (view / update / assign / manage)
  *  project.*        Project OS (view / manage)
- *  pilotage.view    Dashboard / KPIs stratégiques
+ *  pilotage.view    Dashboard / KPIs stratÃ©giques
+ *  pilotage.manage  Decisions stratÃ©giques
  *  payment.*        Paiements
  *  quote.*          Devis
  *  catalog.*        Catalogue
- *  delegation.*     Délégations
- *  user.manage      Gestion équipe / paramètres
+ *  delegation.*     DÃ©lÃ©gations
+ *  user.manage      Gestion Ã©quipe / paramÃ¨tres
  */
 const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
-  // ───── Super-admin : accès total ─────────────────────────────────────────
+  // â”€â”€â”€â”€â”€ Super-admin : accÃ¨s total â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   ADMIN: ["*"],
   CEO:   ["*"],
 
-  // ───── Direction générale ─────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€ Direction gÃ©nÃ©rale â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   DIRECTION: [
     // Commandes
-    "order.create", "order.update", "order.delete", "order.update_status", "order.view",
+    "order.create", "order.update", "order.delete", "order.update_status", "order.view", "order.approve",
     // CRM OS
     "crm.view", "crm.manage",
     "contact.manage", "contact.view",
@@ -47,82 +49,90 @@ const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
     "finance.view", "finance.manage",
     // Marketing OS
     "marketing.view", "marketing.manage",
-    // AI OS — vue seule (pas de configuration)
+    // WhatsApp OS
+    "whatsapp.view", "whatsapp.manage", "whatsapp.send", "whatsapp.broadcast", "whatsapp.templates.manage", "whatsapp.settings",
+    // AI OS â€” vue seule (pas de configuration)
     "ai.view",
     // Catalogue / Devis
     "catalog.manage", "catalog.view",
-    "quote.create", "quote.send",
-    // Operations OS / Tâches
+    "quote.create", "quote.send", "quote.approve",
+    // Operations OS / TÃ¢ches
     "operations.view", "operations.manage",
     "task.view", "task.update", "task.assign", "task.manage",
     // Project OS
     "project.view", "project.manage",
     // Pilotage
     "pilotage.view",
+    "pilotage.manage",
     // Admin
     "delegation.manage",
     "user.manage",
   ],
 
-  // ───── CTO ───────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€ CTO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   CTO: [
     "ai.view", "ai.manage",
     "task.view", "task.update", "task.assign", "task.manage",
     "project.view", "project.manage",
   ],
 
-  // ───── AI Engineer ────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€ AI Engineer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   AI_ENGINEER: [
     "ai.view", "ai.manage",
     "task.view", "task.update", "task.manage",
     "project.view",
   ],
 
-  // ───── CRM Manager ───────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€ CRM Manager â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   CRM_MANAGER: [
     "crm.view", "crm.manage",
     "contact.manage", "contact.view",
     "lead.manage", "lead.view",
     "order.view",
-    "quote.create",
+    "quote.create", "quote.send", "quote.approve",
     "task.view", "task.update", "task.manage",
     "project.view",
+    "whatsapp.view", "whatsapp.manage", "whatsapp.send",
   ],
 
-  // ───── Commercial (scope = portefeuille propre) ───────────────────────────
+  // â”€â”€â”€â”€â”€ Commercial (scope = portefeuille propre) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   COMMERCIAL: [
-    "crm.view", "crm.manage",    // limité au portefeuille — filtré dans access-control
+    "crm.view", "crm.manage",    // limitÃ© au portefeuille â€” filtrÃ© dans access-control
     "contact.manage", "contact.view",
     "lead.manage", "lead.view",
     "order.create", "order.view",
     "catalog.view",
-    "quote.create",
+    "quote.create", "quote.send", "quote.approve",
     "task.view",
     "project.view",
+    "whatsapp.view", "whatsapp.send",
   ],
 
-  // ───── Community Manager ──────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€ Community Manager â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   COMMUNITY_MANAGER: [
     "marketing.view", "marketing.manage",
-    "crm.view",         // contacts seulement — limité dans access-control
+    "crm.view",         // contacts seulement â€” limitÃ© dans access-control
     "contact.view",
     "task.view",
+    "whatsapp.view", "whatsapp.manage", "whatsapp.send", "whatsapp.broadcast", "whatsapp.templates.manage",
   ],
 
-  // ───── Logistics Manager ──────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€ Logistics Manager â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   LOGISTICS_MANAGER: [
     "order.view", "order.update_status",
+    "quote.approve",
     "sourcing.manage", "sourcing.view",
     "logistics.view", "logistics.manage",
     "qc.view", "qc.manage",
-    "crm.view",           // statut livraison seulement — scope limité
+    "crm.view",           // statut livraison seulement â€” scope limitÃ©
     "task.view", "task.update", "task.assign", "task.manage",
     "project.view", "project.manage",
   ],
 
-  // ───── Logistics Assistant ────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€ Logistics Assistant â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   LOGISTICS_ASSISTANT: [
     "order.view",
+    "quote.approve",
     "sourcing.view",
     "logistics.view", "logistics.manage",
     "qc.view", "qc.manage",
@@ -130,7 +140,7 @@ const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
     "project.view",
   ],
 
-  // ───── Sourcing Assistant ─────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€ Sourcing Assistant â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   SOURCING_ASSISTANT: [
     "order.view",
     "sourcing.manage", "sourcing.view",
@@ -138,31 +148,32 @@ const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
     "project.view",
   ],
 
-  // ───── Finance Manager ────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€ Finance Manager â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   FINANCE_MANAGER: [
     "order.view",
+    "order.approve",
     "payment.create", "payment.approve", "payment.confirm",
     "finance.view", "finance.manage",
-    "crm.view",         // données financières clients seulement
+    "crm.view",         // donnÃ©es financiÃ¨res clients seulement
     "logistics.view",   // statut livraison pour facturation
     "task.view",
     "project.view",
   ],
 
-  // ───── Finance ────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€ Finance â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   FINANCE: [
     "order.view", "order.update_status",
     "payment.create", "payment.approve", "payment.confirm",
-    "quote.create", "quote.send",
+    "quote.create", "quote.send", "quote.approve",
     "finance.view", "finance.manage",
-    "crm.view",         // limité — scope dans access-control
+    "crm.view",         // limitÃ© â€” scope dans access-control
     "task.update", "task.assign", "task.view",
     "contact.view", "lead.view",
     "catalog.view",
     "project.view",
   ],
 
-  // ───── Ops (opérations transverses) ──────────────────────────────────────
+  // â”€â”€â”€â”€â”€ Ops (opÃ©rations transverses) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   OPS: [
     "order.create", "order.update", "order.update_status", "order.view",
     "crm.view", "crm.manage",
@@ -172,13 +183,14 @@ const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
     "sourcing.manage", "sourcing.view",
     "logistics.view", "logistics.manage",
     "qc.view", "qc.manage",
-    "quote.create",
+    "quote.create", "quote.send", "quote.approve",
     "operations.view", "operations.manage",
     "task.update", "task.assign", "task.view", "task.manage",
     "project.view", "project.manage",
+    "whatsapp.view", "whatsapp.manage", "whatsapp.send", "whatsapp.broadcast", "whatsapp.templates.manage", "whatsapp.settings",
   ],
 
-  // ───── Viewer (lecture seule) ─────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€ Viewer (lecture seule) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   VIEWER: [
     "order.view",
     "task.view",
@@ -197,11 +209,14 @@ export function hasPermission(role: UserRole, action: string): boolean {
 
 export function checkPermission(role: UserRole, action: string): void {
   if (!hasPermission(role, action)) {
-    throw new Error(`Permission refusée : ${action} pour le rôle ${role}`);
+    throw new Error(`Permission refusÃ©e : ${action} pour le rÃ´le ${role}`);
   }
 }
 
-/** Retourne la liste des permissions d'un rôle (ou ["*"]) */
+/** Retourne la liste des permissions d'un rÃ´le (ou ["*"]) */
 export function getRolePermissions(role: UserRole): string[] {
   return ROLE_PERMISSIONS[role] ?? [];
 }
+
+
+

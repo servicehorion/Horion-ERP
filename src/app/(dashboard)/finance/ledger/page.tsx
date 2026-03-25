@@ -1,15 +1,17 @@
-import Link from "next/link";
-import { ArrowLeft, BookOpen, TrendingUp, TrendingDown, Minus, CheckCircle2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { BookOpen, TrendingUp, TrendingDown, Minus, CheckCircle2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { getLedgerAccounts, getTrialBalance } from "@/lib/actions/finance.actions";
+import { CostCenterService } from "@/lib/services/cost-center.service";
+import { getSession } from "@/lib/session";
 import { AddLedgerEntryForm } from "@/components/finance/add-ledger-entry-form";
 import { SeedChartButton } from "@/components/finance/seed-chart-button";
 import { formatCurrency } from "@/config/currencies";
+import { serializeDecimals } from "@/lib/utils";
 
 export const metadata = { title: "Grand Livre | Horion ERP" };
 
@@ -22,33 +24,22 @@ const TYPE_LABELS: Record<string, { label: string; color: string; icon: typeof T
 };
 
 export default async function LedgerPage() {
-  const [accountsRes, trialRes] = await Promise.all([
+  const user = await getSession();
+  const [accountsRes, trialRes, costCenters] = await Promise.all([
     getLedgerAccounts(),
     getTrialBalance(),
+    CostCenterService.list(user.tenantId),
   ]);
 
-  const accounts = accountsRes.data || [];
+  const accounts = serializeDecimals(accountsRes.data || []);
   const trial = trialRes.data || { rows: [], totalDebit: 0, totalCredit: 0, isBalanced: true };
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild>
-          <Link href="/finance"><ArrowLeft className="h-4 w-4" /></Link>
-        </Button>
-        <div className="flex-1">
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <BookOpen className="h-7 w-7" />
-            Grand Livre Comptable
-          </h1>
-          <p className="text-muted-foreground">Plan comptable et écritures</p>
-        </div>
-        <div className="flex items-center gap-2">
-          {accounts.length === 0 && <SeedChartButton />}
-          {accounts.length > 0 && <AddLedgerEntryForm accounts={accounts} />}
-        </div>
-      </div>
+      <PageHeader title="Grand Livre Comptable" description="Plan comptable et écritures">
+        {accounts.length === 0 && <SeedChartButton />}
+        {accounts.length > 0 && <AddLedgerEntryForm accounts={accounts} costCenters={costCenters} />}
+      </PageHeader>
 
       {/* Trial Balance Summary */}
       {trial.rows.length > 0 && (

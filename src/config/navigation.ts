@@ -1,14 +1,11 @@
-import {
+﻿import {
   LayoutDashboard,
   ShoppingCart,
   Users,
   Search,
-  CheckSquare,
   Truck,
   DollarSign,
-  FolderOpen,
   ListTodo,
-  MessageCircle,
   Megaphone,
   Settings,
   type LucideIcon,
@@ -18,20 +15,35 @@ export interface NavItem {
   title: string;
   href: string;
   icon: LucideIcon;
-  badge?: string;
+  badge?: number | "dot";
   children?: { title: string; href: string }[];
 }
 
 export const sidebarNavigation: NavItem[] = [
   {
     title: "Pilotage",
-    href: "/dashboard",
+    href: "/pilotage",
     icon: LayoutDashboard,
+    children: [
+      { title: "Dashboard", href: "/dashboard" },
+      { title: "Intelligence", href: "/pilotage/intelligence" },
+      { title: "Decisions", href: "/pilotage/decisions" },
+      { title: "Resources", href: "/pilotage/resources" },
+      { title: "Risk Command", href: "/pilotage/risk" },
+      { title: "Forecast", href: "/pilotage/forecast" },
+    ],
   },
   {
     title: "Commandes",
     href: "/orders",
     icon: ShoppingCart,
+    children: [
+      { title: "Dashboard", href: "/orders" },
+      { title: "Devis", href: "/quotes" },
+      { title: "Nouveau", href: "/orders/new" },
+      { title: "Pipeline Kanban", href: "/orders/board" },
+      { title: "Compliance", href: "/orders/compliance" },
+    ],
   },
   {
     title: "CRM",
@@ -40,62 +52,92 @@ export const sidebarNavigation: NavItem[] = [
     children: [
       { title: "Dashboard", href: "/crm" },
       { title: "Intelligence", href: "/crm/intelligence" },
+      { title: "Demandes", href: "/crm/demands" },
       { title: "Leads", href: "/crm/leads" },
       { title: "Contacts", href: "/contacts" },
+      { title: "Analytics", href: "/crm/analytics" },
+      { title: "Calendrier", href: "/crm/calendar" },
+      { title: "Sources", href: "/crm/sources" },
+      { title: "Sales Ops", href: "/crm/sales-ops" },
     ],
   },
   {
     title: "Sourcing",
     href: "/sourcing",
     icon: Search,
-  },
-  {
-    title: "Controle Qualite",
-    href: "/qc",
-    icon: CheckSquare,
+    children: [
+      { title: "Tableau de bord", href: "/sourcing" },
+      { title: "Cas de sourcing", href: "/sourcing/cases" },
+      { title: "Prix Indicatif", href: "/sourcing/indicatif" },
+      { title: "Catalogue Sourcing", href: "/sourcing/catalog" },
+      { title: "Produits", href: "/catalog/products" },
+      { title: "Fournisseurs", href: "/catalog/suppliers" },
+      { title: "Offres", href: "/catalog/offers" },
+      { title: "Vault", href: "/catalog/vault" },
+      { title: "Groupage", href: "/sourcing/groupage" },
+    ],
   },
   {
     title: "Logistique",
     href: "/logistics",
     icon: Truck,
+    children: [
+      { title: "Dashboard", href: "/logistics" },
+      { title: "Controle qualite", href: "/qc" },
+    ],
   },
   {
     title: "Finance",
     href: "/finance",
     icon: DollarSign,
     children: [
+      { title: "Dashboard", href: "/finance" },
+      { title: "Etats financiers", href: "/finance/statements" },
+      { title: "Journaux", href: "/finance/journals" },
+      { title: "Periodes", href: "/finance/periods" },
+      { title: "Facturation", href: "/finance/invoices" },
+      { title: "Budgets", href: "/finance/budgets" },
+      { title: "Centres de cout", href: "/finance/cost-centers" },
+      { title: "P&L Analytique", href: "/finance/pnl" },
+      { title: "Immobilisations", href: "/finance/assets" },
+      { title: "Paie", href: "/finance/payroll" },
+      { title: "Forecast", href: "/finance/forecast" },
+      { title: "Cash Planning", href: "/finance/cash-planning" },
+      { title: "Fiscalite", href: "/finance/tax" },
+      { title: "Banques", href: "/finance/banks" },
+      { title: "Consolidation", href: "/finance/consolidation" },
+      { title: "Risk & Market", href: "/finance/risk" },
+      { title: "Approvals", href: "/finance/approvals" },
       { title: "Paiements", href: "/finance/payments" },
       { title: "Marges", href: "/finance/margins" },
     ],
   },
   {
-    title: "Projets",
-    href: "/projects",
-    icon: FolderOpen,
-  },
-  {
-    title: "Taches",
+    title: "Taches & Projets",
     href: "/tasks",
     icon: ListTodo,
     children: [
-      { title: "Dashboard", href: "/tasks" },
+      { title: "Dashboard Taches", href: "/tasks" },
       { title: "Mes Taches", href: "/tasks/my" },
       { title: "Kanban", href: "/tasks/board" },
       { title: "Gantt", href: "/tasks/gantt" },
       { title: "Timeline", href: "/tasks/timeline" },
       { title: "Analytics", href: "/tasks/analytics" },
       { title: "Templates", href: "/tasks/templates" },
+      { title: "Calendrier", href: "/tasks/calendar" },
+      { title: "Goals / OKRs", href: "/tasks/goals" },
+      { title: "Recurrences", href: "/tasks/recurring" },
+      { title: "Tous les projets", href: "/projects" },
     ],
-  },
-  {
-    title: "WhatsApp",
-    href: "/whatsapp",
-    icon: MessageCircle,
   },
   {
     title: "Marketing",
     href: "/marketing",
     icon: Megaphone,
+    children: [
+      { title: "Dashboard", href: "/marketing" },
+      { title: "WhatsApp", href: "/whatsapp" },
+    ],
   },
   {
     title: "Parametres",
@@ -104,6 +146,11 @@ export const sidebarNavigation: NavItem[] = [
     children: [
       { title: "Equipe", href: "/settings/team" },
       { title: "Delegations", href: "/settings/delegation" },
+      { title: "Agents IA", href: "/settings/agents" },
+      { title: "Branding", href: "/settings/branding" },
+      { title: "Audit Logs", href: "/settings/audit" },
+      { title: "Regles Approvals", href: "/settings/approval-rules" },
+      { title: "Securite (2FA)", href: "/settings/security" },
     ],
   },
 ];
