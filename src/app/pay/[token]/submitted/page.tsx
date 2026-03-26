@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 
 import { PublicPageShell } from "@/components/layout/public-page-shell";
+import { ZeliaPayWidget } from "@/components/assistant/zelia-pay-widget";
 import { prisma } from "@/lib/db";
 import { getPaymentMethodLabel, isManualPaymentMethod, normalizePaymentMethod } from "@/lib/payments/config";
 import { formatPublicMoney } from "@/lib/public-money";
@@ -255,6 +256,7 @@ export default async function PaymentSubmittedPage({
           </a>
         </div>
       </div>
+      <ZeliaPayWidget token={token} page="submitted" />
     </PublicPageShell>
   );
 }

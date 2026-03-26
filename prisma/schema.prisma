@@ -120,6 +120,11 @@ model Tenant {
   qcLotTraces                QcLotTrace[]
   agentLogs                  AgentLog[]
   sourcingTickets            SourcingTicket[]
+  treasuryAccounts           TreasuryAccount[]
+  warehouseIntakeDrafts      WarehouseIntakeDraft[]
+  assistantSessions          AssistantSession[]
+  knowledgeDocuments         KnowledgeDocument[]
+  assistantAuditLogs         AssistantAuditLog[]
 
   @@map("tenants")
 }
@@ -198,6 +203,8 @@ model User {
   approvedReturns               ReturnMerchandise[]         @relation("ReturnApprovedBy")
   assignedSourcingTickets       SourcingTicket[]            @relation("SourcingTicketAssignee")
   warehouseReceiptsAsAgent      WarehouseReceipt[]          @relation("WarehouseReceiptAgent")
+  validatedWarehouseIntakeDrafts WarehouseIntakeDraft[]    @relation("WarehouseIntakeDraftValidator")
+  assistantSessions             AssistantSession[]
   twoFactorSecret               TwoFactorSecret?
 
   twoFactorEnabled Boolean @default(false)
@@ -569,8 +576,9 @@ model Order {
   lead             Lead?                  @relation(fields: [leadId], references: [id])
   qcInspections    QcInspection[]
   demandIntakes    DemandIntake[]
-  customsClearance  OrderCustomsClearance?
-  warehouseReceipts WarehouseReceipt[]
+    customsClearance  OrderCustomsClearance?
+    warehouseReceipts WarehouseReceipt[]
+    warehouseIntakeDrafts WarehouseIntakeDraft[]
 
   @@index([tenantId])
   @@index([tenantId, status])
@@ -1016,6 +1024,8 @@ enum SourcingTicketStatus {
   PENDING_PARTNER_INFO
   QUOTE_READY
   QUOTED
+  CLIENT_ACCEPTED
+  ORDERED
   CONVERTED
   LOST
 }
@@ -1777,9 +1787,10 @@ model Shipment {
   customsClearance   CustomsClearance?
   aiInsight          ShipmentAIInsight?
   costLines          ShipmentCostLine[]
-  incidents          ShipmentIncident[]
-  portalTokens       ShipmentPortalToken[]
-  warehouseReceipt   WarehouseReceipt?
+    incidents          ShipmentIncident[]
+    portalTokens       ShipmentPortalToken[]
+    warehouseReceipt   WarehouseReceipt?
+    warehouseIntakeDrafts WarehouseIntakeDraft[]
 
   @@index([orderId])
   @@index([groupageBatchId])
@@ -3581,6 +3592,11 @@ model CatalogProduct {
   priceVolatilityPct         Decimal?      @db.Decimal(8, 2)
   defaultRiskBufferPct       Decimal?      @db.Decimal(5, 2)
   defaultHiddenMarginPct     Decimal?      @db.Decimal(5, 2)
+  avgActualWeightKg          Decimal?      @db.Decimal(10, 3)
+  avgVolumetricKg            Decimal?      @db.Decimal(10, 3)
+  lastSeenPrice              Decimal?      @db.Decimal(15, 2)
+  lastSeenAt                 DateTime?
+  samplesCount               Int           @default(0)
   historicalOrderCount       Int           @default(0)
   successfulOrderCount       Int           @default(0)
   stableOrderCount           Int           @default(0)
@@ -3614,6 +3630,58 @@ model CatalogProduct {
   @@index([tenantId, categoryId])
   @@index([tenantId, matchingFingerprint])
   @@map("catalog_products")
+}
+
+model TreasuryAccount {
+  id               String   @id @default(cuid())
+  tenantId         String
+  currency         String
+  label            String
+  balance          Decimal  @db.Decimal(15, 2)
+  alertBelowAmount Decimal? @db.Decimal(15, 2)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  tenant       Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  transactions TreasuryTransaction[]
+
+  @@index([tenantId, currency])
+  @@map("treasury_accounts")
+}
+
+model TreasuryTransaction {
+  id                   String                       @id @default(cuid())
+  accountId            String
+  type                 String
+  amount               Decimal                      @db.Decimal(15, 2)
+  fxRate               Decimal?                     @db.Decimal(15, 6)
+  orderId              String?
+  reference            String?
+  status               TreasuryReconciliationStatus @default(PENDING)
+  matchedPaymentId     String?
+  matchedBankTransactionId String?
+  matchScore           Decimal?                     @db.Decimal(5, 2)
+  matchMethod          String?
+  reconciledAt         DateTime?
+  reconciledById       String?
+  metadata             Json                         @default("{}")
+  createdAt            DateTime                     @default(now())
+
+  account TreasuryAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId])
+  @@index([orderId])
+  @@index([status])
+  @@index([matchedPaymentId])
+  @@index([matchedBankTransactionId])
+  @@map("treasury_transactions")
+}
+
+enum TreasuryReconciliationStatus {
+  PENDING
+  SUGGESTED
+  RECONCILED
+  IGNORED
 }
 
 enum ProductStatus {
@@ -4374,11 +4442,12 @@ model WhatsappContact {
 
   tenant           Tenant                 @relation(fields: [tenantId], references: [id])
   linkedContact    Contact?               @relation(fields: [linkedContactId], references: [id])
-  conversations    WhatsappConversation[]
-  groupMemberships WhatsappGroupMember[]
-  campaigns        WhatsappCampaignSend[]
-  intents          WhatsappIntent[]
-  leads            WhatsappLeadPipeline[]
+    conversations    WhatsappConversation[]
+    groupMemberships WhatsappGroupMember[]
+    campaigns        WhatsappCampaignSend[]
+    intents          WhatsappIntent[]
+    leads            WhatsappLeadPipeline[]
+    warehouseIntakeDrafts WarehouseIntakeDraft[]
 
   @@unique([tenantId, phone])
   @@index([linkedContactId])
@@ -4408,9 +4477,10 @@ model WhatsappConversation {
   contact    WhatsappContact           @relation(fields: [waContactId], references: [id])
   assignedTo User?                     @relation("WhatsappAssigned", fields: [assignedToId], references: [id])
   owner      User?                     @relation("WhatsappOwner", fields: [ownerId], references: [id])
-  messages   WhatsappMessage[]
-  intents    WhatsappIntent[]
-  tagsRel    WhatsappConversationTag[]
+    messages   WhatsappMessage[]
+    intents    WhatsappIntent[]
+    tagsRel    WhatsappConversationTag[]
+    warehouseIntakeDrafts WarehouseIntakeDraft[]
 
   @@index([tenantId, status])
   @@index([assignedToId])
@@ -4432,8 +4502,9 @@ model WhatsappMessage {
   rawJson        Json                     @default("{}")
   createdAt      DateTime                 @default(now())
 
-  conversation WhatsappConversation   @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  media        WhatsappMessageMedia[]
+    conversation WhatsappConversation   @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+    media        WhatsappMessageMedia[]
+    warehouseIntakeDrafts WarehouseIntakeDraft[] @relation("WarehouseDraftSourceMessage")
 
   @@index([conversationId])
   @@index([externalId])
@@ -5456,6 +5527,197 @@ model AgentLog {
   @@index([correlationId])
   @@index([createdAt])
   @@map("agent_logs")
+}
+
+enum WarehouseIntakeDraftStatus {
+  PENDING_REVIEW
+  CONFIRMED
+  REJECTED
+}
+
+model WarehouseIntakeDraft {
+  id              String                      @id @default(cuid())
+  tenantId        String
+  conversationId  String?
+  waContactId     String?
+  sourceMessageId String?
+  orderId         String?
+  shipmentId      String?
+  status          WarehouseIntakeDraftStatus @default(PENDING_REVIEW)
+  source          String                     @default("WHATSAPP")
+  rawText         String
+  photoUrls       Json                       @default("[]")
+  parsedPayload   Json                       @default("{}")
+  parsedAt        DateTime?
+  validatedById   String?
+  validatedAt     DateTime?
+  rejectionReason String?
+  createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @updatedAt
+
+  tenant        Tenant                @relation(fields: [tenantId], references: [id])
+  conversation  WhatsappConversation? @relation(fields: [conversationId], references: [id])
+  waContact     WhatsappContact?      @relation(fields: [waContactId], references: [id])
+  sourceMessage WhatsappMessage?      @relation("WarehouseDraftSourceMessage", fields: [sourceMessageId], references: [id])
+  order         Order?                @relation(fields: [orderId], references: [id])
+  shipment      Shipment?             @relation(fields: [shipmentId], references: [id])
+  validatedBy   User?                 @relation("WarehouseIntakeDraftValidator", fields: [validatedById], references: [id])
+
+  @@index([tenantId, status])
+  @@index([conversationId])
+  @@index([waContactId])
+  @@index([orderId])
+  @@index([shipmentId])
+  @@index([sourceMessageId])
+  @@map("warehouse_intake_drafts")
+}
+
+enum AssistantType {
+  INTERNAL
+  PAYMENT
+}
+
+enum AssistantMessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+  TOOL
+}
+
+enum KnowledgeAudience {
+  INTERNAL
+  PUBLIC
+}
+
+enum KnowledgeSourceType {
+  MANUAL
+  DRIVE
+  RUNTIME
+}
+
+model AssistantSession {
+  id              String        @id @default(cuid())
+  tenantId        String
+  assistantType   AssistantType
+  userId          String?
+  publicTokenHash String?
+  title           String?
+  role            String?
+  module          String?
+  entityType      String?
+  entityId        String?
+  metadata        Json          @default("{}")
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  tenant    Tenant             @relation(fields: [tenantId], references: [id])
+  user      User?              @relation(fields: [userId], references: [id])
+  messages  AssistantMessage[]
+  feedbacks AssistantFeedback[]
+  audits    AssistantAuditLog[]
+
+  @@index([tenantId, assistantType])
+  @@index([userId])
+  @@index([publicTokenHash])
+  @@map("assistant_sessions")
+}
+
+model AssistantMessage {
+  id            String               @id @default(cuid())
+  sessionId     String
+  role          AssistantMessageRole
+  content       String
+  toolCallsJson Json                 @default("{}")
+  sourcesJson   Json                 @default("[]")
+  createdAt     DateTime             @default(now())
+
+  session  AssistantSession   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  feedback AssistantFeedback[]
+
+  @@index([sessionId, createdAt])
+  @@map("assistant_messages")
+}
+
+model AssistantFeedback {
+  id        String   @id @default(cuid())
+  sessionId String?
+  messageId String?
+  rating    Int?
+  comment   String?
+  createdAt DateTime @default(now())
+
+  session AssistantSession? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  message AssistantMessage? @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([messageId])
+  @@map("assistant_feedback")
+}
+
+model KnowledgeDocument {
+  id          String              @id @default(cuid())
+  tenantId    String
+  audience    KnowledgeAudience
+  sourceType  KnowledgeSourceType @default(MANUAL)
+  title       String
+  slug        String?
+  module      String?
+  sourceUrl   String?
+  externalRef String?
+  tags        Json                @default("[]")
+  content     String
+  status      String              @default("ACTIVE")
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  tenant Tenant           @relation(fields: [tenantId], references: [id])
+  chunks KnowledgeChunk[]
+
+  @@unique([tenantId, audience, title])
+  @@index([tenantId, audience, module])
+  @@index([slug])
+  @@map("knowledge_documents")
+}
+
+model KnowledgeChunk {
+  id           String   @id @default(cuid())
+  documentId   String
+  ordinal      Int
+  module       String?
+  content      String
+  tags         Json     @default("[]")
+  embeddingRef String?
+  metadata     Json     @default("{}")
+  createdAt    DateTime @default(now())
+
+  document KnowledgeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, ordinal])
+  @@index([module])
+  @@map("knowledge_chunks")
+}
+
+model AssistantAuditLog {
+  id            String        @id @default(cuid())
+  tenantId      String
+  assistantType AssistantType
+  sessionId     String?
+  action        String
+  entityType    String?
+  entityId      String?
+  input         Json          @default("{}")
+  output        Json          @default("{}")
+  status        String        @default("SUCCESS")
+  errorMessage  String?
+  createdAt     DateTime      @default(now())
+
+  tenant  Tenant            @relation(fields: [tenantId], references: [id])
+  session AssistantSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, assistantType])
+  @@index([sessionId])
+  @@index([entityType, entityId])
+  @@map("assistant_audit_logs")
 }
 
 // ============================================================

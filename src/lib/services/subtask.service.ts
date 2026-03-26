@@ -51,6 +51,7 @@ export class SubtaskService {
         priority: data.priority ?? "NORMAL",
         ownerType: "HUMAN",
         slaDeadline,
+        dueDate: slaDeadline,
         position: nextPosition,
         tags: data.tags ?? [],
         riskLevel: "LOW",
@@ -117,23 +118,28 @@ export class SubtaskService {
 
     const progress = await this.getProgress(subtask.parentTaskId);
 
-    // If all subtasks completed, mark parent as completed (or WAITING_APPROVAL if approval required)
+    // If all subtasks completed, attempt strict parent closure.
     if (progress.total > 0 && progress.completed === progress.total) {
       const parent = await prisma.task.findUnique({
         where: { id: subtask.parentTaskId },
-        select: { requiredApproval: true, status: true },
+        select: { requiredApproval: true, status: true, tenantId: true, title: true },
       });
 
       if (parent && !["COMPLETED", "CANCELLED"].includes(parent.status)) {
-        const newStatus = parent.requiredApproval ? "WAITING_APPROVAL" : "COMPLETED";
-        await prisma.task.update({
-          where: { id: subtask.parentTaskId },
-          data: {
-            status: newStatus,
-            ...(newStatus === "COMPLETED" && { completedAt: new Date() }),
-          },
-        });
-        return true;
+        if (parent.requiredApproval) {
+          await prisma.task.update({
+            where: { id: subtask.parentTaskId },
+            data: { status: "WAITING_APPROVAL" },
+          });
+          return true;
+        }
+
+        const { TaskWorkflowService } = await import("@/lib/services/task-workflow.service");
+        const snapshot = await TaskWorkflowService.getTaskWorkflowSnapshot(subtask.parentTaskId);
+        if (snapshot.canComplete) {
+          await TaskWorkflowService.completeTask(subtask.parentTaskId);
+          return true;
+        }
       }
     }
 

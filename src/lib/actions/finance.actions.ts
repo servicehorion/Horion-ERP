@@ -1,12 +1,15 @@
 "use server";
 
+import { z } from "zod";
 import { getSession } from "@/lib/session";
+import { prisma } from "@/lib/db";
 import { LedgerService } from "@/lib/services/ledger.service";
 import { FXRateService } from "@/lib/services/fx-rate.service";
 import { FinanceIntelligenceService } from "@/lib/services/finance-intelligence.service";
 import { AuditService } from "@/lib/services/audit.service";
 import { AccountingService } from "@/lib/services/accounting.service";
 import { FxRevaluationService } from "@/lib/services/fx-revaluation.service";
+import { NotificationService } from "@/lib/services/notification.service";
 import { checkPermission } from "@/lib/permissions";
 import {
   createLedgerAccountSchema,
@@ -14,6 +17,22 @@ import {
   createFXRateSchema,
 } from "@/lib/validators/finance";
 import { revalidatePath } from "next/cache";
+
+const treasuryAccountSchema = z.object({
+  label: z.string().min(2, "Libelle requis"),
+  currency: z.string().min(3, "Devise requise"),
+  balance: z.coerce.number().nonnegative("Solde initial invalide"),
+  alertBelowAmount: z.coerce.number().nonnegative().optional(),
+});
+
+const treasuryTransactionSchema = z.object({
+  accountId: z.string().min(1, "Compte requis"),
+  type: z.enum(["TOP_UP", "ORDER_DEBIT", "FX_LOSS"]),
+  amount: z.coerce.number().positive("Montant invalide"),
+  fxRate: z.coerce.number().positive().optional(),
+  orderId: z.string().optional(),
+  reference: z.string().optional(),
+});
 
 // ============================================================
 // LEDGER ACCOUNTS
@@ -410,5 +429,200 @@ export async function runFxRevaluation() {
     return { data: result };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur revalorisation FX" };
+  }
+}
+
+export async function getTreasuryAccounts() {
+  try {
+    const user = await getSession();
+    checkPermission(user.role, "finance.view");
+
+    const accounts = await prisma.treasuryAccount.findMany({
+      where: { tenantId: user.tenantId },
+      include: {
+        transactions: {
+          orderBy: { createdAt: "desc" },
+          take: 5,
+        },
+      },
+      orderBy: [{ currency: "asc" }, { label: "asc" }],
+    });
+
+    return {
+      data: accounts.map((account) => ({
+        ...account,
+        belowThreshold:
+          account.alertBelowAmount != null &&
+          Number(account.balance) < Number(account.alertBelowAmount),
+      })),
+    };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Erreur chargement tresorerie" };
+  }
+}
+
+export async function getTreasuryTransactions(limit = 20) {
+  try {
+    const user = await getSession();
+    checkPermission(user.role, "finance.view");
+
+    const transactions = await prisma.treasuryTransaction.findMany({
+      where: {
+        account: {
+          tenantId: user.tenantId,
+        },
+      },
+      include: {
+        account: {
+          select: {
+            id: true,
+            label: true,
+            currency: true,
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+    });
+
+    return { data: transactions };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Erreur chargement mouvements" };
+  }
+}
+
+export async function createTreasuryAccount(formData: Record<string, unknown>) {
+  try {
+    const user = await getSession();
+    checkPermission(user.role, "finance.manage");
+
+    const validated = treasuryAccountSchema.parse(formData);
+    const account = await prisma.treasuryAccount.create({
+      data: {
+        tenantId: user.tenantId,
+        label: validated.label,
+        currency: validated.currency.toUpperCase(),
+        balance: validated.balance,
+        alertBelowAmount: validated.alertBelowAmount,
+      },
+    });
+
+    await AuditService.log({
+      tenantId: user.tenantId,
+      userId: user.id,
+      action: "treasury.account.created",
+      entityType: "treasury_account",
+      entityId: account.id,
+      newValue: {
+        label: account.label,
+        currency: account.currency,
+        balance: Number(account.balance),
+        alertBelowAmount: account.alertBelowAmount != null ? Number(account.alertBelowAmount) : null,
+      },
+    });
+
+    revalidatePath("/finance/treasury");
+    return { data: account };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Erreur creation compte de tresorerie" };
+  }
+}
+
+export async function createTreasuryTransaction(formData: Record<string, unknown>) {
+  try {
+    const user = await getSession();
+    checkPermission(user.role, "finance.manage");
+
+    const validated = treasuryTransactionSchema.parse(formData);
+    const account = await prisma.treasuryAccount.findFirst({
+      where: { id: validated.accountId, tenantId: user.tenantId },
+      select: {
+        id: true,
+        tenantId: true,
+        label: true,
+        currency: true,
+        balance: true,
+        alertBelowAmount: true,
+      },
+    });
+
+    if (!account) {
+      return { error: "Compte de tresorerie introuvable" };
+    }
+
+    const signedDelta =
+      validated.type === "TOP_UP" ? validated.amount : -validated.amount;
+
+    const result = await prisma.$transaction(async (tx) => {
+      const transaction = await tx.treasuryTransaction.create({
+        data: {
+          accountId: account.id,
+          type: validated.type,
+          amount: validated.amount,
+          fxRate: validated.fxRate,
+          orderId: validated.orderId || undefined,
+          reference: validated.reference || undefined,
+        },
+      });
+
+      const updatedAccount = await tx.treasuryAccount.update({
+        where: { id: account.id },
+        data: {
+          balance: {
+            increment: signedDelta,
+          },
+        },
+      });
+
+      return { transaction, updatedAccount };
+    });
+
+    await AuditService.log({
+      tenantId: user.tenantId,
+      userId: user.id,
+      action: "treasury.transaction.created",
+      entityType: "treasury_account",
+      entityId: account.id,
+      newValue: {
+        type: validated.type,
+        amount: validated.amount,
+        orderId: validated.orderId || null,
+        reference: validated.reference || null,
+      },
+    });
+
+    const belowThreshold =
+      result.updatedAccount.alertBelowAmount != null &&
+      Number(result.updatedAccount.balance) < Number(result.updatedAccount.alertBelowAmount);
+
+    if (belowThreshold) {
+      const leadership = await prisma.user.findMany({
+        where: {
+          tenantId: user.tenantId,
+          isActive: true,
+          role: { in: ["CEO", "DIRECTION", "ADMIN", "FINANCE_MANAGER", "FINANCE"] as any[] },
+        },
+        select: { id: true },
+      });
+
+      if (leadership.length > 0) {
+        await NotificationService.notifyMany(
+          leadership.map((member) => member.id),
+          {
+            tenantId: user.tenantId,
+            type: "SLA_BREACH",
+            title: `Alerte tresorerie - ${result.updatedAccount.label}`,
+            message: `Le compte ${result.updatedAccount.label} est passe sous son seuil d'alerte.`,
+            entityType: "treasury_account",
+            entityId: result.updatedAccount.id,
+          }
+        );
+      }
+    }
+
+    revalidatePath("/finance/treasury");
+    return { data: result };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Erreur creation mouvement de tresorerie" };
   }
 }

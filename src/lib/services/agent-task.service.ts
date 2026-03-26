@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import type { AgentExecutionStatus, OwnerType, Priority } from "@prisma/client";
 import { AgentPlatformService } from "@/lib/services/agent-platform.service";
+import { OperationalTaskService } from "@/lib/services/operational-task.service";
 
 /**
  * AgentTaskService — API layer for AI agents to interact with the Tasks OS.
@@ -174,9 +175,6 @@ export class AgentTaskService {
     automationAllowed?: boolean;
     assigneeId?: string;
   }) {
-    const slaDeadline = data.slaHours
-      ? new Date(Date.now() + data.slaHours * 3600 * 1000)
-      : undefined;
     const resolvedAgentId =
       data.agentId ||
       (data.ownerType === "AI_AGENT"
@@ -189,37 +187,28 @@ export class AgentTaskService {
     const resolvedAgentProfile = resolvedAgentId
       ? await AgentPlatformService.getAgentProfile(data.tenantId, resolvedAgentId)
       : null;
-
-    const task = await prisma.task.create({
-      data: {
-        tenantId: data.tenantId,
-        title: data.title,
-        description: data.description,
-        module: data.module,
-        taskType: data.taskType,
-        entityType: data.entityType ?? "manual",
-        entityId: data.entityId ?? "none",
-        priority: data.priority ?? "NORMAL",
-        ownerType: data.ownerType ?? "SYSTEM",
-        agentId: resolvedAgentId ?? undefined,
-        agentName: data.agentName ?? resolvedAgentProfile?.displayName ?? undefined,
-        slaDeadline,
-        parentTaskId: data.parentTaskId,
-        tags: data.tags ?? [],
-        requiredApproval: data.requiredApproval ?? false,
-        automationAllowed: data.automationAllowed ?? false,
-        riskLevel: "LOW",
-      },
+    const result = await OperationalTaskService.create({
+      tenantId: data.tenantId,
+      title: data.title,
+      description: data.description,
+      module: data.module,
+      taskType: data.taskType,
+      entityType: data.entityType ?? "manual",
+      entityId: data.entityId ?? "none",
+      priority: data.priority ?? "NORMAL",
+      ownerType: data.ownerType ?? "SYSTEM",
+      slaHours: data.slaHours,
+      parentTaskId: data.parentTaskId,
+      tags: data.tags ?? [],
+      requiredApproval: data.requiredApproval ?? false,
+      automationAllowed: data.automationAllowed ?? false,
+      riskLevel: "LOW",
+      assigneeId: data.assigneeId ?? null,
+      agentId: resolvedAgentId ?? undefined,
+      agentName: data.agentName ?? resolvedAgentProfile?.displayName ?? undefined,
     });
 
-    // Assign if specified
-    if (data.assigneeId) {
-      await prisma.taskAssignment.create({
-        data: { taskId: task.id, userId: data.assigneeId },
-      });
-    }
-
-    return task;
+    return prisma.task.findUniqueOrThrow({ where: { id: result.taskId } });
   }
 
   static async createAgentHandoff(data: {
@@ -239,34 +228,34 @@ export class AgentTaskService {
     summary?: string;
     payload?: Record<string, unknown>;
   }) {
-    return prisma.task.create({
-      data: {
-        tenantId: data.tenantId,
-        title: data.title,
-        description: data.description,
-        module: data.module,
-        taskType: "agent_handoff",
-        entityType: data.entityType ?? "manual",
-        entityId: data.entityId ?? "none",
-        priority: data.priority ?? "NORMAL",
-        ownerType: "AI_AGENT",
-        agentId: data.targetAgentId,
-        agentName: data.targetAgentName,
-        automationAllowed: true,
-        parentTaskId: data.parentTaskId,
-        tags: Array.from(new Set([...(data.tags ?? []), "agent-handoff"])),
-        customFields: {
-          handoff: {
-            sourceAgentId: data.sourceAgentId,
-            sourceAgentName: data.sourceAgentName,
-            targetAgentId: data.targetAgentId,
-            targetAgentName: data.targetAgentName,
-            summary: data.summary,
-            payload: data.payload ?? {},
-          },
-        } as any,
+    const result = await OperationalTaskService.create({
+      tenantId: data.tenantId,
+      title: data.title,
+      description: data.description,
+      module: data.module,
+      taskType: "agent_handoff",
+      entityType: data.entityType ?? "manual",
+      entityId: data.entityId ?? "none",
+      priority: data.priority ?? "NORMAL",
+      ownerType: "AI_AGENT",
+      automationAllowed: true,
+      parentTaskId: data.parentTaskId,
+      tags: Array.from(new Set([...(data.tags ?? []), "agent-handoff"])),
+      customFields: {
+        handoff: {
+          sourceAgentId: data.sourceAgentId,
+          sourceAgentName: data.sourceAgentName,
+          targetAgentId: data.targetAgentId,
+          targetAgentName: data.targetAgentName,
+          summary: data.summary,
+          payload: data.payload ?? {},
+        },
       },
+      agentId: data.targetAgentId,
+      agentName: data.targetAgentName,
     });
+
+    return prisma.task.findUniqueOrThrow({ where: { id: result.taskId } });
   }
 
   /**

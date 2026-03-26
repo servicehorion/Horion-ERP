@@ -3,6 +3,8 @@ import type { DemandStatus, Prisma, UserRole } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { formatPublicMoney } from "@/lib/public-money";
 import { NotificationService } from "@/lib/services/notification.service";
+import { OperationalTaskService } from "@/lib/services/operational-task.service";
+import { SourcingTicketService } from "@/lib/services/sourcing-ticket.service";
 
 const DEFAULT_QUOTE_ASSISTANT_APPROVAL_THRESHOLD_XAF = 100_000;
 const DEFAULT_QUOTE_MANAGER_APPROVAL_THRESHOLD_XAF = 500_000;
@@ -164,6 +166,10 @@ function getQuoteApprovalDeadline(gate: QuoteApprovalGate) {
   return new Date(Date.now() + hours * 3_600_000);
 }
 
+function getQuoteApprovalSlaHours(gate: QuoteApprovalGate) {
+  return gate === "LOGISTICS_MANAGER" ? 2 : 1;
+}
+
 export async function createQuoteVersion(
   tx: Prisma.TransactionClient,
   data: Prisma.QuoteUncheckedCreateInput & { orderId: string }
@@ -314,75 +320,34 @@ export async function ensureQuoteApprovalTask(input: {
     totalXaf: input.totalXaf,
   };
 
-  const existingTask = await prisma.task.findFirst({
-    where: {
-      entityType: "order",
-      entityId: input.orderId,
-      taskType: "quote_approval",
-      status: { notIn: ["COMPLETED", "CANCELLED"] },
+  const task = await OperationalTaskService.create({
+    tenantId: input.tenantId,
+    entityType: "order",
+    entityId: input.orderId,
+    taskType: "quote_approval",
+    title,
+    description,
+    module: "orders",
+    priority: "URGENT",
+    ownerType: "SYSTEM",
+    riskLevel: policy.requiredGate === "CEO" ? "HIGH" : "MEDIUM",
+    slaHours: getQuoteApprovalSlaHours(policy.requiredGate),
+    assigneeId: approverId,
+    fallbackRoles: ["ADMIN", "DIRECTION", "CEO"],
+    watcherIds: adminWatcherIds,
+    assignedByName: "Automatisation Horion",
+    tags: ["devis-approval", input.orderNumber, policy.requiredGate.toLowerCase()],
+    customFields: customFields as unknown as Record<string, unknown>,
+    reuseIfOpen: true,
+    completionRequirements: {
+      requireApprovedDecision: true,
+      requiredComment: true,
     },
-    select: { id: true },
-    orderBy: { createdAt: "desc" },
   });
 
-  const task = existingTask
-    ? await prisma.task.update({
-        where: { id: existingTask.id },
-        data: {
-          title,
-          description,
-          priority: "URGENT",
-          ownerType: "SYSTEM",
-          riskLevel: policy.requiredGate === "CEO" ? "HIGH" : "MEDIUM",
-          slaDeadline: getQuoteApprovalDeadline(policy.requiredGate),
-          tags: ["devis-approval", input.orderNumber, policy.requiredGate.toLowerCase()],
-          customFields,
-        },
-        select: { id: true },
-      })
-    : await prisma.task.create({
-        data: {
-          tenantId: input.tenantId,
-          entityType: "order",
-          entityId: input.orderId,
-          taskType: "quote_approval",
-          title,
-          description,
-          module: "orders",
-          priority: "URGENT",
-          ownerType: "SYSTEM",
-          status: "PENDING",
-          riskLevel: policy.requiredGate === "CEO" ? "HIGH" : "MEDIUM",
-          slaDeadline: getQuoteApprovalDeadline(policy.requiredGate),
-          tags: ["devis-approval", input.orderNumber, policy.requiredGate.toLowerCase()],
-          customFields,
-        },
-        select: { id: true },
-      });
+  await NotificationService.onApprovalRequired(task.taskId, input.tenantId, title);
 
-  await prisma.taskAssignment.deleteMany({ where: { taskId: task.id } });
-
-  if (approverId) {
-    await prisma.taskAssignment.create({
-      data: { taskId: task.id, userId: approverId, assignedAt: new Date() },
-    });
-  }
-
-  if (adminWatcherIds.length > 0) {
-    await prisma.taskAssignment.createMany({
-      data: adminWatcherIds.map((userId) => ({
-        taskId: task.id,
-        userId,
-        role: "watcher",
-        assignedAt: new Date(),
-      })),
-      skipDuplicates: true,
-    });
-  }
-
-  await NotificationService.onApprovalRequired(task.id, input.tenantId, title);
-
-  return { taskId: task.id, approverId, policy };
+  return { taskId: task.taskId, approverId, policy };
 }
 
 export async function ensureCeoPaymentValidationTask(input: {
@@ -430,60 +395,32 @@ export async function ensureCeoPaymentValidationTask(input: {
     validatorLabel,
   };
 
-  // Support legacy taskType "ceo_payment_validation" + new "payment_validation"
-  const existingTask = await prisma.task.findFirst({
-    where: {
-      entityType: "order",
-      entityId: input.orderId,
-      taskType: { in: ["ceo_payment_validation", "payment_validation"] },
-      status: { notIn: ["COMPLETED", "CANCELLED"] },
+  const task = await OperationalTaskService.create({
+    tenantId: input.tenantId,
+    entityType: "order",
+    entityId: input.orderId,
+    taskType: "payment_validation",
+    title: `Valider le paiement client - ${input.orderNumber}`,
+    description,
+    module: "finance",
+    priority: isCritical ? "URGENT" : "HIGH",
+    ownerType: "SYSTEM",
+    riskLevel: isCritical ? "HIGH" : "MEDIUM",
+    slaHours: 4,
+    assigneeId: approverId,
+    fallbackRoles: ["ADMIN", "DIRECTION", "CEO"],
+    watcherRoles: ["ADMIN"],
+    assignedByName: "Automatisation Horion",
+    tags: ["payment-validation", input.orderNumber, validatorLabel.toLowerCase()],
+    customFields: customFields as unknown as Record<string, unknown>,
+    reuseIfOpen: true,
+    completionRequirements: {
+      requireApprovedDecision: true,
+      requiredComment: true,
     },
-    select: { id: true },
-    orderBy: { createdAt: "desc" },
   });
 
-  const task = existingTask
-    ? await prisma.task.update({
-        where: { id: existingTask.id },
-        data: {
-          title: `Valider le paiement client - ${input.orderNumber}`,
-          description,
-          priority: isCritical ? "URGENT" : "HIGH",
-          ownerType: "SYSTEM",
-          module: "finance",
-          slaDeadline: new Date(Date.now() + 4 * 3_600_000),
-          tags: ["payment-validation", input.orderNumber, validatorLabel.toLowerCase()],
-          customFields,
-        },
-        select: { id: true },
-      })
-    : await prisma.task.create({
-        data: {
-          tenantId: input.tenantId,
-          entityType: "order",
-          entityId: input.orderId,
-          taskType: "payment_validation",
-          title: `Valider le paiement client - ${input.orderNumber}`,
-          description,
-          module: "finance",
-          priority: isCritical ? "URGENT" : "HIGH",
-          ownerType: "SYSTEM",
-          status: "PENDING",
-          riskLevel: isCritical ? "HIGH" : "MEDIUM",
-          slaDeadline: new Date(Date.now() + 4 * 3_600_000),
-          tags: ["payment-validation", input.orderNumber, validatorLabel.toLowerCase()],
-          customFields,
-        },
-        select: { id: true },
-      });
-
-  await prisma.taskAssignment.deleteMany({ where: { taskId: task.id } });
-
   if (approverId) {
-    await prisma.taskAssignment.create({
-      data: { taskId: task.id, userId: approverId, assignedAt: new Date() },
-    });
-
     await prisma.notification.create({
       data: {
         tenantId: input.tenantId,
@@ -497,7 +434,7 @@ export async function ensureCeoPaymentValidationTask(input: {
     });
   }
 
-  return { taskId: task.id, approverId, validatorRoles, validatorLabel };
+  return { taskId: task.taskId, approverId, validatorRoles, validatorLabel };
 }
 
 export async function cancelQuoteWorkflowTasks(input: {
@@ -602,19 +539,21 @@ export async function syncDemandStatusForQuote(quoteId: string) {
     select: { id: true, status: true },
   });
 
-  if (demands.length === 0) return;
+  if (demands.length > 0) {
+    const nextStatus = mapDemandStatusFromQuote(quote);
+    for (const demand of demands) {
+      if (demand.status === "CONVERTED") continue;
 
-  const nextStatus = mapDemandStatusFromQuote(quote);
-  for (const demand of demands) {
-    if (demand.status === "CONVERTED") continue;
-
-    await prisma.demandIntake.update({
-      where: { id: demand.id },
-      data: {
-        status: nextStatus,
-        quoteId,
-        orderId: quote.orderId,
-      },
-    });
+      await prisma.demandIntake.update({
+        where: { id: demand.id },
+        data: {
+          status: nextStatus,
+          quoteId,
+          orderId: quote.orderId,
+        },
+      });
+    }
   }
+
+  await SourcingTicketService.syncForQuote(quoteId);
 }

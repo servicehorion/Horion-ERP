@@ -1,31 +1,28 @@
-"use client";
+﻿"use client";
 
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
+  Activity,
+  AlertTriangle,
+  BarChart3,
+  Clock,
+  Package,
   RefreshCw,
   Ship,
-  Truck,
   TrendingUp,
-  Clock,
-  Activity,
+  Truck,
   Users,
-  AlertTriangle,
-  Zap,
-  BarChart3,
-  Package,
-  Wifi,
   Warehouse,
+  Wifi,
+  Zap,
 } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/shared/page-header";
 import { KpiCard, KpiGrid } from "@/components/shared/kpi-card";
-
 import { LogisticsDashboardData } from "@/components/logistics/types";
 import { LogisticsExportActions } from "@/components/logistics/logistics-export-actions";
-import { runLogisticsSlaCheck } from "@/lib/actions/logistics.actions";
 import { ShipmentsTab } from "@/components/logistics/shipments-tab";
 import { PartnersTab } from "@/components/logistics/partners-tab";
 import { CustomsTab } from "@/components/logistics/customs-tab";
@@ -33,6 +30,9 @@ import { AiTab } from "@/components/logistics/ai-tab";
 import { AnalyticsTab } from "@/components/logistics/analytics-tab";
 import { ConsolidationTab } from "@/components/logistics/consolidation-tab";
 import { WarehouseReceiptForm } from "@/components/logistics/warehouse-receipt-form";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { runLogisticsSlaCheck } from "@/lib/actions/logistics.actions";
 
 function formatNumber(value: number, digits = 0) {
   return value.toLocaleString("fr-FR", {
@@ -54,7 +54,7 @@ export function LogisticsDashboard({
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Logistique" description="Command center expéditions et dédouanement">
+      <PageHeader title="Logistique" description="Command center expeditions et dedouanement">
         <Button
           variant="outline"
           size="sm"
@@ -76,7 +76,7 @@ export function LogisticsDashboard({
 
       <KpiGrid cols={6}>
         <KpiCard
-          label="Expéditions actives"
+          label="Expeditions actives"
           value={data.kpis.inProgressCount}
           sub="en cours"
           icon={<Truck className="h-4 w-4 text-muted-foreground" />}
@@ -84,20 +84,20 @@ export function LogisticsDashboard({
         <KpiCard
           label="OTD global"
           value={`${formatNumber(data.kpis.onTimeRate, 0)}%`}
-          sub="livraison à temps"
+          sub="livraison a temps"
           icon={<TrendingUp className="h-4 w-4 text-muted-foreground" />}
           variant={data.kpis.onTimeRate >= 90 ? "success" : data.kpis.onTimeRate >= 70 ? "default" : "warning"}
         />
         <KpiCard
-          label="Délai moyen"
+          label="Delai moyen"
           value={`${formatNumber(data.kpis.avgTransitDays, 1)}j`}
           sub="transit moyen"
           icon={<Clock className="h-4 w-4 text-muted-foreground" />}
         />
         <KpiCard
-          label="Coût / kg"
+          label="Cout / kg"
           value={`${formatNumber(data.kpis.costPerKg, 2)} USD`}
-          sub="coût moyen"
+          sub="cout moyen"
           icon={<Activity className="h-4 w-4 text-muted-foreground" />}
         />
         <KpiCard
@@ -117,63 +117,77 @@ export function LogisticsDashboard({
       </KpiGrid>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid grid-cols-2 md:grid-cols-7 gap-2">
+        <TabsList className="grid grid-cols-2 gap-2 md:grid-cols-7">
           <TabsTrigger value="shipments">
-            <Ship className="h-4 w-4 mr-2" /> Shipments
+            <Ship className="mr-2 h-4 w-4" /> Shipments
           </TabsTrigger>
           <TabsTrigger value="warehouse">
-            <Warehouse className="h-4 w-4 mr-2" /> Entrepôt
+            <Warehouse className="mr-2 h-4 w-4" /> Entrepot
           </TabsTrigger>
           <TabsTrigger value="partners">
-            <Users className="h-4 w-4 mr-2" /> Partners
+            <Users className="mr-2 h-4 w-4" /> Partners
           </TabsTrigger>
           <TabsTrigger value="customs">
-            <AlertTriangle className="h-4 w-4 mr-2" /> Customs
+            <AlertTriangle className="mr-2 h-4 w-4" /> Customs
           </TabsTrigger>
           <TabsTrigger value="ai">
-            <Zap className="h-4 w-4 mr-2" /> AI Alerts
+            <Zap className="mr-2 h-4 w-4" /> AI Alerts
           </TabsTrigger>
           <TabsTrigger value="analytics">
-            <BarChart3 className="h-4 w-4 mr-2" /> Analytics
+            <BarChart3 className="mr-2 h-4 w-4" /> Analytics
           </TabsTrigger>
           <TabsTrigger value="consolidation">
-            <Package className="h-4 w-4 mr-2" /> Consolidation
+            <Package className="mr-2 h-4 w-4" /> Consolidation
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="shipments">
           <ShipmentsTab data={data} canManage={canManage} />
         </TabsContent>
+
         <TabsContent value="warehouse">
           {canManage ? (
-            <div className="max-w-2xl mx-auto">
-              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+            <div className="mx-auto max-w-2xl">
+              <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold">
                 <Warehouse className="h-5 w-5" />
-                Réception entrepôt Chine
+                Reception entrepot Chine
               </h2>
-              <p className="text-sm text-muted-foreground mb-6">
-                Scannez le QR code de l&apos;expédition ou entrez son identifiant manuellement pour enregistrer la réception et les mensurations réelles du colis.
+              <p className="mb-3 text-sm text-muted-foreground">
+                Reserve equipe interne Horion Chine / Ops. Le partenaire externe Chine n'utilise pas cet ecran.
+              </p>
+              <p className="mb-3 text-sm text-muted-foreground">
+                Day 1, le flux terrain passe par WhatsApp puis par la file de revue interne{" "}
+                <Link href="/logistics/warehouse-bridge" className="font-medium text-foreground underline">
+                  Warehouse Bridge
+                </Link>
+                .
+              </p>
+              <p className="mb-6 text-sm text-muted-foreground">
+                Utilisez ce formulaire uniquement pour l'equipe Horion interne en Chine ou pour les operations qui doivent finaliser un WarehouseReceipt.
               </p>
               <WarehouseReceiptForm />
             </div>
           ) : (
-            <div className="text-center py-12 text-muted-foreground">
-              Accès réservé à l&apos;équipe logistique.
-            </div>
+            <div className="py-12 text-center text-muted-foreground">Acces reserve a l'equipe logistique.</div>
           )}
         </TabsContent>
+
         <TabsContent value="partners">
           <PartnersTab data={data} canManage={canManage} />
         </TabsContent>
+
         <TabsContent value="customs">
           <CustomsTab data={data} canManage={canManage} />
         </TabsContent>
+
         <TabsContent value="ai">
           <AiTab data={data} />
         </TabsContent>
+
         <TabsContent value="analytics">
           <AnalyticsTab data={data} />
         </TabsContent>
+
         <TabsContent value="consolidation">
           <ConsolidationTab data={data} canManage={canManage} />
         </TabsContent>

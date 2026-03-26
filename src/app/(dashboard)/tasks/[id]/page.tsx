@@ -22,7 +22,13 @@ import { TaskDependencyManager } from "@/components/tasks/task-dependency-manage
 import { TaskChecklist } from "@/components/tasks/task-checklist";
 import { TaskCustomFields } from "@/components/tasks/task-custom-fields";
 import { CommentReactions } from "@/components/tasks/comment-reactions";
-import { getTaskById, getTaskActivity, getTeamMembers, getTaskChecklists } from "@/lib/actions/task.actions";
+import {
+  getTaskById,
+  getTaskActivity,
+  getTeamMembers,
+  getTaskChecklists,
+  getTaskWorkflowSnapshot,
+} from "@/lib/actions/task.actions";
 import { getTimeEntries } from "@/lib/actions/project.actions";
 import { auth } from "@/lib/auth";
 import { formatDate } from "@/lib/utils";
@@ -45,12 +51,13 @@ export default async function TaskDetailPage({ params }: PageProps) {
   const currentUserRole = (session?.user as any)?.role ?? "OPS";
   const canApproveTime = ["ADMIN", "CEO", "DIRECTION", "FINANCE_MANAGER"].includes(currentUserRole);
 
-  const [taskResult, activityResult, membersResult, timeResult, checklistResult] = await Promise.all([
+  const [taskResult, activityResult, membersResult, timeResult, checklistResult, workflowResult] = await Promise.all([
     getTaskById(id),
     getTaskActivity(id),
     getTeamMembers(),
     getTimeEntries({ taskId: id }),
     getTaskChecklists(id),
+    getTaskWorkflowSnapshot(id),
   ]);
 
   if (taskResult.error || !taskResult.data) notFound();
@@ -70,6 +77,7 @@ export default async function TaskDetailPage({ params }: PageProps) {
   const agentExecs = task.agentExecutions ?? [];
   const tags = task.tags ?? [];
   const attachments = (task as any).attachments ?? [];
+  const workflow = workflowResult.data ?? null;
 
   // Subtask progress
   const completedChildren = children.filter((c: any) => c.status === "COMPLETED" || c.status === "CANCELLED").length;
@@ -154,6 +162,82 @@ export default async function TaskDetailPage({ params }: PageProps) {
               />
             </CardContent>
           </Card>
+
+          {workflow && (
+            <Card
+              className={cn(
+                (!workflow.canComplete || task.status === "BLOCKED" || task.slaBreach) &&
+                  "border-amber-300 bg-amber-50/40 dark:bg-amber-950/10"
+              )}
+            >
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-500" />
+                  Fiabilite operationnelle
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4 text-sm">
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="rounded-lg border bg-background/70 p-3">
+                    <p className="font-medium">Conditions de cloture</p>
+                    <div className="mt-2 space-y-1 text-muted-foreground">
+                      <div>Sous-taches ouvertes: {workflow.metrics.openSubtasks}</div>
+                      <div>Checklist non cochee: {workflow.metrics.pendingChecklistItems}</div>
+                      <div>Dependances non resolues: {workflow.metrics.unresolvedDependencies}</div>
+                      <div>Pieces jointes: {workflow.metrics.attachmentCount}</div>
+                      <div>Commentaires: {workflow.metrics.commentCount}</div>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-1">
+                      <Badge variant={workflow.requirements.requireAllSubtasks ? "default" : "outline"} className="text-xs">
+                        Sous-taches obligatoires
+                      </Badge>
+                      <Badge variant={workflow.requirements.requireAllChecklistItems ? "default" : "outline"} className="text-xs">
+                        Checklist obligatoire
+                      </Badge>
+                      {workflow.requirements.requiredAttachmentCount > 0 && (
+                        <Badge variant="outline" className="text-xs">
+                          {workflow.requirements.requiredAttachmentCount} piece(s) jointe(s) min.
+                        </Badge>
+                      )}
+                      {workflow.requirements.requiredComment && (
+                        <Badge variant="outline" className="text-xs">Commentaire requis</Badge>
+                      )}
+                      {workflow.requirements.requireApprovedDecision && (
+                        <Badge variant="outline" className="text-xs">Approbation requise</Badge>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border bg-background/70 p-3">
+                    <p className="font-medium">Impact sur les operations</p>
+                    <div className="mt-2 space-y-1 text-muted-foreground">
+                      <div>Taches aval impactees: {workflow.operationalImpact.downstreamTaskCount}</div>
+                      <div>Deja bloquees en aval: {workflow.operationalImpact.downstreamBlockedCount}</div>
+                      <div>Modules touches: {workflow.operationalImpact.impactedModules.join(", ") || "Aucun"}</div>
+                      <div>
+                        Prochaine echeance impactee:{" "}
+                        {workflow.operationalImpact.nearestDeadline
+                          ? formatDate(new Date(workflow.operationalImpact.nearestDeadline), true)
+                          : "Aucune"}
+                      </div>
+                    </div>
+                    <p className="mt-3 text-xs text-muted-foreground">{workflow.operationalImpact.summary}</p>
+                  </div>
+                </div>
+
+                {!workflow.canComplete && workflow.blockers.length > 0 && (
+                  <div className="rounded-lg border border-red-200 bg-red-50 p-3 dark:bg-red-950/10">
+                    <p className="font-medium text-red-700">La tache ne peut pas etre terminee pour le moment</p>
+                    <ul className="mt-2 space-y-1 text-sm text-red-700">
+                      {workflow.blockers.map((blocker, index) => (
+                        <li key={`${blocker.code}-${index}`}>• {blocker.message}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {/* Subtasks */}
           <Card>

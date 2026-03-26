@@ -10,10 +10,14 @@ import { Progress } from "@/components/ui/progress";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { TreasuryWalletManager } from "@/components/finance/treasury-wallet-manager";
+import { TreasuryReconciliationPanel } from "@/components/finance/treasury-reconciliation-panel";
 import {
   getFinancialKPIs,
   getAgingReport,
   getPaymentMethodStats,
+  getTreasuryAccounts,
+  getTreasuryTransactions,
 } from "@/lib/actions/finance.actions";
 import { getPayments } from "@/lib/actions/payment.actions";
 import { formatCurrency } from "@/config/currencies";
@@ -21,11 +25,13 @@ import { formatCurrency } from "@/config/currencies";
 export const metadata = { title: "Trésorerie | Horion ERP" };
 
 export default async function TreasuryPage() {
-  const [kpisRes, agingRes, methodsRes, pendingRes] = await Promise.all([
+  const [kpisRes, agingRes, methodsRes, pendingRes, treasuryAccountsRes, treasuryTransactionsRes] = await Promise.all([
     getFinancialKPIs(),
     getAgingReport(),
     getPaymentMethodStats(),
     getPayments({ status: "PENDING", limit: 20 }),
+    getTreasuryAccounts(),
+    getTreasuryTransactions(15),
   ]);
 
   const kpis = kpisRes.data || {
@@ -41,6 +47,8 @@ export default async function TreasuryPage() {
   };
   const methods = methodsRes.data || [];
   const pendingPayments = pendingRes.data || [];
+  const treasuryAccounts = treasuryAccountsRes.data || [];
+  const treasuryTransactions = treasuryTransactionsRes.data || [];
 
   // Cash position estimate
   const cashPosition = kpis.mtdInbound - kpis.mtdOutbound;
@@ -119,6 +127,108 @@ export default async function TreasuryPage() {
             </div>
           </CardContent>
         </Card>
+      </div>
+
+      <div className="space-y-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-semibold">Wallets Chine & devises</h2>
+            <p className="text-sm text-muted-foreground">
+              Suivi du wallet CNY, des rechargements et des débits commandes.
+            </p>
+          </div>
+          <Badge variant="secondary">{treasuryAccounts.length} wallet(s)</Badge>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {treasuryAccounts.length === 0 ? (
+            <Card className="md:col-span-2 xl:col-span-4">
+              <CardContent className="py-8 text-center text-sm text-muted-foreground">
+                Aucun wallet configuré pour le moment.
+              </CardContent>
+            </Card>
+          ) : (
+            treasuryAccounts.map((account: any) => (
+              <Card key={account.id} className={account.belowThreshold ? "border-red-300" : ""}>
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center justify-between gap-2 text-base">
+                    <span>{account.label}</span>
+                    <Badge variant={account.belowThreshold ? "destructive" : "secondary"}>
+                      {account.currency}
+                    </Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm">
+                  <div className="text-2xl font-bold">
+                    {formatCurrency(Number(account.balance), account.currency)}
+                  </div>
+                  <div className="flex items-center justify-between text-muted-foreground">
+                    <span>Seuil d'alerte</span>
+                    <span>
+                      {account.alertBelowAmount != null
+                        ? formatCurrency(Number(account.alertBelowAmount), account.currency)
+                        : "-"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-muted-foreground">
+                    <span>Derniers mouvements</span>
+                    <span>{account.transactions?.length ?? 0}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </div>
+
+        <TreasuryWalletManager
+          accounts={treasuryAccounts.map((account: any) => ({
+            id: account.id,
+            label: account.label,
+            currency: account.currency,
+          }))}
+        />
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Mouvements récents de trésorerie</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {treasuryTransactions.length === 0 ? (
+              <p className="py-4 text-center text-sm text-muted-foreground">
+                Aucun mouvement enregistré.
+              </p>
+            ) : (
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Compte</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Référence</TableHead>
+                      <TableHead>Commande</TableHead>
+                      <TableHead className="text-right">Montant</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {treasuryTransactions.map((transaction: any) => (
+                      <TableRow key={transaction.id}>
+                        <TableCell>{transaction.account.label}</TableCell>
+                        <TableCell>{transaction.type}</TableCell>
+                        <TableCell>{transaction.reference || "-"}</TableCell>
+                        <TableCell>{transaction.orderId || "-"}</TableCell>
+                        <TableCell className="text-right font-medium">
+                          {formatCurrency(Number(transaction.amount), transaction.account.currency)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <TreasuryReconciliationPanel />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">

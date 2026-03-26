@@ -9,6 +9,7 @@ import { getSession } from "@/lib/session";
 import { checkPermission } from "@/lib/permissions";
 import { AuditService } from "@/lib/services/audit.service";
 import { OrderService } from "@/lib/services/order.service";
+import { SourcingTicketService } from "@/lib/services/sourcing-ticket.service";
 import {
   EmailNotificationChannel,
   WhatsAppNotificationChannel,
@@ -425,6 +426,17 @@ export async function sendIndicatifQuote(data: z.infer<typeof sendIndicatifQuote
         });
       }
     await syncDemandStatusForQuote(quote.id);
+    await SourcingTicketService.ensureForIndicatifQuote({
+      tenantId: user.tenantId,
+      quoteId: quote.id,
+      orderId: resolvedOrderId,
+      contactId: order.contact?.id ?? null,
+      assignedToId: user.id,
+      items: normalizedItems as unknown as Array<Record<string, unknown>>,
+      approvalStatus: quote.approvalStatus,
+      quoteStatus: quote.status,
+      paymentStatus: quote.paymentStatus,
+    });
 
     const appUrl =
       process.env.NEXT_PUBLIC_APP_URL ||

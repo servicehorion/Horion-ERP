@@ -1,4 +1,4 @@
-"use server";
+﻿"use server";
 
 import { revalidatePath } from "next/cache";
 import type { DemandSource, DemandStatus, DemandUrgency, Prisma } from "@prisma/client";
@@ -6,6 +6,8 @@ import type { DemandSource, DemandStatus, DemandUrgency, Prisma } from "@prisma/
 import { prisma } from "@/lib/db";
 import { checkPermission } from "@/lib/permissions";
 import { getSession } from "@/lib/session";
+import { OperationalTaskService } from "@/lib/services/operational-task.service";
+import { SourcingTicketService } from "@/lib/services/sourcing-ticket.service";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -34,31 +36,27 @@ async function createSourcingIndicatifTask(
   description: string,
   assigneeId?: string
 ) {
-  const task = await prisma.task.create({
-    data: {
-      tenantId,
-      entityType: "demand",
-      entityId: demandId,
-      taskType: "sourcing_indicatif",
-      title: `Sourcing indicatif — ${orderNumber || "nouvelle demande"}`,
-      description,
-      module: "sourcing",
-      priority: "HIGH",
-      ownerType: "HUMAN",
-      status: "PENDING",
-      riskLevel: "LOW",
-      slaDeadline: new Date(Date.now() + 4 * 3_600_000), // 4h SLA
-      tags: ["indicatif", "auto-demand"],
+  const result = await OperationalTaskService.create({
+    tenantId,
+    entityType: "demand",
+    entityId: demandId,
+    taskType: "sourcing_indicatif",
+    title: `Sourcing indicatif - ${orderNumber || "nouvelle demande"}`,
+    description,
+    module: "sourcing",
+    priority: "HIGH",
+    ownerType: "SYSTEM",
+    riskLevel: "LOW",
+    slaHours: 4,
+    tags: ["indicatif", "auto-demand"],
+    assigneeId: assigneeId ?? null,
+    completionRequirements: {
+      requiredComment: true,
     },
+    reuseIfOpen: true,
   });
 
-  if (assigneeId) {
-    await prisma.taskAssignment.create({
-      data: { taskId: task.id, userId: assigneeId, assignedAt: new Date() },
-    });
-  }
-
-  return task;
+  return prisma.task.findUnique({ where: { id: result.taskId } });
 }
 
 // ─── Actions ─────────────────────────────────────────────────────────────────
@@ -200,6 +198,8 @@ export async function createDemandIntake(data: {
       },
     });
 
+    await SourcingTicketService.ensureFromDemand(demand.id);
+
     revalidatePath("/sourcing");
     revalidatePath("/tasks");
     return { data: demand };
@@ -239,6 +239,8 @@ export async function qualifyDemandIntake(
         leadId: qualification.leadId ?? demand.leadId,
       },
     });
+
+    await SourcingTicketService.ensureFromDemand(updated.id);
 
     revalidatePath("/sourcing");
     return { data: updated };
@@ -290,6 +292,8 @@ export async function assignSourcingTask(id: string, assigneeId?: string) {
       resolvedAssignee
     );
 
+    await SourcingTicketService.ensureFromDemand(updated.id);
+
     revalidatePath("/sourcing");
     revalidatePath("/tasks");
     return { data: updated };
@@ -317,6 +321,8 @@ export async function linkQuoteToDemand(demandId: string, quoteId: string, order
       },
     });
 
+    await SourcingTicketService.ensureFromDemand(updated.id);
+
     revalidatePath("/sourcing");
     return { data: updated };
   } catch (error) {
@@ -340,6 +346,8 @@ export async function markDemandLost(id: string, reason: string) {
       data: { status: "LOST", rejectionReason: reason },
     });
 
+    await SourcingTicketService.ensureFromDemand(updated.id);
+
     revalidatePath("/sourcing");
     return { data: updated };
   } catch (error) {
@@ -361,6 +369,8 @@ export async function convertDemand(demandId: string, orderId: string) {
       where: { id: demandId },
       data: { status: "CONVERTED", orderId },
     });
+
+    await SourcingTicketService.ensureFromDemand(updated.id);
 
     revalidatePath("/sourcing");
     return { data: updated };
@@ -438,6 +448,8 @@ export async function createDemandFromWhatsAppIntent(params: {
       },
     });
 
+    await SourcingTicketService.ensureFromDemand(demand.id);
+
     // Notify CM
     if (cm) {
       await prisma.notification.create({
@@ -459,3 +471,4 @@ export async function createDemandFromWhatsAppIntent(params: {
     return { error: error instanceof Error ? error.message : "Erreur création demande WhatsApp" };
   }
 }
+

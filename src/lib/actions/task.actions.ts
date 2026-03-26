@@ -7,6 +7,7 @@ import { SubtaskService } from "@/lib/services/subtask.service";
 import { TaskDependencyService } from "@/lib/services/task-dependency.service";
 import { TaskTemplateService } from "@/lib/services/task-template.service";
 import { AgentTaskService } from "@/lib/services/agent-task.service";
+import { TaskWorkflowService } from "@/lib/services/task-workflow.service";
 import { NotificationService } from "@/lib/services/notification.service";
 import { AuditService } from "@/lib/services/audit.service";
 import { checkPermission, hasPermission } from "@/lib/permissions";
@@ -229,7 +230,7 @@ export async function getTaskDashboardData() {
     const user = await getSession();
     checkPermission(user.role, "task.view");
     const allowedModules = getTaskAllowedModules(user.role);
-    await TaskService.checkSLABreaches(user.tenantId);
+    await TaskWorkflowService.checkSLABreachesWithConsequences(user.tenantId);
 
     const [metrics, moduleBreakdown, priorities, urgencies, myTasks, teamWorkload] = await Promise.all([
       TaskIntelligenceService.getDashboardMetrics(user.tenantId, user.id, allowedModules),
@@ -259,20 +260,28 @@ export async function updateTaskStatus(taskId: string, newStatus: string) {
     if (!existing || existing.tenantId !== user.tenantId) return { error: "TÃ¢che introuvable" };
     if (!canAccessTaskModule(user.role, existing.module)) return { error: "AccÃ¨s refusÃ©" };
 
-    const task = await TaskService.updateStatus(taskId, newStatus as TaskStatus);
-
-    // Handle dependency resolution on completion
+    let task;
     if (newStatus === "COMPLETED") {
-      await TaskDependencyService.resolveCompletedTask(taskId);
+      const result = await TaskWorkflowService.completeTask(taskId, { completedByUserId: user.id });
+      task = result.task;
       if (existing.parentTaskId) {
         await SubtaskService.onSubtaskCompleted(taskId);
       }
-      await NotificationService.onTaskCompleted(taskId, user.tenantId, task.title, user.id);
-    }
-
-    // Handle subtask blocked propagation
-    if (newStatus === "BLOCKED" && existing.parentTaskId) {
-      await SubtaskService.onSubtaskBlocked(taskId);
+    } else if (newStatus === "BLOCKED") {
+      const result = await TaskWorkflowService.blockTask(taskId, {
+        reason: existing.blockedBy || "Bloquee manuellement",
+        blockedByUserId: user.id,
+      });
+      task = result.task;
+      if (existing.parentTaskId) {
+        await SubtaskService.onSubtaskBlocked(taskId);
+      }
+    } else if (newStatus === "IN_PROGRESS") {
+      task = await TaskWorkflowService.startTask(taskId);
+    } else if (newStatus === "WAITING_APPROVAL") {
+      task = await TaskWorkflowService.submitForApproval(taskId, user.tenantId, existing.title);
+    } else {
+      task = await TaskService.updateStatus(taskId, newStatus as TaskStatus);
     }
 
     await AuditService.log({
@@ -361,6 +370,7 @@ export async function createManualTask(formData: {
         module: formData.module,
         priority: (formData.priority as Priority) || "NORMAL",
         slaDeadline,
+        dueDate: slaDeadline,
         ownerType: "HUMAN",
         status: "PENDING",
         riskLevel: "LOW",
@@ -451,17 +461,26 @@ export async function approveTask(taskId: string, decision: string, comment?: st
     if (!task || task.tenantId !== user.tenantId) return { error: "TÃ¢che introuvable" };
     if (!canAccessTaskModule(user.role, task.module)) return { error: "Accès refusé" };
 
+    if (decision === "APPROVED") {
+      const readiness = await TaskWorkflowService.getTaskWorkflowSnapshot(taskId);
+      const actionableBlockers = readiness.blockers.filter((blocker) => blocker.code !== "APPROVAL_REQUIRED");
+      if (actionableBlockers.length > 0) {
+        return { error: actionableBlockers.map((blocker) => blocker.message).join(" ") };
+      }
+    }
+
     const approval = await prisma.approval.create({
       data: { taskId, userId: user.id, decision: decision as any, comment },
     });
 
     if (decision === "APPROVED") {
-      await prisma.task.update({ where: { id: taskId }, data: { status: "COMPLETED", completedAt: new Date() } });
-      await TaskDependencyService.resolveCompletedTask(taskId);
+      await TaskWorkflowService.completeTask(taskId, { completedByUserId: user.id, skipApproval: true });
       if (task.parentTaskId) await SubtaskService.onSubtaskCompleted(taskId);
-      await NotificationService.onTaskCompleted(taskId, user.tenantId, task.title, user.id);
     } else if (decision === "REJECTED") {
-      await prisma.task.update({ where: { id: taskId }, data: { status: "BLOCKED", blockedBy: `Rejected: ${comment || "No reason"}` } });
+      await TaskWorkflowService.blockTask(taskId, {
+        reason: `Rejected: ${comment || "No reason"}`,
+        blockedByUserId: user.id,
+      });
     }
 
     // Notify watchers
@@ -814,20 +833,32 @@ export async function bulkUpdateTaskStatus(taskIds: string[], status: string) {
     const user = await getSession();
     checkPermission(user.role, "task.update");
 
-    await prisma.task.updateMany({
+    const tasks = await prisma.task.findMany({
       where: { id: { in: taskIds }, tenantId: user.tenantId },
-      data: { status: status as TaskStatus, ...(status === "COMPLETED" && { completedAt: new Date() }) },
+      select: { id: true, title: true, module: true },
     });
 
-    // Resolve dependencies for completed tasks
-    if (status === "COMPLETED") {
-      for (const id of taskIds) {
-        await TaskDependencyService.resolveCompletedTask(id);
+    for (const task of tasks) {
+      if (!canAccessTaskModule(user.role, task.module)) continue;
+
+      if (status === "COMPLETED") {
+        await TaskWorkflowService.completeTask(task.id, { completedByUserId: user.id });
+      } else if (status === "BLOCKED") {
+        await TaskWorkflowService.blockTask(task.id, {
+          reason: "Bloquee via mise a jour en masse",
+          blockedByUserId: user.id,
+        });
+      } else if (status === "IN_PROGRESS") {
+        await TaskWorkflowService.startTask(task.id);
+      } else if (status === "WAITING_APPROVAL") {
+        await TaskWorkflowService.submitForApproval(task.id, user.tenantId, task.title);
+      } else {
+        await TaskService.updateStatus(task.id, status as TaskStatus);
       }
     }
 
     revalidateTask();
-    return { data: { updated: taskIds.length } };
+    return { data: { updated: tasks.length } };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur" };
   }
@@ -1496,6 +1527,26 @@ export async function getGanttData(options?: { module?: string }) {
 // In a "use server" module, we must only export async functions.
 export async function getTaskChecklists(...args: Parameters<typeof taskExtrasActions.getTaskChecklists>) {
   return taskExtrasActions.getTaskChecklists(...args);
+}
+
+export async function getTaskWorkflowSnapshot(taskId: string) {
+  try {
+    const user = await getSession();
+    checkPermission(user.role, "task.view");
+
+    const task = await prisma.task.findUnique({
+      where: { id: taskId },
+      select: { tenantId: true, module: true },
+    });
+
+    if (!task || task.tenantId !== user.tenantId) return { error: "Tache introuvable" };
+    if (!canAccessTaskModule(user.role, task.module)) return { error: "Acces refuse" };
+
+    const snapshot = await TaskWorkflowService.getTaskWorkflowSnapshot(taskId);
+    return { data: snapshot };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Erreur" };
+  }
 }
 
 export async function addChecklistItem(...args: Parameters<typeof taskExtrasActions.addChecklistItem>) {

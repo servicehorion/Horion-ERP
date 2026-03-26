@@ -8,6 +8,7 @@ import { NotificationService } from "@/lib/services/notification.service";
 import { LeadScoringService } from "@/lib/services/lead-scoring.service";
 import { CrmEmailService } from "@/lib/services/crm-email.service";
 import { LeadSlaService } from "@/lib/services/lead-sla.service";
+import { OperationalTaskService } from "@/lib/services/operational-task.service";
 import { checkPermission } from "@/lib/permissions";
 import { canExportCrm, getCrmContactScopeWithDelegation, getCrmLeadScopeWithDelegation } from "@/lib/access-control";
 import { createContactSchema, createLeadSchema, updateContactSchema } from "@/lib/validators/contact";
@@ -710,36 +711,29 @@ export async function createLeadTask(
     const title = data.title?.trim();
     if (!title) return { error: "Titre requis" };
 
-    const slaDeadline = data.slaHours
-      ? new Date(Date.now() + Number(data.slaHours) * 3600 * 1000)
-      : null;
-
     const assigneeId = data.assigneeId || lead.assignedTo || lead.ownerId || user.id;
 
-    const task = await prisma.task.create({
-      data: {
-        tenantId: user.tenantId,
-        entityType: "lead",
-        entityId: leadId,
-        taskType: "manual",
-        title,
-        description: data.description || undefined,
-        module: "crm",
-        priority: (data.priority as any) || "NORMAL",
-        slaDeadline,
-        ownerType: "HUMAN",
-        status: "PENDING",
-        riskLevel: "LOW",
-        tags: ["crm", "lead", leadId],
+    const result = await OperationalTaskService.create({
+      tenantId: user.tenantId,
+      entityType: "lead",
+      entityId: leadId,
+      taskType: "manual",
+      title,
+      description: data.description || undefined,
+      module: "crm",
+      priority: (data.priority as any) || "NORMAL",
+      ownerType: "HUMAN",
+      riskLevel: "LOW",
+      slaHours: data.slaHours ? Number(data.slaHours) : undefined,
+      tags: ["crm", "lead", leadId],
+      assigneeId,
+      assignedByName: user.name,
+      completionRequirements: {
+        requiredComment: true,
       },
     });
-
-    if (assigneeId) {
-      await prisma.taskAssignment.create({
-        data: { taskId: task.id, userId: assigneeId, role: "assignee" },
-      });
-      await NotificationService.onTaskAssigned(task.id, user.tenantId, assigneeId, task.title, user.name);
-    }
+    const task = await prisma.task.findUnique({ where: { id: result.taskId } });
+    if (!task) return { error: "Erreur creation tache" };
 
     await AuditService.log({
       tenantId: user.tenantId,

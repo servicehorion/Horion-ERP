@@ -160,7 +160,23 @@
       "Bash(npm install:*)",
       "Bash(ls \"c:/Users/jafred Parker242/Desktop/Horion service/src/app/\\(dashboard\\)/logistics/\")",
       "Bash(node -e \"require\\(''qrcode''\\); console.log\\(''qrcode ok''\\)\")",
-      "Bash(node -e \"const q = require\\(''qrcode''\\); console.log\\(typeof q.toDataURL\\)\")"
+      "Bash(node -e \"const q = require\\(''qrcode''\\); console.log\\(typeof q.toDataURL\\)\")",
+      "Skill(update-config)",
+      "Skill(update-config:*)"
+    ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"c:/Users/jafred Parker242/Desktop/Horion service\" && git diff --quiet HEAD 2>/dev/null; DIRTY=$?; UNPUSHED=$(git log @{u}.. --oneline 2>/dev/null | wc -l | tr -d ' '); if [ \"$UNPUSHED\" -gt \"0\" ] || [ \"$DIRTY\" -ne \"0\" ]; then git add -A 2>/dev/null; git diff --staged --quiet || git commit -m \"chore(auto): push quotidien $(date +%Y-%m-%d)\" 2>/dev/null; git push origin HEAD 2>&1 | tail -3; echo '{\"systemMessage\": \"✅ Horion ERP poussé sur GitHub\"}'; else echo '{\"systemMessage\": \"✓ GitHub déjà à jour\"}'; fi",
+            "timeout": 30,
+            "statusMessage": "Push GitHub en cours..."
+          }
+        ]
+      }
     ]
   }
 }

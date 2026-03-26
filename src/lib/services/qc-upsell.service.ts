@@ -1,30 +1,6 @@
 import { prisma } from "@/lib/db";
+import { OperationalTaskService } from "@/lib/services/operational-task.service";
 import { QC_UPSELL_PRICING, type QcUpsellOption } from "@/lib/qc-upsell";
-
-async function pickUserId(tenantId: string, roles: string[]) {
-  const user = await prisma.user.findFirst({
-    where: {
-      tenantId,
-      isActive: true,
-      role: { in: roles as any[] },
-    },
-    orderBy: { name: "asc" },
-    select: { id: true },
-  });
-  return user?.id ?? null;
-}
-
-async function assignTask(taskId: string, userId?: string | null) {
-  if (!userId) return;
-  await prisma.taskAssignment.deleteMany({ where: { taskId } });
-  await prisma.taskAssignment.create({
-    data: {
-      taskId,
-      userId,
-      assignedAt: new Date(),
-    },
-  });
-}
 
 function qcLevelFromOption(option: QcUpsellOption) {
   return option === "PHYSICAL" ? "PHYSICAL" : "VIRTUAL";
@@ -59,45 +35,47 @@ export class QcUpsellService {
         status: "PENDING",
         cost: Number(order.qcCost || QC_UPSELL_PRICING[order.qcOption as QcUpsellOption].costXaf),
         currency: "XAF",
-        decisionNotes: `QC ${order.qcOption} créé automatiquement après paiement confirmé.`,
+        decisionNotes: `QC ${order.qcOption} cree automatiquement apres paiement confirme.`,
       },
     });
 
-    const existingTask = await prisma.task.findFirst({
-      where: {
-        entityType: "order",
-        entityId: order.id,
-        taskType: "qc_intake_prepare",
-        status: { notIn: ["COMPLETED", "CANCELLED"] },
+    await OperationalTaskService.create({
+      tenantId: order.tenantId,
+      entityType: "order",
+      entityId: order.id,
+      taskType: "qc_intake_prepare",
+      title: `Preparer le QC ${order.qcOption.toLowerCase()} - ${order.orderNumber}`,
+      description: "QC demande par le client. Le dossier QC est pret et attend la reception marchandise.",
+      module: "qc",
+      priority: "HIGH",
+      ownerType: "SYSTEM",
+      riskLevel: "MEDIUM",
+      slaHours: 12,
+      tags: ["qc-upsell", order.orderNumber, String(order.qcOption).toLowerCase()],
+      customFields: {
+        qcRequestId: request.id,
+        actionType: "INTERNAL_ACTION",
+        isAutomated: false,
       },
-      select: { id: true },
-    });
-    if (!existingTask) {
-      const task = await prisma.task.create({
-        data: {
-          tenantId: order.tenantId,
-          entityType: "order",
-          entityId: order.id,
-          taskType: "qc_intake_prepare",
-          title: `Préparer le QC ${order.qcOption.toLowerCase()} - ${order.orderNumber}`,
-          description: `QC demandé par le client. Le dossier QC est prêt et attend la réception marchandise.`,
-          module: "qc",
-          priority: "HIGH",
-          ownerType: "HUMAN",
-          status: "PENDING",
-          riskLevel: "MEDIUM",
-          slaDeadline: new Date(Date.now() + 12 * 3_600_000),
-          tags: ["qc-upsell", order.orderNumber, String(order.qcOption).toLowerCase()],
-          customFields: {
-            qcRequestId: request.id,
-            actionType: "INTERNAL_ACTION",
-            isAutomated: false,
-          },
+      completionRequirements: {
+        requireAllSubtasks: true,
+      },
+      assigneeRoles: ["LOGISTICS_MANAGER", "LOGISTICS_ASSISTANT", "OPS"],
+      reuseIfOpen: true,
+      subtasks: [
+        {
+          title: "Verifier les exigences client et le niveau de QC",
+          slaHours: 4,
+          assigneeRoles: ["LOGISTICS_ASSISTANT", "LOGISTICS_MANAGER"],
         },
-      });
-      const assigneeId = await pickUserId(order.tenantId, ["LOGISTICS_MANAGER", "LOGISTICS_ASSISTANT"]);
-      await assignTask(task.id, assigneeId);
-    }
+        {
+          title: "Preparer le brief entrepot ou partenaire",
+          slaHours: 8,
+          assigneeRoles: ["LOGISTICS_MANAGER", "LOGISTICS_ASSISTANT"],
+          dependsOnPrevious: true,
+        },
+      ],
+    });
 
     return request;
   }
@@ -110,63 +88,60 @@ export class QcUpsellService {
         tenantId: true,
         orderNumber: true,
         qcOption: true,
-        qcCost: true,
         qcRequests: {
           where: { status: { not: "CANCELLED" } },
           orderBy: [{ createdAt: "desc" }],
           take: 1,
-          select: { id: true, status: true, level: true },
+          select: { id: true, status: true },
         },
       },
     });
 
     if (!order) return;
 
-    const logisticsManagerId = await pickUserId(order.tenantId, ["LOGISTICS_MANAGER", "DIRECTION", "CEO", "ADMIN"]);
-    const logisticsAssistantId = await pickUserId(order.tenantId, ["LOGISTICS_ASSISTANT", "LOGISTICS_MANAGER"]);
-    const communityManagerId = await pickUserId(order.tenantId, ["COMMUNITY_MANAGER", "CRM_MANAGER"]);
-
     if (order.qcOption === "NONE") {
-      const existing = await prisma.task.findFirst({
-        where: {
-          entityType: "order",
-          entityId: order.id,
-          taskType: "warehouse_visual_check",
-          status: { notIn: ["COMPLETED", "CANCELLED"] },
+      await OperationalTaskService.create({
+        tenantId: order.tenantId,
+        entityType: "order",
+        entityId: order.id,
+        taskType: "warehouse_visual_check",
+        title: `Verification visuelle entrepot - ${order.orderNumber}`,
+        description: "Comptage et verification visuelle simple a l'entrepot.",
+        module: "qc",
+        priority: "HIGH",
+        ownerType: "SYSTEM",
+        riskLevel: "LOW",
+        slaHours: 24,
+        tags: ["qc-basic", order.orderNumber],
+        customFields: {
+          actionType: "WHATSAPP_PARTNER",
+          isAutomated: false,
+          actionPayload: `Order ${order.orderNumber}: basic visual check required within 24h.`,
         },
-        select: { id: true },
-      });
-      if (!existing) {
-        const task = await prisma.task.create({
-          data: {
-            tenantId: order.tenantId,
-            entityType: "order",
-            entityId: order.id,
-            taskType: "warehouse_visual_check",
-            title: `Vérification visuelle entrepôt - ${order.orderNumber}`,
-            description: "Comptage + vérification visuelle simple à l'entrepôt.",
-            module: "qc",
-            priority: "HIGH",
-            ownerType: "HUMAN",
-            status: "PENDING",
-            riskLevel: "LOW",
-            slaDeadline: new Date(Date.now() + 24 * 3_600_000),
-            tags: ["qc-basic", order.orderNumber],
-            customFields: {
-              actionType: "WHATSAPP_PARTNER",
-              isAutomated: false,
-              actionPayload: `Order ${order.orderNumber}: basic visual check required within 24h.`,
-            },
+        completionRequirements: {
+          requireAllSubtasks: true,
+          requiredAttachmentCount: 1,
+        },
+        assigneeRoles: ["LOGISTICS_ASSISTANT", "LOGISTICS_MANAGER", "OPS"],
+        reuseIfOpen: true,
+        subtasks: [
+          {
+            title: "Demander les photos de verification a l'entrepot",
+            slaHours: 8,
+            assigneeRoles: ["LOGISTICS_ASSISTANT", "OPS"],
           },
-        });
-        await assignTask(task.id, logisticsAssistantId);
-      }
+          {
+            title: "Valider la conformite visuelle de base",
+            slaHours: 24,
+            assigneeRoles: ["LOGISTICS_ASSISTANT", "LOGISTICS_MANAGER"],
+            dependsOnPrevious: true,
+          },
+        ],
+      });
       return;
     }
 
-    const request =
-      order.qcRequests[0] ??
-      (await this.ensureGhostRequestAfterPayment(order.id));
+    const request = order.qcRequests[0] ?? (await this.ensureGhostRequestAfterPayment(order.id));
     if (!request) return;
 
     if (request.status === "PENDING" || request.status === "SCHEDULED") {
@@ -180,117 +155,114 @@ export class QcUpsellService {
     }
 
     if (order.qcOption === "VIRTUAL") {
-      const existing = await prisma.task.findFirst({
-        where: {
-          entityType: "order",
-          entityId: order.id,
-          taskType: "virtual_qc_execution",
-          status: { notIn: ["COMPLETED", "CANCELLED"] },
+      await OperationalTaskService.create({
+        tenantId: order.tenantId,
+        entityType: "order",
+        entityId: order.id,
+        taskType: "virtual_qc_execution",
+        title: `QC virtuel a executer - ${order.orderNumber}`,
+        description: "Photos HD, checklist de non-conformite et rapport QC sous 48h.",
+        module: "qc",
+        priority: "HIGH",
+        ownerType: "SYSTEM",
+        riskLevel: "MEDIUM",
+        slaHours: QC_UPSELL_PRICING.VIRTUAL.slaHours ?? 48,
+        tags: ["qc-upsell", "virtual", order.orderNumber],
+        customFields: {
+          qcRequestId: request.id,
+          actionType: "WHATSAPP_PARTNER",
+          isAutomated: false,
+          actionPayload: `Hello partner, virtual QC is required for order ${order.orderNumber}. Please provide HD photos + defect checklist within 48h.`,
         },
-        select: { id: true },
-      });
-      if (!existing) {
-        const task = await prisma.task.create({
-          data: {
-            tenantId: order.tenantId,
-            entityType: "order",
-            entityId: order.id,
-            taskType: "virtual_qc_execution",
-            title: `QC virtuel à exécuter - ${order.orderNumber}`,
-            description: "Photos HD, checklist de non-conformité et rapport QC sous 48h.",
-            module: "qc",
-            priority: "HIGH",
-            ownerType: "HUMAN",
-            status: "PENDING",
-            riskLevel: "MEDIUM",
-            slaDeadline: new Date(Date.now() + (QC_UPSELL_PRICING.VIRTUAL.slaHours ?? 48) * 3_600_000),
-            tags: ["qc-upsell", "virtual", order.orderNumber],
-            customFields: {
-              qcRequestId: request.id,
-              actionType: "WHATSAPP_PARTNER",
-              isAutomated: false,
-              actionPayload: `Hello partner, virtual QC is required for order ${order.orderNumber}. Please provide HD photos + defect checklist within 48h.`,
-            },
+        completionRequirements: {
+          requireAllSubtasks: true,
+          requiredAttachmentCount: 1,
+          requiredComment: true,
+        },
+        assigneeRoles: ["LOGISTICS_MANAGER", "LOGISTICS_ASSISTANT", "OPS"],
+        reuseIfOpen: true,
+        subtasks: [
+          {
+            title: "Recueillir les photos HD et la checklist",
+            slaHours: 24,
+            assigneeRoles: ["LOGISTICS_ASSISTANT", "OPS"],
           },
-        });
-        await assignTask(task.id, logisticsManagerId ?? logisticsAssistantId);
-      }
+          {
+            title: "Analyser les non-conformites et rediger le rapport",
+            slaHours: 48,
+            assigneeRoles: ["LOGISTICS_MANAGER", "LOGISTICS_ASSISTANT"],
+            dependsOnPrevious: true,
+          },
+        ],
+      });
     }
 
     if (order.qcOption === "PHYSICAL") {
-      const existing = await prisma.task.findFirst({
-        where: {
-          entityType: "order",
-          entityId: order.id,
-          taskType: "physical_qc_booking",
-          status: { notIn: ["COMPLETED", "CANCELLED"] },
-        },
-        select: { id: true },
-      });
-      if (!existing) {
-        const task = await prisma.task.create({
-          data: {
-            tenantId: order.tenantId,
-            entityType: "order",
-            entityId: order.id,
-            taskType: "physical_qc_booking",
-            title: `Mandater l'inspection tierce - ${order.orderNumber}`,
-            description: "Mandater SGS/Bureau Veritas et obtenir le rapport tiers sous 72h.",
-            module: "qc",
-            priority: "URGENT",
-            ownerType: "HUMAN",
-            status: "PENDING",
-            riskLevel: "HIGH",
-            slaDeadline: new Date(Date.now() + (QC_UPSELL_PRICING.PHYSICAL.slaHours ?? 72) * 3_600_000),
-            tags: ["qc-upsell", "physical", order.orderNumber],
-            customFields: {
-              qcRequestId: request.id,
-              actionType: "WHATSAPP_PARTNER",
-              isAutomated: false,
-              actionPayload: `Please book third-party inspection for order ${order.orderNumber} and share the report within 72h.`,
-            },
-          },
-        });
-        await assignTask(task.id, logisticsManagerId);
-      }
-    }
-
-    const existingClientTask = await prisma.task.findFirst({
-      where: {
+      await OperationalTaskService.create({
+        tenantId: order.tenantId,
         entityType: "order",
         entityId: order.id,
-        taskType: "client_notification_qc_stage",
-        status: { notIn: ["COMPLETED", "CANCELLED"] },
-      },
-      select: { id: true },
-    });
-    if (!existingClientTask) {
-      const task = await prisma.task.create({
-        data: {
-          tenantId: order.tenantId,
-          entityType: "order",
-          entityId: order.id,
-          taskType: "client_notification_qc_stage",
-          title: `Notifier le client - QC en cours ${order.orderNumber}`,
-          description: "Informer le client que le contrôle qualité a démarré et rappeler le SLA annoncé.",
-          module: "whatsapp",
-          priority: "HIGH",
-          ownerType: "HUMAN",
-          status: "PENDING",
-          riskLevel: "LOW",
-          slaDeadline: new Date(Date.now() + 4 * 3_600_000),
-          tags: ["client-notification", "qc", order.orderNumber],
-          customFields: {
-            actionType: "WHATSAPP_CLIENT",
-            isAutomated: false,
-            actionPayload:
-              order.qcOption === "PHYSICAL"
-                ? `Bonjour, l'inspection tierce de votre commande ${order.orderNumber} est en cours. Nous vous partageons le rapport dès réception.`
-                : `Bonjour, le QC virtuel de votre commande ${order.orderNumber} est lancé. Vous recevrez les photos et le rapport dès validation.`,
-          },
+        taskType: "physical_qc_booking",
+        title: `Mandater l'inspection tierce - ${order.orderNumber}`,
+        description: "Mandater SGS/Bureau Veritas et obtenir le rapport tiers sous 72h.",
+        module: "qc",
+        priority: "URGENT",
+        ownerType: "SYSTEM",
+        riskLevel: "HIGH",
+        slaHours: QC_UPSELL_PRICING.PHYSICAL.slaHours ?? 72,
+        tags: ["qc-upsell", "physical", order.orderNumber],
+        customFields: {
+          qcRequestId: request.id,
+          actionType: "WHATSAPP_PARTNER",
+          isAutomated: false,
+          actionPayload: `Please book third-party inspection for order ${order.orderNumber} and share the report within 72h.`,
         },
+        completionRequirements: {
+          requireAllSubtasks: true,
+          requiredAttachmentCount: 1,
+          requiredComment: true,
+        },
+        assigneeRoles: ["LOGISTICS_MANAGER", "DIRECTION", "ADMIN"],
+        reuseIfOpen: true,
+        subtasks: [
+          {
+            title: "Contacter SGS ou Bureau Veritas",
+            slaHours: 24,
+            assigneeRoles: ["LOGISTICS_MANAGER", "ADMIN"],
+          },
+          {
+            title: "Recueillir et verifier le rapport tiers",
+            slaHours: 72,
+            assigneeRoles: ["LOGISTICS_MANAGER", "LOGISTICS_ASSISTANT"],
+            dependsOnPrevious: true,
+          },
+        ],
       });
-      await assignTask(task.id, communityManagerId);
     }
+
+    await OperationalTaskService.create({
+      tenantId: order.tenantId,
+      entityType: "order",
+      entityId: order.id,
+      taskType: "client_notification_qc_stage",
+      title: `Notifier le client - QC en cours ${order.orderNumber}`,
+      description: "Informer le client que le controle qualite a demarre et rappeler le SLA annonce.",
+      module: "whatsapp",
+      priority: "HIGH",
+      ownerType: "SYSTEM",
+      riskLevel: "LOW",
+      slaHours: 4,
+      tags: ["client-notification", "qc", order.orderNumber],
+      customFields: {
+        actionType: "WHATSAPP_CLIENT",
+        isAutomated: false,
+        actionPayload:
+          order.qcOption === "PHYSICAL"
+            ? `Bonjour, l'inspection tierce de votre commande ${order.orderNumber} est en cours. Nous vous partageons le rapport des reception.`
+            : `Bonjour, le QC virtuel de votre commande ${order.orderNumber} est lance. Vous recevrez les photos et le rapport des validation.`,
+      },
+      assigneeRoles: ["COMMUNITY_MANAGER", "CRM_MANAGER", "ADMIN"],
+      reuseIfOpen: true,
+    });
   }
 }

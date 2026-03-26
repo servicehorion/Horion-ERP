@@ -10,6 +10,7 @@ import { NotificationService } from "@/lib/services/notification.service";
 import { computeShipmentSla, notifyShipmentSlaIfNeeded } from "@/lib/services/logistics-sla.service";
 import { refreshShipmentAI } from "@/lib/services/logistics-ai.service";
 import { StorageService } from "@/lib/services/storage.service";
+import { CatalogMemoryService } from "@/lib/services/catalog-memory.service";
 import type { NegotiatedTransportRateProfile } from "@/lib/services/transport-calculator.service";
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
@@ -1625,6 +1626,31 @@ export async function createWarehouseReceipt(raw: unknown) {
         ...(data.readyToShip ? { status: "IN_TRANSIT" } : {}),
       },
     });
+
+    const productIds = Array.from(
+      new Set(
+        (
+          await prisma.orderItem.findMany({
+            where: { orderId: shipment.order.id, productId: { not: null } },
+            select: { productId: true },
+          })
+        )
+          .map((item) => item.productId)
+          .filter((value): value is string => Boolean(value))
+      )
+    );
+
+    if (productIds.length === 1) {
+      await CatalogMemoryService.refreshProductLogisticsProfileFromWarehouse(
+        user.tenantId,
+        productIds[0]
+      ).catch((error) => {
+        console.error(
+          `[createWarehouseReceipt] Failed to refresh logistics memory for product ${productIds[0]}:`,
+          error
+        );
+      });
+    }
 
     // If damaged or wrong item — notify logistics manager
     if (["DAMAGED", "WRONG_ITEM", "PARTIAL"].includes(data.condition)) {

@@ -78,6 +78,7 @@ export function WarehouseReceiptForm({
   const actualW = Number(form.actualWeightKg) || 0;
   const chargeableW =
     volWeight !== null ? Math.ceil(Math.max(actualW, volWeight) * 10) / 10 : actualW;
+  const hasConditionIssue = ["DAMAGED", "WRONG_ITEM", "PARTIAL"].includes(form.condition);
 
   function setField<K extends keyof WarehouseFormState>(key: K, value: WarehouseFormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -281,7 +282,7 @@ export function WarehouseReceiptForm({
               </SelectContent>
             </Select>
           </div>
-          {form.condition !== "OK" && (
+          {hasConditionIssue && (
             <div>
               <Label htmlFor="conditionNotes">Description de l&apos;anomalie *</Label>
               <Textarea

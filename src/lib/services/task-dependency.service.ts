@@ -98,9 +98,11 @@ export class TaskDependencyService {
     if (allResolved || blockingDeps.length === 0) {
       const task = await prisma.task.findUnique({
         where: { id: taskId },
-        select: { status: true },
+        select: { status: true, blockedBy: true },
       });
-      if (task?.status === "BLOCKED") {
+      const dependencyBlocked =
+        task?.blockedBy?.startsWith("Depends on:") || task?.blockedBy?.startsWith("Dependency:");
+      if (task?.status === "BLOCKED" && dependencyBlocked) {
         await prisma.task.update({
           where: { id: taskId },
           data: { status: "PENDING", blockedBy: null },

@@ -1,5 +1,8 @@
 import { prisma } from "@/lib/db";
 import type { Priority, OwnerType } from "@prisma/client";
+import { OperationalTaskService } from "@/lib/services/operational-task.service";
+import { SubtaskService } from "@/lib/services/subtask.service";
+import { TaskDependencyService } from "@/lib/services/task-dependency.service";
 
 /**
  * TaskTemplateService — Templates + Recurring tasks.
@@ -155,37 +158,30 @@ export class TaskTemplateService {
       : undefined;
 
     const slaHours = context.overrideSlaHours ?? template.defaultSlaHours;
-    const slaDeadline = slaHours
-      ? new Date(Date.now() + slaHours * 3600 * 1000)
-      : undefined;
 
-    // Create main task
-    const task = await prisma.task.create({
-      data: {
-        tenantId: context.tenantId,
-        title,
-        description,
-        module: template.module,
-        taskType: template.taskType,
-        entityType: context.entityType ?? "manual",
-        entityId: context.entityId ?? "none",
-        priority: context.overridePriority ?? template.defaultPriority,
-        ownerType: template.ownerType,
-        slaDeadline,
-        tags: template.defaultTags,
-        requiredApproval: template.requiresApproval,
-        automationAllowed: template.automationAllowed,
-        templateId: template.id,
-        riskLevel: "LOW",
+    const taskResult = await OperationalTaskService.create({
+      tenantId: context.tenantId,
+      title,
+      description,
+      module: template.module,
+      taskType: template.taskType,
+      entityType: context.entityType ?? "manual",
+      entityId: context.entityId ?? "none",
+      priority: context.overridePriority ?? template.defaultPriority,
+      ownerType: template.ownerType,
+      slaHours: slaHours ?? undefined,
+      tags: template.defaultTags,
+      requiredApproval: template.requiresApproval,
+      automationAllowed: template.automationAllowed,
+      templateId: template.id,
+      riskLevel: "LOW",
+      assigneeId: context.assigneeId ?? null,
+      customFields: {
+        templateName: template.name,
       },
     });
 
-    // Assign if specified
-    if (context.assigneeId) {
-      await prisma.taskAssignment.create({
-        data: { taskId: task.id, userId: context.assigneeId },
-      });
-    }
+    const task = await prisma.task.findUniqueOrThrow({ where: { id: taskResult.taskId } });
 
     // Create subtasks from definitions
     const subtaskDefs = (template.subtaskDefinitions as unknown as SubtaskDefinition[]) ?? [];
@@ -193,25 +189,13 @@ export class TaskTemplateService {
 
     for (let i = 0; i < subtaskDefs.length; i++) {
       const def = subtaskDefs[i];
-      const subSlaDeadline = def.slaHours
-        ? new Date(Date.now() + def.slaHours * 3600 * 1000)
-        : undefined;
-
-      const subtask = await prisma.task.create({
-        data: {
-          tenantId: context.tenantId,
-          parentTaskId: task.id,
-          title: replaceVars(def.title),
-          module: def.module ?? template.module,
-          taskType: "subtask",
-          entityType: context.entityType ?? "manual",
-          entityId: context.entityId ?? "none",
-          priority: (def.priority as Priority) ?? template.defaultPriority,
-          ownerType: "HUMAN",
-          slaDeadline: subSlaDeadline,
-          position: i,
-          riskLevel: "LOW",
-        },
+      const subtask = await SubtaskService.createSubtask({
+        parentTaskId: task.id,
+        title: replaceVars(def.title),
+        module: def.module ?? template.module,
+        priority: (def.priority as Priority) ?? template.defaultPriority,
+        slaHours: def.slaHours,
+        tags: template.defaultTags,
       });
       createdSubtasks.push({ id: subtask.id, index: i });
     }
@@ -222,13 +206,11 @@ export class TaskTemplateService {
       const from = createdSubtasks.find((s) => s.index === depDef.fromStep);
       const to = createdSubtasks.find((s) => s.index === depDef.toStep);
       if (from && to) {
-        await prisma.taskDependency.create({
-          data: {
-            taskId: from.id,
-            dependsOnId: to.id,
-            type: (depDef.type as any) ?? "BLOCKS",
-          },
-        });
+        await TaskDependencyService.addDependency(
+          from.id,
+          to.id,
+          (depDef.type as any) ?? "BLOCKS"
+        ).catch(() => null);
       }
     }
 

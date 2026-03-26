@@ -292,6 +292,12 @@ export class CatalogMemoryService {
       .filter((value) => value > 0);
     const averageWeightEstimate = weightSamples.length > 0 ? round(avg(weightSamples), 2) : null;
     const averageVolumeEstimate = volumeSamples.length > 0 ? round(avg(volumeSamples), 4) : null;
+    const avgActualWeightKg = weightSamples.length > 0 ? round(avg(weightSamples), 3) : null;
+    const avgVolumetricKg = successful
+      .map((row) => (row.volumetricWeightKg != null ? Number(row.volumetricWeightKg) : 0))
+      .filter((value) => value > 0);
+    const averageVolumetricWeightKg =
+      avgVolumetricKg.length > 0 ? round(avg(avgVolumetricKg), 3) : null;
 
     await prisma.catalogProduct.update({
       where: { id: productId },
@@ -307,6 +313,12 @@ export class CatalogMemoryService {
         historicalOrderCount,
         successfulOrderCount,
         stableOrderCount,
+        avgActualWeightKg: avgActualWeightKg ?? undefined,
+        avgVolumetricKg: averageVolumetricWeightKg ?? undefined,
+        lastSeenPrice:
+          latest.actualUnitPrice != null ? Number(latest.actualUnitPrice) : undefined,
+        lastSeenAt: latest.createdAt,
+        samplesCount: historicalOrderCount,
         catalogConfidenceScore: confidenceScore,
         isCertified,
         weightEstimate: averageWeightEstimate ?? product.weightEstimate ?? undefined,
@@ -370,6 +382,74 @@ export class CatalogMemoryService {
           bufferedWeights.length > 0 ? round(avg(bufferedWeights), 2) : undefined,
         historicalSampleCount,
         lastMemoryUpdatedAt: new Date(),
+      },
+    });
+  }
+
+  static async refreshProductLogisticsProfileFromWarehouse(tenantId: string, productId: string) {
+    const receipts = await prisma.warehouseReceipt.findMany({
+      where: {
+        order: {
+          tenantId,
+          items: {
+            some: { productId },
+          },
+        },
+      },
+      orderBy: { receivedAt: "desc" },
+      select: {
+        receivedAt: true,
+        actualWeightKg: true,
+        volumetricWeightKg: true,
+        order: {
+          select: {
+            items: {
+              select: {
+                productId: true,
+                unitPrice: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const safeSamples = receipts.filter((receipt) => {
+      const distinctProductIds = Array.from(
+        new Set(
+          receipt.order.items
+            .map((item) => item.productId)
+            .filter((value): value is string => Boolean(value))
+        )
+      );
+      return distinctProductIds.length === 1 && distinctProductIds[0] === productId;
+    });
+
+    if (safeSamples.length === 0) return;
+
+    const actualWeights = safeSamples
+      .map((receipt) => Number(receipt.actualWeightKg || 0))
+      .filter((value) => value > 0);
+    const volumetricWeights = safeSamples
+      .map((receipt) => Number(receipt.volumetricWeightKg || 0))
+      .filter((value) => value > 0);
+    const lastSample = safeSamples[0];
+    const lastItemPrice = lastSample.order.items.find((item) => item.productId === productId)?.unitPrice;
+
+    const product = await prisma.catalogProduct.findFirst({
+      where: { id: productId, tenantId },
+      select: { id: true },
+    });
+    if (!product) return;
+
+    await prisma.catalogProduct.update({
+      where: { id: productId },
+      data: {
+        avgActualWeightKg: actualWeights.length > 0 ? round(avg(actualWeights), 3) : undefined,
+        avgVolumetricKg: volumetricWeights.length > 0 ? round(avg(volumetricWeights), 3) : undefined,
+        lastSeenPrice: lastItemPrice != null ? Number(lastItemPrice) : undefined,
+        lastSeenAt: lastSample.receivedAt,
+        samplesCount: safeSamples.length,
       },
     });
   }

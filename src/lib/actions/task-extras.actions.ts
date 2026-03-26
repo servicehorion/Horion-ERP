@@ -531,13 +531,25 @@ export async function updateTaskCustomFields(taskId: string, customFields: Recor
     const user = await getSession();
     checkPermission(user.role, "task.update");
 
-    const task = await prisma.task.findUnique({ where: { id: taskId }, select: { tenantId: true, module: true } });
+    const task = await prisma.task.findUnique({
+      where: { id: taskId },
+      select: { tenantId: true, module: true, customFields: true },
+    });
     if (!task || task.tenantId !== user.tenantId) return { error: "Tache introuvable" };
     if (!canAccessTaskModule(user.role, task.module)) return { error: "Acces refuse" };
 
+    const reserved = Object.entries(
+      task.customFields && typeof task.customFields === "object" && !Array.isArray(task.customFields)
+        ? (task.customFields as Record<string, unknown>)
+        : {}
+    ).reduce<Record<string, unknown>>((acc, [key, value]) => {
+      if (key.startsWith("__")) acc[key] = value;
+      return acc;
+    }, {});
+
     const updated = await prisma.task.update({
       where: { id: taskId },
-      data: { customFields: customFields as any },
+      data: { customFields: { ...reserved, ...customFields } as any },
     });
 
     revalidateTask(taskId);

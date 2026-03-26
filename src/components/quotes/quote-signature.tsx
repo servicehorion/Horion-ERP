@@ -16,6 +16,7 @@ import {
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { ZeliaPayWidget } from "@/components/assistant/zelia-pay-widget";
 import { Input } from "@/components/ui/input";
 import { PublicPageShell } from "@/components/layout/public-page-shell";
 import { acceptQuoteAndPreparePaymentByToken, rejectQuoteByToken } from "@/lib/actions/order.actions";
@@ -487,6 +488,7 @@ export function QuoteSignature({ quote, token }: { quote: QuoteView; token: stri
           </div>
         </div>
       </div>
+      <ZeliaPayWidget token={token} page="quote" />
     </PublicPageShell>
   );
 }

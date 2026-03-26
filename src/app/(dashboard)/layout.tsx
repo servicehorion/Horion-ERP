@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { Header } from "@/components/layout/header";
+import { ZeliaInternalWidget } from "@/components/assistant/zelia-internal-widget";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { getNavBadges } from "@/lib/actions/navigation.actions";
 import { getSession } from "@/lib/session";
@@ -51,6 +52,7 @@ async function DashboardLayoutInner({
         >
           {children}
         </main>
+        <ZeliaInternalWidget />
       </SidebarInset>
     </SidebarProvider>
   );

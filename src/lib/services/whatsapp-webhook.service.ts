@@ -1,8 +1,9 @@
-import { prisma } from "@/lib/db";
-import { WhatsappConversationService } from "@/lib/services/whatsapp-conversation.service";
-import { WhatsappMessageService } from "@/lib/services/whatsapp-message.service";
-import { WhatsappIntentService } from "@/lib/services/whatsapp-intent.service";
+﻿import { prisma } from "@/lib/db";
 import { WhatsappBotFlowService } from "@/lib/services/whatsapp-bot-flow.service";
+import { WhatsappConversationService } from "@/lib/services/whatsapp-conversation.service";
+import { WhatsappIntentService } from "@/lib/services/whatsapp-intent.service";
+import { WhatsappMessageService } from "@/lib/services/whatsapp-message.service";
+import { WarehouseBridgeService } from "@/lib/services/warehouse-bridge.service";
 
 type MetaMessage = {
   from: string;
@@ -10,8 +11,8 @@ type MetaMessage = {
   timestamp: string;
   type: string;
   text?: { body?: string };
-  image?: { id?: string; caption?: string };
-  document?: { id?: string; caption?: string; filename?: string };
+  image?: { id?: string; caption?: string; mime_type?: string };
+  document?: { id?: string; caption?: string; filename?: string; mime_type?: string };
 };
 
 type MetaStatus = {
@@ -28,6 +29,28 @@ function mapStatus(status?: string) {
   if (value === "read") return "READ";
   if (value === "failed") return "FAILED";
   return "PENDING";
+}
+
+function extractInboundMedia(message: MetaMessage) {
+  const media: Array<{ url: string; mimeType?: string; caption?: string }> = [];
+
+  if (message.image?.id) {
+    media.push({
+      url: `meta-media:${message.image.id}`,
+      mimeType: message.image.mime_type,
+      caption: message.image.caption,
+    });
+  }
+
+  if (message.document?.id) {
+    media.push({
+      url: `meta-media:${message.document.id}`,
+      mimeType: message.document.mime_type,
+      caption: message.document.caption ?? message.document.filename,
+    });
+  }
+
+  return media;
 }
 
 export class WhatsappWebhookService {
@@ -133,6 +156,8 @@ export class WhatsappWebhookService {
             message.document?.caption ||
             message.document?.filename ||
             "";
+          const inboundMedia = extractInboundMedia(message);
+
           const created = await WhatsappMessageService.createMessage({
             tenantId: account.tenantId,
             conversationId: conversation.id,
@@ -142,6 +167,7 @@ export class WhatsappWebhookService {
             externalId: message.id,
             sentAt: message.timestamp ? new Date(Number(message.timestamp) * 1000) : undefined,
             rawJson: payload,
+            media: inboundMedia,
           });
 
           if (body) {
@@ -161,6 +187,15 @@ export class WhatsappWebhookService {
               });
             }
           }
+
+          await WarehouseBridgeService.captureInbound({
+            tenantId: account.tenantId,
+            conversationId: conversation.id,
+            waContactId: waContact.id,
+            sourceMessageId: created?.id ?? null,
+            rawText: body,
+            photoUrls: inboundMedia.map((item) => item.url),
+          });
 
           await prisma.whatsappWebhookEvent.updateMany({
             where: { accountId: account.id, externalId: message.id },

@@ -38,10 +38,21 @@ function detectType(value: unknown): FieldType {
 }
 
 export function TaskCustomFields({ taskId, initialFields }: TaskCustomFieldsProps) {
+  const reservedFields = useMemo(() => {
+    const hidden: Record<string, unknown> = {};
+    if (initialFields) {
+      Object.entries(initialFields).forEach(([key, value]) => {
+        if (key.startsWith("__")) hidden[key] = value;
+      });
+    }
+    return hidden;
+  }, [initialFields]);
+
   const initialRows = useMemo(() => {
     const rows: FieldRow[] = [];
     if (initialFields) {
       Object.entries(initialFields).forEach(([k, v]) => {
+        if (k.startsWith("__")) return;
         rows.push({ key: k, type: detectType(v), value: v as any });
       });
     }
@@ -80,6 +91,8 @@ export function TaskCustomFields({ taskId, initialFields }: TaskCustomFieldsProp
             payload[key] = row.value ?? "";
         }
       });
+
+      Object.assign(payload, reservedFields);
 
       const res = await updateTaskCustomFields(taskId, payload);
       if (res.error) {

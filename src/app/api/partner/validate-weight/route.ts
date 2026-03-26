@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/lib/db";
 import { requireSecretHeader } from "@/lib/api/secret-auth";
+import { OperationalTaskService } from "@/lib/services/operational-task.service";
 import { TransportCalculatorService } from "@/lib/services/transport-calculator.service";
 import { toPlainData } from "@/lib/utils";
 
@@ -17,15 +18,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => ({}));
-  const {
-    orderId,
-    orderNumber,
-    weightKg,
-    lengthCm,
-    widthCm,
-    heightCm,
-    proofImageUrl,
-  } = body as {
+  const { orderId, orderNumber, weightKg, lengthCm, widthCm, heightCm, proofImageUrl } = body as {
     orderId?: string;
     orderNumber?: string;
     weightKg?: number;
@@ -148,59 +141,55 @@ export async function POST(req: NextRequest) {
         });
 
   if (deviationPct > 10) {
-    const existingTask = await prisma.task.findFirst({
-      where: {
-        entityType: "order",
-        entityId: order.id,
-        taskType: "transport_regularization",
-        status: { notIn: ["COMPLETED", "CANCELLED"] },
+    await OperationalTaskService.create({
+      tenantId: order.tenantId,
+      entityType: "order",
+      entityId: order.id,
+      taskType: "transport_regularization",
+      title: `Regularisation transport - ${order.orderNumber}`,
+      description: `Le poids facturable reel (${transportPreview.chargeableWeightKg} kg) depasse l'estime du devis (${estimatedChargeableWeight} kg) de ${Math.round(
+        deviationPct
+      )}%. Verifiez si un complement client est necessaire avant expedition.`,
+      module: "logistics",
+      priority: "URGENT",
+      ownerType: "SYSTEM",
+      riskLevel: "HIGH",
+      slaHours: 4,
+      tags: ["transport-regularization", order.orderNumber],
+      customFields: {
+        estimatedChargeableWeight,
+        actualChargeableWeight: transportPreview.chargeableWeightKg,
+        deviationPct: Math.round(deviationPct * 100) / 100,
+        proofImageUrl: proofImageUrl || null,
       },
-      select: { id: true },
-    });
-
-    if (!existingTask) {
-      const logisticsManager = await prisma.user.findFirst({
-        where: { tenantId: order.tenantId, role: "LOGISTICS_MANAGER", isActive: true },
-        select: { id: true },
-      });
-      const task = await prisma.task.create({
-        data: {
-          tenantId: order.tenantId,
-          entityType: "order",
-          entityId: order.id,
-          taskType: "transport_regularization",
-          title: `Régularisation transport - ${order.orderNumber}`,
-          description: `Le poids facturable réel (${transportPreview.chargeableWeightKg} kg) dépasse l'estimé du devis (${estimatedChargeableWeight} kg) de ${Math.round(
-            deviationPct
-          )}%. Vérifiez si un complément client est nécessaire avant expédition.`,
-          module: "logistics",
-          priority: "URGENT",
-          ownerType: "HUMAN",
-          status: "PENDING",
-          riskLevel: "HIGH",
-          slaDeadline: new Date(Date.now() + 4 * 3_600_000),
-          tags: ["transport-regularization", order.orderNumber],
-          customFields: {
-            estimatedChargeableWeight,
-            actualChargeableWeight: transportPreview.chargeableWeightKg,
-            deviationPct: Math.round(deviationPct * 100) / 100,
-            proofImageUrl: proofImageUrl || null,
-          },
+      completionRequirements: {
+        requireAllSubtasks: true,
+        requiredComment: true,
+        ...(proofImageUrl ? { requiredFieldKeys: ["proofImageUrl"] } : {}),
+      },
+      assigneeRoles: ["LOGISTICS_MANAGER", "LOGISTICS_ASSISTANT", "ADMIN"],
+      reuseIfOpen: true,
+      subtasks: [
+        {
+          title: "Verifier l'impact sur la marge",
+          slaHours: 2,
+          assigneeRoles: ["LOGISTICS_MANAGER", "FINANCE_MANAGER", "ADMIN"],
         },
-      });
-      if (logisticsManager) {
-        await prisma.taskAssignment.create({
-          data: { taskId: task.id, userId: logisticsManager.id, assignedAt: new Date() },
-        });
-      }
-    }
+        {
+          title: "Contacter le client si une regularisation est necessaire",
+          slaHours: 4,
+          assigneeRoles: ["COMMUNITY_MANAGER", "LOGISTICS_ASSISTANT", "ADMIN"],
+          dependsOnPrevious: true,
+        },
+      ],
+    });
   }
 
   await prisma.orderTimeline.create({
     data: {
       orderId: order.id,
       event: "partner_weight_validated",
-      note: `Poids réel validé via partenaire: ${transportPreview.chargeableWeightKg} kg facturables.`,
+      note: `Poids reel valide via partenaire: ${transportPreview.chargeableWeightKg} kg facturables.`,
     },
   });
 

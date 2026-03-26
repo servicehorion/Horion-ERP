@@ -3,9 +3,9 @@ import type { Event } from "@prisma/client";
 import { TaskDependencyService } from "@/lib/services/task-dependency.service";
 import { NotificationService } from "@/lib/services/notification.service";
 import { SubtaskService } from "@/lib/services/subtask.service";
-import { TaskService } from "@/lib/services/task.service";
 import { CustomerIntelligenceService } from "@/lib/services/customer-intelligence.service";
 import { IndicatifSourcingOrchestratorService } from "@/lib/services/indicatif-sourcing-orchestrator.service";
+import { OperationalTaskService } from "@/lib/services/operational-task.service";
 import { QcUpsellService } from "@/lib/services/qc-upsell.service";
 import {
   cancelQuoteWorkflowTasks,
@@ -30,6 +30,7 @@ type OrderOpsAssignees = {
   sourcingAssistantId: string | null;
   financeManagerId: string | null;
   financeId: string | null;
+  adminFallbackId: string | null;
 };
 
 const AUTO_ASSIGNER_NAME = "Automatisation Horion";
@@ -100,13 +101,14 @@ async function resolveOrderOpsAssignees(orderId: string, tenantId: string) {
     collaboratorIdsByRole.set(order.owner.role, current);
   }
 
-  const [logisticsManagerId, logisticsAssistantId, sourcingAssistantId, financeManagerId, financeId] =
+  const [logisticsManagerId, logisticsAssistantId, sourcingAssistantId, financeManagerId, financeId, adminFallbackId] =
     await Promise.all([
       pickActiveUserByRoles(tenantId, ["LOGISTICS_MANAGER"], collaboratorIdsByRole.get("LOGISTICS_MANAGER") ?? []),
       pickActiveUserByRoles(tenantId, ["LOGISTICS_ASSISTANT"], collaboratorIdsByRole.get("LOGISTICS_ASSISTANT") ?? []),
       pickActiveUserByRoles(tenantId, ["SOURCING_ASSISTANT"], collaboratorIdsByRole.get("SOURCING_ASSISTANT") ?? []),
       pickActiveUserByRoles(tenantId, ["FINANCE_MANAGER"], collaboratorIdsByRole.get("FINANCE_MANAGER") ?? []),
       pickActiveUserByRoles(tenantId, ["FINANCE"], collaboratorIdsByRole.get("FINANCE") ?? []),
+      pickActiveUserByRoles(tenantId, ["ADMIN", "DIRECTION", "CEO"]),
     ]);
 
   return {
@@ -116,6 +118,7 @@ async function resolveOrderOpsAssignees(orderId: string, tenantId: string) {
     sourcingAssistantId,
     financeManagerId,
     financeId,
+    adminFallbackId,
   } satisfies OrderOpsAssignees;
 }
 
@@ -124,27 +127,53 @@ function resolveTaskAssigneeId(
   assignees: OrderOpsAssignees,
   explicitRole?: TaskRoleHint
 ) {
-  if (explicitRole === "LOGISTICS_MANAGER") return assignees.logisticsManagerId ?? assignees.ownerId;
+  if (explicitRole === "LOGISTICS_MANAGER") {
+    return assignees.logisticsManagerId ?? assignees.ownerId ?? assignees.adminFallbackId;
+  }
   if (explicitRole === "LOGISTICS_ASSISTANT") {
-    return assignees.logisticsAssistantId ?? assignees.logisticsManagerId ?? assignees.ownerId;
+    return (
+      assignees.logisticsAssistantId ??
+      assignees.logisticsManagerId ??
+      assignees.ownerId ??
+      assignees.adminFallbackId
+    );
   }
   if (explicitRole === "SOURCING_ASSISTANT") {
-    return assignees.sourcingAssistantId ?? assignees.logisticsManagerId ?? assignees.ownerId;
+    return (
+      assignees.sourcingAssistantId ??
+      assignees.logisticsManagerId ??
+      assignees.ownerId ??
+      assignees.adminFallbackId
+    );
   }
-  if (explicitRole === "FINANCE_MANAGER") return assignees.financeManagerId ?? assignees.financeId;
-  if (explicitRole === "FINANCE") return assignees.financeId ?? assignees.financeManagerId;
+  if (explicitRole === "FINANCE_MANAGER") {
+    return assignees.financeManagerId ?? assignees.financeId ?? assignees.adminFallbackId;
+  }
+  if (explicitRole === "FINANCE") {
+    return assignees.financeId ?? assignees.financeManagerId ?? assignees.adminFallbackId;
+  }
 
   if (module === "sourcing") {
-    return assignees.logisticsManagerId ?? assignees.sourcingAssistantId ?? assignees.ownerId;
+    return (
+      assignees.sourcingAssistantId ??
+      assignees.logisticsManagerId ??
+      assignees.ownerId ??
+      assignees.adminFallbackId
+    );
   }
   if (module === "logistics" || module === "qc") {
-    return assignees.logisticsManagerId ?? assignees.logisticsAssistantId ?? assignees.ownerId;
+    return (
+      assignees.logisticsAssistantId ??
+      assignees.logisticsManagerId ??
+      assignees.ownerId ??
+      assignees.adminFallbackId
+    );
   }
   if (module === "finance") {
-    return assignees.financeManagerId ?? assignees.financeId;
+    return assignees.financeManagerId ?? assignees.financeId ?? assignees.adminFallbackId;
   }
 
-  return assignees.ownerId;
+  return assignees.ownerId ?? assignees.adminFallbackId;
 }
 
 const handleCustomerIntelligenceFromOrder: EventHandler = async (event) => {
@@ -523,70 +552,11 @@ async function createTaskFromEvent(
 
   if (!order) return;
 
-  const slaDeadline = new Date();
-  slaDeadline.setHours(slaDeadline.getHours() + config.slaHours);
-
-  const task = await prisma.task.create({
-    data: {
-      tenantId: order.tenantId,
-      entityType: event.entityType,
-      entityId: event.entityId,
-      taskType: config.taskType,
-      title: config.title,
-      module: config.module,
-      priority: config.priority || "NORMAL",
-      slaDeadline,
-      ownerType: config.ownerType || "HUMAN",
-      automationAllowed: config.automationAllowed ?? false,
-      status: "PENDING",
-      riskLevel: "LOW",
-      tags: config.tags ?? [],
-    },
-  });
-
   const assignees = await resolveOrderOpsAssignees(event.entityId, order.tenantId);
   const parentAssigneeId = resolveTaskAssigneeId(config.module, assignees);
-  if (parentAssigneeId) {
-    await TaskService.assignTask(task.id, parentAssigneeId);
-    await NotificationService.onTaskAssigned(
-      task.id,
-      order.tenantId,
-      parentAssigneeId,
-      task.title,
-      AUTO_ASSIGNER_NAME
-    );
-  }
-
-  // Auto-create subtasks if defined
-  if (config.subtasks && config.subtasks.length > 0) {
-    for (const sub of config.subtasks) {
-      const subtaskAssigneeId = resolveTaskAssigneeId(
-        sub.module ?? config.module,
-        assignees,
-        sub.assigneeRole
-      );
-      const subtask = await SubtaskService.createSubtask({
-        parentTaskId: task.id,
-        title: sub.title,
-        slaHours: sub.slaHours,
-        module: sub.module,
-        priority: sub.priority as any,
-        assigneeId: subtaskAssigneeId ?? undefined,
-      });
-
-      if (subtaskAssigneeId) {
-        await NotificationService.onTaskAssigned(
-          subtask.id,
-          order.tenantId,
-          subtaskAssigneeId,
-          subtask.title,
-          AUTO_ASSIGNER_NAME
-        );
-      }
-    }
-  }
 
   // Auto-add dependencies on previous task types in the same order
+  const dependencyTaskIds: string[] = [];
   if (config.dependsOnTaskTypes && config.dependsOnTaskTypes.length > 0) {
     const previousTasks = await prisma.task.findMany({
       where: {
@@ -599,10 +569,38 @@ async function createTaskFromEvent(
 
     for (const prev of previousTasks) {
       if (!["COMPLETED", "CANCELLED"].includes(prev.status)) {
-        await TaskDependencyService.addDependency(task.id, prev.id, "BLOCKS");
+        dependencyTaskIds.push(prev.id);
       }
     }
   }
+
+  const taskResult = await OperationalTaskService.create({
+    tenantId: order.tenantId,
+    entityType: event.entityType,
+    entityId: event.entityId,
+    taskType: config.taskType,
+    title: config.title,
+    module: config.module,
+    priority: config.priority || "NORMAL",
+    ownerType: config.ownerType || "HUMAN",
+    automationAllowed: config.automationAllowed ?? false,
+    assigneeId: parentAssigneeId,
+    assignedByName: AUTO_ASSIGNER_NAME,
+    tags: config.tags ?? [],
+    slaHours: config.slaHours,
+    subtasks: config.subtasks?.map((sub, index) => ({
+      title: sub.title,
+      slaHours: sub.slaHours,
+      module: sub.module,
+      priority: sub.priority as any,
+      assigneeId: resolveTaskAssigneeId(sub.module ?? config.module, assignees, sub.assigneeRole) ?? undefined,
+      dependsOnPrevious: index > 0,
+    })),
+    dependencies: dependencyTaskIds.map((taskId) => ({
+      dependsOnTaskId: taskId,
+      type: "BLOCKS",
+    })),
+  });
 
   // Notify team
   const teamMembers = await prisma.user.findMany({
@@ -623,12 +621,12 @@ async function createTaskFromEvent(
         title: `Nouvelle tâche: ${config.title}`,
         message: `Commande ${order.orderNumber} — Module ${config.module}`,
         entityType: "task",
-        entityId: task.id,
+        entityId: taskResult.taskId,
       }
     );
   }
 
-  return task;
+  return prisma.task.findUnique({ where: { id: taskResult.taskId } });
 }
 
 // Map modules to relevant user roles
@@ -890,19 +888,23 @@ const handleOrderStatusChanged: EventHandler = async (event) => {
   const notifConfig = CLIENT_NOTIFICATION_CONFIGS[newStatus];
   if (notifConfig) {
     const orderId = event.entityId;
-      const order = await prisma.order.findUnique({
-        where: { id: orderId },
-        select: { tenantId: true, orderNumber: true, ownerId: true, onboardedById: true },
-      });
-      if (order) {
-        const cm = await prisma.user.findFirst({
-          where: { tenantId: order.tenantId, role: { in: ["COMMUNITY_MANAGER", "CRM_MANAGER"] as any[] }, isActive: true },
-          select: { id: true },
-        });
-        const fallbackAssigneeId = cm?.id || order.ownerId || order.onboardedById || null;
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      select: { tenantId: true, orderNumber: true, ownerId: true, onboardedById: true },
+    });
 
-        // Avoid duplicate client notification tasks for the same status
-        const existing = await prisma.task.findFirst({
+    if (order) {
+      const cm = await prisma.user.findFirst({
+        where: {
+          tenantId: order.tenantId,
+          role: { in: ["COMMUNITY_MANAGER", "CRM_MANAGER"] as any[] },
+          isActive: true,
+        },
+        select: { id: true },
+      });
+      const fallbackAssigneeId = cm?.id || order.ownerId || order.onboardedById || null;
+
+      const existing = await prisma.task.findFirst({
         where: {
           entityType: "order",
           entityId: orderId,
@@ -913,57 +915,51 @@ const handleOrderStatusChanged: EventHandler = async (event) => {
       });
 
       if (!existing) {
-        const notifTask = await prisma.task.create({
-          data: {
-            tenantId: order.tenantId,
-            entityType: "order",
-            entityId: orderId,
-            taskType: "client_notification",
-              title: `[${order.orderNumber}] ${notifConfig.title}`,
-              description: `Message suggéré au client :\n\n"${notifConfig.clientMessage}"`,
-              module: "whatsapp",
-              priority: "HIGH",
-              ownerType: "SYSTEM",
-              status: "PENDING",
-              riskLevel: "LOW",
-              slaDeadline: new Date(Date.now() + notifConfig.slaHours * 3_600_000),
-              tags: [
-                "client-notification",
-                order.orderNumber,
-                newStatus.toLowerCase(),
-                ...(fallbackAssigneeId ? [] : ["unassigned"]),
-              ],
+        const notifTask = await OperationalTaskService.create({
+          tenantId: order.tenantId,
+          entityType: "order",
+          entityId: orderId,
+          taskType: "client_notification",
+          title: `[${order.orderNumber}] ${notifConfig.title}`,
+          description: `Message suggéré au client :\n\n"${notifConfig.clientMessage}"`,
+          module: "whatsapp",
+          priority: "HIGH",
+          ownerType: "SYSTEM",
+          riskLevel: "LOW",
+          slaHours: notifConfig.slaHours,
+          assigneeId: fallbackAssigneeId,
+          assigneeRoles: ["COMMUNITY_MANAGER", "CRM_MANAGER"],
+          fallbackRoles: ["ADMIN", "DIRECTION", "CEO"],
+          watcherRoles: ["ADMIN"],
+          assignedByName: AUTO_ASSIGNER_NAME,
+          tags: ["client-notification", order.orderNumber, newStatus.toLowerCase()],
+        });
+
+        if (!fallbackAssigneeId) {
+          const fallbackUsers = await prisma.user.findMany({
+            where: {
+              tenantId: order.tenantId,
+              isActive: true,
+              role: { in: ["CEO", "DIRECTION", "ADMIN"] as any[] },
             },
+            select: { id: true },
           });
-          if (fallbackAssigneeId) {
-            await prisma.taskAssignment.create({
-              data: { taskId: notifTask.id, userId: fallbackAssigneeId, assignedAt: new Date() },
-            });
-          } else {
-            const fallbackUsers = await prisma.user.findMany({
-              where: {
+          if (fallbackUsers.length > 0) {
+            await NotificationService.notifyMany(
+              fallbackUsers.map((user) => user.id),
+              {
                 tenantId: order.tenantId,
-                isActive: true,
-                role: { in: ["CEO", "DIRECTION", "ADMIN"] as any[] },
-              },
-              select: { id: true },
-            });
-            if (fallbackUsers.length > 0) {
-              await NotificationService.notifyMany(
-                fallbackUsers.map((user) => user.id),
-                {
-                  tenantId: order.tenantId,
-                  type: "TASK_ASSIGNED",
-                  title: `Affectation requise - notification client ${order.orderNumber}`,
-                  message: "Aucun COMMUNITY_MANAGER n'est configuré pour cette notification client.",
-                  entityType: "task",
-                  entityId: notifTask.id,
-                }
-              );
-            }
+                type: "TASK_ASSIGNED",
+                title: `Affectation requise - notification client ${order.orderNumber}`,
+                message: "Aucun COMMUNITY_MANAGER n'est configuré pour cette notification client.",
+                entityType: "task",
+                entityId: notifTask.taskId,
+              }
+            );
           }
         }
       }
+    }
   }
 
   // ── WhatsApp automatique sur jalons critiques (dernier kilomètre) ──────────
