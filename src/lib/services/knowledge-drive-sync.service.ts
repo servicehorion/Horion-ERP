@@ -124,7 +124,7 @@ function parseJsonEnv<T>(value: string | undefined, fallback: T): T {
 }
 
 function extractDriveFileId(url?: string | null) {
-  if (!url) return null;
+  if (!url) return undefined;
   const patterns = [
     /\/d\/([a-zA-Z0-9_-]{10,})/,
     /[?&]id=([a-zA-Z0-9_-]{10,})/,
@@ -136,7 +136,7 @@ function extractDriveFileId(url?: string | null) {
     if (match?.[1]) return match[1];
   }
 
-  return null;
+  return undefined;
 }
 
 async function getTenantDriveSources(tenantId: string): Promise<NormalizedKnowledgeSource[]> {
@@ -164,7 +164,7 @@ async function getTenantDriveSources(tenantId: string): Promise<NormalizedKnowle
       sourceUrl: typeof item.sourceUrl === "string" && item.sourceUrl.trim() ? item.sourceUrl.trim() : undefined,
       title: typeof item.title === "string" && item.title.trim() ? item.title.trim() : undefined,
       module: typeof item.module === "string" && item.module.trim() ? item.module.trim() : null,
-      audience: item.audience === "PUBLIC" ? "PUBLIC" : "INTERNAL",
+      audience: (item.audience === "PUBLIC" ? "PUBLIC" : "INTERNAL") as KnowledgeAudience,
       tags: Array.isArray(item.tags) ? item.tags.map((tag) => String(tag)).filter(Boolean) : [],
       chunkSize:
         typeof item.chunkSize === "number" && Number.isFinite(item.chunkSize) && item.chunkSize >= 300
@@ -177,7 +177,7 @@ async function getTenantDriveSources(tenantId: string): Promise<NormalizedKnowle
     .filter((item) => item.fileId || item.folderId || item.sourceUrl)
     .map((item) => ({
       ...item,
-      audience: item.audience ?? "INTERNAL",
+      audience: (item.audience ?? "INTERNAL") as KnowledgeAudience,
       tags: item.tags ?? [],
       status: item.status ?? "ACTIVE",
     }));
@@ -345,7 +345,7 @@ async function resolveDriveSources(tenantId: string) {
           if (!content) continue;
           resolved.push({
             title: file.name,
-            module: source.module,
+            module: source.module ?? null,
             audience: source.audience,
             tags: source.tags,
             content,
@@ -369,7 +369,7 @@ async function resolveDriveSources(tenantId: string) {
         if (!content) continue;
         resolved.push({
           title: source.title ?? metadata.name,
-          module: source.module,
+          module: source.module ?? null,
           audience: source.audience,
           tags: source.tags,
           content,
@@ -391,11 +391,11 @@ async function resolveDriveSources(tenantId: string) {
         if (!content) continue;
         resolved.push({
           title: source.title ?? source.sourceUrl,
-          module: source.module,
+          module: source.module ?? null,
           audience: source.audience,
           tags: source.tags,
           content,
-          sourceUrl: source.sourceUrl,
+          sourceUrl: source.sourceUrl ?? null,
           externalRef: source.externalRef ?? `url:${source.sourceUrl}`,
           chunkSize: source.chunkSize ?? DEFAULT_CHUNK_SIZE,
           status: source.status,
