@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -564,6 +565,9 @@ export function ShipmentsTab({
                           <Button size="sm" variant="outline" onClick={() => setSelectedShipment(ship)}>
                             Voir
                           </Button>
+                          <Button size="sm" variant="ghost" asChild>
+                            <Link href={`/logistics/shipments/${ship.id}`}>Dossier</Link>
+                          </Button>
                           {canManage && (
                             <Select
                               value={ship.status}
@@ -815,6 +819,62 @@ export function ShipmentsTab({
                         </div>
                       </div>
                     ))}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Wifi className="h-4 w-4" />
+                    Shipment workflow
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-center justify-between text-sm text-muted-foreground">
+                    <span>Tracking freshness</span>
+                    <Badge variant="outline">
+                      {selectedShipment.workflow?.trackingFreshness || "MISSING"}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center justify-between text-sm text-muted-foreground">
+                    <span>Shipment health</span>
+                    <Badge variant="outline">
+                      {selectedShipment.workflow?.shipmentHealth || "WATCH"}
+                    </Badge>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Prochaine action</p>
+                    <p className="text-sm text-muted-foreground">
+                      {selectedShipment.workflow?.nextAction || "Aucune action consolidee disponible."}
+                    </p>
+                  </div>
+                  {selectedShipment.workflow?.blockers && selectedShipment.workflow.blockers.length > 0 ? (
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium">Blocages actifs</p>
+                      <ul className="list-disc list-inside text-sm text-muted-foreground">
+                        {selectedShipment.workflow.blockers.map((blocker) => (
+                          <li key={blocker}>{blocker}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Aucun gate bloquant sur la prochaine transition.</p>
+                  )}
+                  <div className="space-y-1 rounded-md border p-3">
+                    <p className="text-sm font-medium">Responsabilite active</p>
+                    <p className="text-sm text-muted-foreground">
+                      Principal: {selectedShipment.workflow?.responsibility?.primaryOwner?.name || "Non defini"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Backup: {selectedShipment.workflow?.responsibility?.backupOwner?.name || "Non defini"} | Manager:{" "}
+                      {selectedShipment.workflow?.responsibility?.managerOwner?.name || "Non defini"}
+                    </p>
+                    {selectedShipment.workflow?.responsibility?.assignmentReason ? (
+                      <p className="text-xs text-muted-foreground">
+                        {selectedShipment.workflow.responsibility.assignmentReason}
+                      </p>
+                    ) : null}
+                  </div>
                 </CardContent>
               </Card>
 

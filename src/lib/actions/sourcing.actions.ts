@@ -21,6 +21,7 @@ import { SourcingAssignmentService } from "@/lib/services/sourcing-assignment.se
 import { SourcingIngestionService } from "@/lib/services/sourcing-ingestion.service";
 import { SourcingTaskOrchestratorService } from "@/lib/services/sourcing-task-orchestrator.service";
 import { SourcingTicketService } from "@/lib/services/sourcing-ticket.service";
+import { LogisticsBatchService } from "@/lib/services/logistics-batch.service";
 import { OrderService } from "@/lib/services/order.service";
 import { SupplierContractService } from "@/lib/services/supplier-contract.service";
 import { convertCurrency } from "@/config/currencies";
@@ -558,6 +559,7 @@ export async function linkSourcingCaseContract(caseId: string, contractId: strin
       sourcingCaseId: caseId,
       contractId,
     });
+    await SourcingTaskOrchestratorService.syncCaseWorkflow(caseId);
 
     await AuditService.log({
       tenantId: user.tenantId,
@@ -608,6 +610,8 @@ export async function promoteToProFond(caseId: string) {
       where: { id: caseId },
       data: { level: "PROFOND" },
     });
+
+    await SourcingTaskOrchestratorService.syncCaseWorkflow(caseId);
 
     await AuditService.log({
       tenantId: user.tenantId,
@@ -704,6 +708,8 @@ export async function updateSourcingWeights(
       },
     });
 
+    await SourcingTaskOrchestratorService.syncCaseWorkflow(caseId);
+
     revalidatePath(`/sourcing/cases/${caseId}`);
     return { data: updated, transport };
   } catch (error) {
@@ -755,6 +761,8 @@ export async function simulateSourcingMargin(
       },
     });
 
+    await SourcingTaskOrchestratorService.syncCaseWorkflow(caseId);
+
     revalidatePath(`/sourcing/cases/${caseId}`);
     return { data: simulation };
   } catch (error) {
@@ -782,6 +790,8 @@ export async function approveSourcingMarginCeo(caseId: string) {
       where: { id: caseId },
       data: { marginApprovedByCeo: true, ceoApprovedAt: new Date() },
     });
+
+    await SourcingTaskOrchestratorService.syncCaseWorkflow(caseId);
 
     await AuditService.log({
       tenantId: user.tenantId,
@@ -907,6 +917,8 @@ export async function createGroupageBatch(data: {
       },
     });
 
+    await LogisticsBatchService.ensureFromGroupageBatch(batch.id);
+
     revalidatePath("/sourcing/groupage");
     return { data: batch };
   } catch (error) {
@@ -921,6 +933,7 @@ export async function addToGroupageBatch(batchId: string, sourcingCaseId: string
 
     const batch = await prisma.groupageBatch.findUnique({ where: { id: batchId } });
     if (!batch || batch.tenantId !== user.tenantId) return { error: "Batch introuvable" };
+    const canonicalBatch = await LogisticsBatchService.ensureFromGroupageBatch(batchId);
 
     const sc = await SourcingCaseService.getById(sourcingCaseId);
     if (!sc || sc.order.tenantId !== user.tenantId) return { error: "Cas introuvable" };
@@ -944,6 +957,7 @@ export async function addToGroupageBatch(batchId: string, sourcingCaseId: string
     await prisma.groupageBatch.update({
       where: { id: batchId },
       data: {
+        logisticsBatchId: canonicalBatch?.id,
         totalWeight: allItems.reduce((s, i) => s + Number(i.weightKg ?? 0), 0),
         totalCbm: allItems.reduce((s, i) => s + Number(i.cbm ?? 0), 0),
       },
@@ -978,6 +992,8 @@ export async function removeFromGroupageBatch(itemId: string) {
       },
     });
 
+    await LogisticsBatchService.ensureFromGroupageBatch(item.batchId);
+
     revalidatePath("/sourcing/groupage");
     return { data: true };
   } catch (error) {
@@ -992,8 +1008,22 @@ export async function updateGroupageBatchStatus(batchId: string, status: string)
 
     const batch = await prisma.groupageBatch.findUnique({ where: { id: batchId } });
     if (!batch || batch.tenantId !== user.tenantId) return { error: "Batch introuvable" };
+    const canonicalBatch = await LogisticsBatchService.ensureFromGroupageBatch(batchId);
 
-    const updated = await prisma.groupageBatch.update({ where: { id: batchId }, data: { status } });
+    const updated = await prisma.groupageBatch.update({
+      where: { id: batchId },
+      data: {
+        status,
+        logisticsBatchId: canonicalBatch?.id,
+      },
+    });
+
+    if (canonicalBatch?.id) {
+      await prisma.logisticsBatch.update({
+        where: { id: canonicalBatch.id },
+        data: { status },
+      });
+    }
 
     const statusMap: Record<string, string | null> = {
       OPEN: "PENDING",
@@ -1043,6 +1073,7 @@ export async function createShipmentsFromGroupageBatch(batchId: string) {
       },
     });
     if (!batch || batch.tenantId !== user.tenantId) return { error: "Batch introuvable" };
+    const canonicalBatch = await LogisticsBatchService.ensureFromGroupageBatch(batchId);
 
     let created = 0;
     let skipped = 0;
@@ -1083,8 +1114,11 @@ export async function createShipmentsFromGroupageBatch(batchId: string) {
         data: {
           orderId: order.id,
           groupageBatchId: batchId,
+          logisticsBatchId: canonicalBatch?.id,
           mode: mode as any,
           status: (shipmentStatusMap[batch.status] || "PENDING") as any,
+          deliveryScope: "FULL",
+          shipmentRole: "PRIMARY",
           origin: order.originCountry || "Guangzhou",
           destination: order.destinationCity || batch.destination,
           estimatedDeparture: batch.etd ?? undefined,
@@ -1253,7 +1287,11 @@ export async function createDemandIntake(formData: Record<string, unknown>) {
     }
 
     if (!assignedToId && validated.autoAssign) {
-      const aiAssignee = await SourcingAssignmentService.pickAssignee(user.tenantId);
+      const aiAssignee = await SourcingAssignmentService.pickAssignee(user.tenantId, {
+        entityType: "demand",
+        category: validated.category ?? null,
+        urgency: validated.urgency,
+      });
       assignedToId = aiAssignee?.id;
     }
 
@@ -1277,15 +1315,18 @@ export async function createDemandIntake(formData: Record<string, unknown>) {
       },
     });
 
-    await AuditService.log({
-      tenantId: user.tenantId,
-      userId: user.id,
-      action: "sourcing.demand.created",
-      entityType: "demand_intake",
-      entityId: demand.id,
-    });
+      await AuditService.log({
+        tenantId: user.tenantId,
+        userId: user.id,
+        action: "sourcing.demand.created",
+        entityType: "demand_intake",
+        entityId: demand.id,
+      });
 
-    revalidatePath("/sourcing");
+      await SourcingTicketService.ensureFromDemand(demand.id);
+      await SourcingTaskOrchestratorService.syncDemandWorkflow(user.tenantId, demand.id);
+
+      revalidatePath("/sourcing");
     return { data: demand };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur creation demande" };
@@ -1353,26 +1394,36 @@ export async function autoAssignUnassignedDemands(limit = 50) {
     const user = await getSession();
     checkPermission(user.role, "sourcing.manage");
 
-    const demands = await prisma.demandIntake.findMany({
-      where: {
-        tenantId: user.tenantId,
-        assignedToId: null,
-        status: { in: ["RAW", "QUALIFIED"] as DemandStatus[] },
-      },
-      orderBy: { receivedAt: "desc" },
-      take: limit,
-    });
-
-    let updated = 0;
-    for (const demand of demands) {
-      const assignee = await SourcingAssignmentService.pickAssignee(user.tenantId);
-      if (!assignee) break;
-      await prisma.demandIntake.update({
-        where: { id: demand.id },
-        data: { assignedToId: assignee.id },
+      const demands = await prisma.demandIntake.findMany({
+        where: {
+          tenantId: user.tenantId,
+          assignedToId: null,
+          status: { in: ["RAW", "QUALIFIED"] as DemandStatus[] },
+        },
+        orderBy: { receivedAt: "desc" },
+        take: limit,
+        select: {
+          id: true,
+          category: true,
+          urgency: true,
+        },
       });
-      updated += 1;
-    }
+
+      let updated = 0;
+      for (const demand of demands) {
+        const assignee = await SourcingAssignmentService.pickAssignee(user.tenantId, {
+          entityType: "demand",
+          category: demand.category,
+          urgency: demand.urgency,
+        });
+        if (!assignee) break;
+        await prisma.demandIntake.update({
+          where: { id: demand.id },
+          data: { assignedToId: assignee.id },
+        });
+        await SourcingTaskOrchestratorService.syncDemandWorkflow(user.tenantId, demand.id);
+        updated += 1;
+      }
 
     revalidatePath("/sourcing");
     return { data: { updated } };
@@ -1417,12 +1468,15 @@ export async function qualifyDemand(demandId: string) {
     const demand = await prisma.demandIntake.findUnique({ where: { id: demandId } });
     if (!demand || demand.tenantId !== user.tenantId) return { error: "Demande introuvable" };
 
-    const updated = await prisma.demandIntake.update({
-      where: { id: demandId },
-      data: { status: "QUALIFIED", qualifiedById: user.id },
-    });
+      const updated = await prisma.demandIntake.update({
+        where: { id: demandId },
+        data: { status: "QUALIFIED", qualifiedById: user.id },
+      });
 
-    await AuditService.log({
+      await SourcingTicketService.ensureFromDemand(demandId);
+      await SourcingTaskOrchestratorService.syncDemandWorkflow(user.tenantId, demandId);
+
+      await AuditService.log({
       tenantId: user.tenantId,
       userId: user.id,
       action: "sourcing.demand.qualified",
@@ -1445,12 +1499,15 @@ export async function rejectDemand(demandId: string, reason?: string) {
     const demand = await prisma.demandIntake.findUnique({ where: { id: demandId } });
     if (!demand || demand.tenantId !== user.tenantId) return { error: "Demande introuvable" };
 
-    const updated = await prisma.demandIntake.update({
-      where: { id: demandId },
-      data: { status: "LOST", rejectionReason: reason },
-    });
+      const updated = await prisma.demandIntake.update({
+        where: { id: demandId },
+        data: { status: "LOST", rejectionReason: reason },
+      });
 
-    await AuditService.log({
+      await SourcingTicketService.ensureFromDemand(demandId);
+      await SourcingTaskOrchestratorService.syncDemandWorkflow(user.tenantId, demandId);
+
+      await AuditService.log({
       tenantId: user.tenantId,
       userId: user.id,
       action: "sourcing.demand.rejected",
@@ -1482,12 +1539,14 @@ export async function assignDemand(demandId: string, assignedToId?: string) {
       if (!assignee) return { error: "Assigne introuvable" };
     }
 
-    const updated = await prisma.demandIntake.update({
-      where: { id: demandId },
-      data: { assignedToId: assignedToId ?? null },
-    });
+      const updated = await prisma.demandIntake.update({
+        where: { id: demandId },
+        data: { assignedToId: assignedToId ?? null },
+      });
 
-    await AuditService.log({
+      await SourcingTaskOrchestratorService.syncDemandWorkflow(user.tenantId, demandId);
+
+      await AuditService.log({
       tenantId: user.tenantId,
       userId: user.id,
       action: "sourcing.demand.assigned",
@@ -1511,13 +1570,19 @@ export async function assignDemandAI(demandId: string) {
     const demand = await prisma.demandIntake.findUnique({ where: { id: demandId } });
     if (!demand || demand.tenantId !== user.tenantId) return { error: "Demande introuvable" };
 
-    const assignee = await SourcingAssignmentService.pickAssignee(user.tenantId);
-    if (!assignee) return { error: "Aucun assigne disponible" };
+      const assignee = await SourcingAssignmentService.pickAssignee(user.tenantId, {
+        entityType: "demand",
+        category: demand.category,
+        urgency: demand.urgency,
+      });
+      if (!assignee) return { error: "Aucun assigne disponible" };
 
-    const updated = await prisma.demandIntake.update({
-      where: { id: demandId },
-      data: { assignedToId: assignee.id },
-    });
+      const updated = await prisma.demandIntake.update({
+        where: { id: demandId },
+        data: { assignedToId: assignee.id },
+      });
+
+      await SourcingTaskOrchestratorService.syncDemandWorkflow(user.tenantId, demandId);
 
     await AuditService.log({
       tenantId: user.tenantId,
@@ -1572,12 +1637,23 @@ export async function convertDemandToSourcing(demandId: string) {
         },
       }));
 
-    const quantity = demand.quantity ?? 1;
-    const unitPrice = Number(demand.targetPrice || 0);
-    const currency = demand.currency || "RMB";
+      const quantity = demand.quantity ?? 1;
+      const unitPrice = Number(demand.targetPrice || 0);
+      const currency = demand.currency || "RMB";
+      const suggestedAssignee =
+        demand.assignedToId ??
+        (
+          await SourcingAssignmentService.pickAssignee(user.tenantId, {
+            entityType: "sourcing_case",
+            category: demand.category,
+            pipelineType: mapPipelineType(demand.clientSegment),
+            urgency: demand.urgency,
+            preferredIds: demand.assignedToId ? [demand.assignedToId] : [],
+          })
+        )?.id;
 
-    const order = await OrderService.create(user.tenantId, {
-      contactId: contact.id,
+      const order = await OrderService.create(user.tenantId, {
+        contactId: contact.id,
       items: [
         {
           description: demand.rawDescription,
@@ -1593,28 +1669,35 @@ export async function convertDemandToSourcing(demandId: string) {
       onboardedById: user.id,
     });
 
-    const sc = await SourcingCaseService.create({
-      orderId: order.id,
-      requirement: demand.rawDescription,
+      const sc = await SourcingCaseService.create({
+        orderId: order.id,
+        requirement: demand.rawDescription,
       budget:
         (demand.estimatedRevenue != null ? Number(demand.estimatedRevenue) : undefined) ??
         (demand.targetPrice != null ? Number(demand.targetPrice) * quantity : undefined),
-      currency: demand.currency || "USD",
-      category: demand.category || undefined,
-      pipelineType: mapPipelineType(demand.clientSegment),
-      assignedToId: demand.assignedToId ?? undefined,
-      assignedAgent: demand.assignedToId ? undefined : "AI Agent Alpha",
-    });
+        currency: demand.currency || "USD",
+        category: demand.category || undefined,
+        pipelineType: mapPipelineType(demand.clientSegment),
+        assignedToId: suggestedAssignee ?? undefined,
+        assignedAgent: suggestedAssignee ? undefined : "AI Agent Alpha",
+      });
 
-    await prisma.demandIntake.update({
-      where: { id: demandId },
-      data: {
-        status: "CONVERTED",
-        convertedCaseId: sc.id,
-      },
-    });
+      await prisma.demandIntake.update({
+        where: { id: demandId },
+        data: {
+          status: "CONVERTED",
+          convertedCaseId: sc.id,
+          orderId: order.id,
+          convertedAt: new Date(),
+        },
+      });
 
-    await AuditService.log({
+      await SourcingTicketService.ensureFromDemand(demandId);
+      await SourcingTicketService.syncForSourcingCase(sc.id);
+      await SourcingTaskOrchestratorService.syncDemandWorkflow(user.tenantId, demandId);
+      await SourcingTaskOrchestratorService.syncCaseWorkflow(sc.id);
+
+      await AuditService.log({
       tenantId: user.tenantId,
       userId: user.id,
       action: "sourcing.demand.converted",
@@ -1667,7 +1750,14 @@ export async function getSourcingPipelineAdvanced() {
     const payload = cases.map((sc) => {
       const sla = SourcingSlaService.compute(
         sc.status,
-        sc.stageEnteredAt || sc.updatedAt || sc.createdAt
+        sc.stageEnteredAt || sc.updatedAt || sc.createdAt,
+        {
+          level: sc.level,
+          pipelineType: sc.pipelineType,
+          category: sc.category,
+          platform: sc.platform,
+          sensitiveProduct: sc.sensitiveProduct,
+        }
       );
       return {
         id: sc.id,
@@ -1855,6 +1945,7 @@ export async function approveSourcingDecision(caseId: string, data: { supplierId
       where: { id: caseId },
       data: { supplierId: data.supplierId, status: "SELECTED", stageEnteredAt: new Date() },
     });
+    await SourcingTaskOrchestratorService.syncCaseWorkflow(caseId);
 
     await AuditService.log({
       tenantId: user.tenantId,

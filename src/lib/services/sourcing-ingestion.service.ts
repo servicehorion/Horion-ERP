@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/db";
 import { SourcingAssignmentService } from "@/lib/services/sourcing-assignment.service";
+import { SourcingTaskOrchestratorService } from "@/lib/services/sourcing-task-orchestrator.service";
+import { SourcingTicketService } from "@/lib/services/sourcing-ticket.service";
 
 const prismaAny = prisma as any;
 
@@ -60,7 +62,10 @@ export class SourcingIngestionService {
 
     let assignedToId = intent.conversation?.assignedToId ?? null;
     if (!assignedToId && options?.autoAssign) {
-      const assignee = await SourcingAssignmentService.pickAssignee(tenantId);
+      const assignee = await SourcingAssignmentService.pickAssignee(tenantId, {
+        entityType: "demand",
+        urgency: mapIntentScoreToUrgency(intent.score),
+      });
       assignedToId = assignee?.id ?? null;
     }
 
@@ -68,7 +73,7 @@ export class SourcingIngestionService {
     const clientName = waContact?.name || waContact?.phone || "WhatsApp";
     const tags = intent.conversation?.tags;
 
-    await prisma.demandIntake.create({
+    const demand = await prisma.demandIntake.create({
       data: {
         tenantId,
         source: "WHATSAPP",
@@ -88,6 +93,9 @@ export class SourcingIngestionService {
         receivedAt: intent.createdAt ?? new Date(),
       },
     });
+
+    await SourcingTicketService.ensureFromDemand(demand.id);
+    await SourcingTaskOrchestratorService.syncDemandWorkflow(tenantId, demand.id);
 
     return { created: 1, skipped: 0 };
   }
@@ -154,11 +162,14 @@ export class SourcingIngestionService {
 
       let assignedToId = lead.assignedTo || lead.ownerId;
       if (!assignedToId && params.autoAssign) {
-        const assignee = await SourcingAssignmentService.pickAssignee(params.tenantId);
+        const assignee = await SourcingAssignmentService.pickAssignee(params.tenantId, {
+          entityType: "demand",
+          category: lead.category,
+        });
         assignedToId = assignee?.id ?? null;
       }
 
-      await prisma.demandIntake.create({
+      const demand = await prisma.demandIntake.create({
         data: {
           tenantId: params.tenantId,
           source: "CRM",
@@ -180,6 +191,8 @@ export class SourcingIngestionService {
           receivedAt: lead.createdAt ?? new Date(),
         },
       });
+      await SourcingTicketService.ensureFromDemand(demand.id);
+      await SourcingTaskOrchestratorService.syncDemandWorkflow(params.tenantId, demand.id);
       created += 1;
     }
 

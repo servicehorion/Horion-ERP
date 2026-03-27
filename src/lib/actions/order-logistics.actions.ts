@@ -9,6 +9,9 @@ import { getSession } from "@/lib/session";
 import { OrderService } from "@/lib/services/order.service";
 import { AuditService } from "@/lib/services/audit.service";
 import { NotificationService } from "@/lib/services/notification.service";
+import { LogisticsGovernanceService } from "@/lib/services/logistics-governance.service";
+import { LogisticsTaskOrchestratorService } from "@/lib/services/logistics-task-orchestrator.service";
+import { OrderCustomsSummaryService } from "@/lib/services/order-customs-summary.service";
 import { ShipmentTrackingService } from "@/lib/services/shipment-tracking.service";
 import { notifyShipmentSlaIfNeeded } from "@/lib/services/logistics-sla.service";
 import { refreshShipmentAI } from "@/lib/services/logistics-ai.service";
@@ -126,6 +129,12 @@ export async function createShipment(orderId: string, data: {
   mode: string;
   origin?: string;
   destination?: string;
+  parentShipmentId?: string;
+  deliveryScope?: "FULL" | "PARTIAL" | "MULTI_LEG" | "SPLIT_DELIVERY";
+  shipmentRole?: "PRIMARY" | "LEG" | "PARTIAL";
+  splitGroupKey?: string;
+  segmentIndex?: number;
+  segmentLabel?: string;
   containerNumber?: string;
   blNumber?: string;
   estimatedDeparture?: string;
@@ -210,6 +219,12 @@ export async function createShipment(orderId: string, data: {
       data: {
         orderId,
         mode: data.mode as any,
+        parentShipmentId: data.parentShipmentId,
+        deliveryScope: data.deliveryScope || "FULL",
+        shipmentRole: data.shipmentRole || "PRIMARY",
+        splitGroupKey: data.splitGroupKey,
+        segmentIndex: data.segmentIndex,
+        segmentLabel: data.segmentLabel,
         origin: data.origin || "Guangzhou",
         destination: data.destination || "Pointe-Noire",
         trackingProvider: data.trackingProvider,
@@ -248,14 +263,20 @@ export async function createShipment(orderId: string, data: {
       newValue: {
         orderId,
         mode: data.mode,
+        deliveryScope: data.deliveryScope || "FULL",
+        shipmentRole: data.shipmentRole || "PRIMARY",
+        parentShipmentId: data.parentShipmentId ?? null,
+        segmentIndex: data.segmentIndex ?? null,
         surchargePct: appliedSurchargePct,
         complianceWarnings,
       },
     });
 
     await refreshShipmentAI(shipment.id);
+    await LogisticsTaskOrchestratorService.syncShipmentWorkflow(shipment.id);
 
     revalidatePath(`/orders/${orderId}`);
+    revalidatePath("/logistics");
     return { data: shipment, warnings: complianceWarnings };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur creation expedition" };
@@ -274,6 +295,8 @@ export async function updateShipmentStatus(shipmentId: string, status: string) {
     if (!shipment || shipment.order.tenantId !== user.tenantId) {
       return { error: "Expedition introuvable" };
     }
+
+    await LogisticsGovernanceService.assertShipmentTransition(shipmentId, status as any);
 
     const updated = await prisma.shipment.update({
       where: { id: shipmentId },
@@ -297,8 +320,10 @@ export async function updateShipmentStatus(shipmentId: string, status: string) {
     });
 
     await refreshShipmentAI(shipmentId);
+    await LogisticsTaskOrchestratorService.syncShipmentWorkflow(shipmentId);
 
     revalidatePath(`/orders/${shipment.order.id}`);
+    revalidatePath("/logistics");
     return { data: updated };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur mise a jour expedition" };
@@ -339,8 +364,10 @@ export async function addTrackingEvent(shipmentId: string, data: { event: string
     });
 
     await refreshShipmentAI(shipmentId);
+    await LogisticsTaskOrchestratorService.syncShipmentWorkflow(shipmentId);
 
     revalidatePath(`/orders/${shipment.order.id}`);
+    revalidatePath("/logistics");
     return { data: event };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur tracking" };
@@ -397,6 +424,7 @@ export async function syncShipmentTracking(shipmentId: string) {
     });
 
     await refreshShipmentAI(shipmentId);
+    await LogisticsTaskOrchestratorService.syncShipmentWorkflow(shipmentId);
 
     const teamIds = await getOrderTeamUserIds(shipment.order.id);
     await NotificationService.notifyMany(teamIds, {
@@ -409,6 +437,7 @@ export async function syncShipmentTracking(shipmentId: string) {
     });
 
     revalidatePath(`/orders/${shipment.order.id}`);
+    revalidatePath("/logistics");
     return { data: updated };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur sync tracking" };
@@ -861,8 +890,8 @@ export async function upsertCustomsClearance(
       return { error: "Exp-dition introuvable" };
     }
 
-    const clearance = await prisma.customsClearance.upsert({
-      where: { shipmentId },
+      const clearance = await prisma.customsClearance.upsert({
+        where: { shipmentId },
       update: {
         ...(data.status && { status: data.status as any }),
         ...(data.declarationNum !== undefined && { declarationNum: data.declarationNum }),
@@ -881,11 +910,16 @@ export async function upsertCustomsClearance(
         brokerName: data.brokerName,
         submittedAt: data.submittedAt ? new Date(data.submittedAt) : undefined,
         clearedAt: data.clearedAt ? new Date(data.clearedAt) : undefined,
-      },
-    });
+        },
+      });
 
-    revalidatePath(`/orders/${shipment.order.id}`);
-    return { data: clearance };
+      await OrderCustomsSummaryService.syncFromShipments(shipment.order.id);
+      await refreshShipmentAI(shipmentId);
+      await LogisticsTaskOrchestratorService.syncShipmentWorkflow(shipmentId);
+
+      revalidatePath(`/orders/${shipment.order.id}`);
+      revalidatePath("/logistics");
+      return { data: clearance };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur d-douanement" };
   }

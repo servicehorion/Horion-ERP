@@ -12,7 +12,12 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
-import { getProductById, getProductIntelligence } from "@/lib/actions/catalog.actions";
+import {
+  getCatalogProductProvenance,
+  getProductById,
+  getProductIntelligence,
+} from "@/lib/actions/catalog.actions";
+import { CatalogProvenancePanel } from "@/components/catalog/catalog-provenance-panel";
 import { ProductStatusSelect } from "@/components/catalog/product-status-select";
 import { formatCurrency } from "@/config/currencies";
 
@@ -35,12 +40,14 @@ const QC_RESULT_CONFIG: Record<string, { label: string; color: string; icon: typ
 };
 
 export default async function ProductDetailPage({ params }: { params: { id: string } }) {
-  const [res, intelRes] = await Promise.all([
+  const [res, intelRes, provenanceRes] = await Promise.all([
     getProductById(params.id),
     getProductIntelligence(params.id),
+    getCatalogProductProvenance(params.id),
   ]);
   if (!res.data) notFound();
   const intel = intelRes.data;
+  const provenance = provenanceRes.data;
 
   const p = res.data as any;
   const statusConfig = STATUS_CONFIG[p.status] || { label: p.status, color: "bg-gray-100 text-gray-800" };
@@ -302,6 +309,8 @@ export default async function ProductDetailPage({ params }: { params: { id: stri
               </div>
             </CardContent>
           </Card>
+
+          {provenance ? <CatalogProvenancePanel items={provenance.items} /> : null}
 
           {/* Logistics + Notes */}
           <div className="grid gap-4 md:grid-cols-2">

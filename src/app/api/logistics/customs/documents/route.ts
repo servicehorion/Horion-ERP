@@ -7,6 +7,8 @@ import { checkPermission } from "@/lib/permissions";
 import { StorageService } from "@/lib/services/storage.service";
 import { NotificationService } from "@/lib/services/notification.service";
 import { refreshShipmentAI } from "@/lib/services/logistics-ai.service";
+import { LogisticsTaskOrchestratorService } from "@/lib/services/logistics-task-orchestrator.service";
+import { OrderCustomsSummaryService } from "@/lib/services/order-customs-summary.service";
 
 async function getOrderTeamUserIds(orderId: string): Promise<string[]> {
   const order = await prisma.order.findUnique({
@@ -105,6 +107,7 @@ export async function POST(req: Request) {
         documents: [doc],
       },
     });
+    await OrderCustomsSummaryService.syncFromShipments(shipment.order.id);
 
     const downloadUrl = await StorageService.createSignedUrl({
       bucket: upload.bucket,
@@ -122,6 +125,7 @@ export async function POST(req: Request) {
     });
 
     await refreshShipmentAI(shipment.id);
+    await LogisticsTaskOrchestratorService.syncShipmentWorkflow(shipment.id);
 
     return NextResponse.json({ data: { ...doc, downloadUrl } });
   } catch (error) {

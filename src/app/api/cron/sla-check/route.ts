@@ -1,6 +1,7 @@
 ﻿import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { notifyShipmentSlaIfNeeded } from "@/lib/services/logistics-sla.service";
+import { LogisticsTaskOrchestratorService } from "@/lib/services/logistics-task-orchestrator.service";
 import { LeadSlaService } from "@/lib/services/lead-sla.service";
 import { TaskWorkflowService } from "@/lib/services/task-workflow.service";
 import { requireSecretHeader } from "@/lib/api/secret-auth";
@@ -45,6 +46,7 @@ export async function POST(req: Request) {
         tenantId: shipment.order.tenantId,
         teamIds,
       });
+      await LogisticsTaskOrchestratorService.syncShipmentWorkflow(shipment.id);
       if (res.notified) notified += 1;
     }
 

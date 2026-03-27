@@ -67,6 +67,9 @@ export default async function SourcingCaseDetailPage({
 
   const sc = caseResult.data as typeof caseResult.data & {
     level?: string;
+    pipelineType?: string;
+    category?: string | null;
+    platform?: string | null;
     weightKg?: number | null;
     lengthCm?: number | null;
     widthCm?: number | null;
@@ -98,7 +101,14 @@ export default async function SourcingCaseDetailPage({
   const canCapitalize = LOGISTICS_ROLES.includes(userRole);
   const sla = SourcingSlaService.compute(
     sc.status,
-    sc.stageEnteredAt || sc.updatedAt || sc.createdAt
+    sc.stageEnteredAt || sc.updatedAt || sc.createdAt,
+    {
+      level: sc.level,
+      pipelineType: sc.pipelineType,
+      category: sc.category,
+      platform: sc.platform,
+      sensitiveProduct: sc.sensitiveProduct,
+    }
   );
   const slaColor =
     sla.status === "BREACHED"

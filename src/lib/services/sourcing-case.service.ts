@@ -135,6 +135,15 @@ export class SourcingCaseService {
   }
 
   static async selectSupplier(id: string, supplierId: string, offerId: string) {
+    const current = await prisma.sourcingCase.findUnique({
+      where: { id },
+      select: { status: true },
+    });
+    if (!current) throw new Error("Cas de sourcing introuvable");
+    if (!["OFFERS_RECEIVED", "NEGOTIATING", "SELECTED"].includes(current.status)) {
+      throw new Error("Le dossier doit etre en offres recues ou en negociation avant selection.");
+    }
+
     return prisma.$transaction(async (tx) => {
       // Mark the offer as selected
       await tx.offer.updateMany({

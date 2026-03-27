@@ -2,6 +2,7 @@
 
 import { z } from "zod";
 import crypto from "crypto";
+import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/session";
 import { checkPermission } from "@/lib/permissions";
@@ -9,6 +10,10 @@ import { serializeDecimals } from "@/lib/utils";
 import { NotificationService } from "@/lib/services/notification.service";
 import { computeShipmentSla, notifyShipmentSlaIfNeeded } from "@/lib/services/logistics-sla.service";
 import { refreshShipmentAI } from "@/lib/services/logistics-ai.service";
+import { LogisticsTaskOrchestratorService } from "@/lib/services/logistics-task-orchestrator.service";
+import { ShipmentProjectionService } from "@/lib/services/shipment-projection.service";
+import { LogisticsBatchService } from "@/lib/services/logistics-batch.service";
+import { OrderCustomsSummaryService } from "@/lib/services/order-customs-summary.service";
 import { StorageService } from "@/lib/services/storage.service";
 import { CatalogMemoryService } from "@/lib/services/catalog-memory.service";
 import type { NegotiatedTransportRateProfile } from "@/lib/services/transport-calculator.service";
@@ -244,11 +249,32 @@ export async function getLogisticsDashboard() {
           },
         },
         freightPartner: { select: { id: true, name: true, rating: true, country: true, type: true, notes: true } },
+        logisticsBatch: { select: { id: true, batchNumber: true, type: true, status: true } },
+        groupageBatch: { select: { id: true, name: true, status: true } },
+        consolidationBatch: { select: { id: true, batchNumber: true, status: true } },
+        parentShipment: {
+          select: {
+            id: true,
+            status: true,
+            order: { select: { orderNumber: true } },
+          },
+        },
+        childShipments: {
+          select: { id: true, status: true },
+          take: 20,
+        },
         trackingEvents: { orderBy: { occurredAt: "desc" } },
         customsClearance: true,
         aiInsight: true,
         costLines: true,
         incidents: { orderBy: { createdAt: "desc" }, take: 5 },
+        warehouseReceipt: {
+          select: {
+            receivedAt: true,
+            readyToShip: true,
+            condition: true,
+          },
+        },
       },
       orderBy: { updatedAt: "desc" },
       take: 250,
@@ -419,10 +445,42 @@ export async function getLogisticsDashboard() {
           : riskLevelBase;
       const aiFactors = Array.isArray(aiInsight?.factors) ? aiInsight?.factors : [];
       const mergedReasons = [...riskReasons, ...aiFactors].filter((reason): reason is string => Boolean(reason));
+      const workflow = ShipmentProjectionService.projectRecord({
+        id: ship.id,
+        status: ship.status,
+        mode: ship.mode,
+        origin: ship.origin,
+        destination: ship.destination,
+        freightPartnerId: ship.freightPartnerId,
+        trackingProvider: ship.trackingProvider,
+        trackingNumber: ship.trackingNumber,
+        trackingUrl: ship.trackingUrl,
+        lastTrackingSyncAt: ship.lastTrackingSyncAt,
+        containerNumber: ship.containerNumber,
+        blNumber: ship.blNumber,
+        proofImageUrl: ship.proofImageUrl,
+        estimatedDeparture: ship.estimatedDeparture,
+        actualDeparture: ship.actualDeparture,
+        estimatedArrival: ship.estimatedArrival,
+        actualArrival: ship.actualArrival,
+        updatedAt: ship.updatedAt,
+        weightValidatedAt: ship.weightValidatedAt,
+        aiInsight: ship.aiInsight
+          ? {
+              riskLevel: ship.aiInsight.riskLevel,
+            }
+          : null,
+        warehouseReceipt: ship.warehouseReceipt,
+        customsClearance: ship.customsClearance,
+        trackingEvents: ship.trackingEvents,
+        incidents: ship.incidents,
+      });
 
       return {
         id: ship.id,
         orderId: ship.orderId,
+        parentShipmentId: ship.parentShipmentId ?? null,
+        logisticsBatchId: ship.logisticsBatchId ?? null,
         orderNumber: ship.order?.orderNumber || "",
         customerName: ship.order?.contact?.name || "",
         customerPhone: ship.order?.contact?.phone || "",
@@ -432,6 +490,11 @@ export async function getLogisticsDashboard() {
         freightPartner: ship.freightPartner?.name || "",
         freightPartnerId: ship.freightPartner?.id || null,
         mode: ship.mode,
+        deliveryScope: ship.deliveryScope,
+        shipmentRole: ship.shipmentRole,
+        splitGroupKey: ship.splitGroupKey ?? null,
+        segmentIndex: ship.segmentIndex ?? null,
+        segmentLabel: ship.segmentLabel ?? null,
         origin: ship.origin,
         destination: ship.destination,
         trackingNumber: ship.trackingNumber || ship.blNumber || ship.containerNumber || "",
@@ -485,10 +548,42 @@ export async function getLogisticsDashboard() {
           resolvedAt: d.resolvedAt,
         })) || [],
         consolidationBatchId: ship.consolidationBatchId ?? null,
+        groupageBatchId: ship.groupageBatchId ?? null,
+        batchSummary: ship.logisticsBatch
+          ? {
+              id: ship.logisticsBatch.id,
+              label: ship.logisticsBatch.batchNumber,
+              type: ship.logisticsBatch.type,
+              status: ship.logisticsBatch.status,
+            }
+          : ship.groupageBatch
+            ? {
+                id: ship.groupageBatch.id,
+                label: ship.groupageBatch.name,
+                type: "GROUPAGE" as const,
+                status: ship.groupageBatch.status,
+              }
+            : ship.consolidationBatch
+              ? {
+                  id: ship.consolidationBatch.id,
+                  label: ship.consolidationBatch.batchNumber,
+                  type: "CONSOLIDATION" as const,
+                  status: ship.consolidationBatch.status,
+                }
+              : null,
+        parentShipment: ship.parentShipment
+          ? {
+              id: ship.parentShipment.id,
+              status: ship.parentShipment.status,
+              orderNumber: ship.parentShipment.order?.orderNumber ?? null,
+            }
+          : null,
+        childShipmentCount: ship.childShipments.length,
         slaDueAt: sla.dueAt,
         daysLate: sla.daysLate,
         slaStatus: sla.level,
         apiConnected: Boolean(ship.freightPartner?.notes?.toLowerCase().includes("api")),
+        workflow,
       };
     });
 
@@ -914,6 +1009,8 @@ export async function createConsolidationBatch(formData: Record<string, unknown>
       },
     });
 
+    await LogisticsBatchService.ensureFromConsolidationBatch(batch.id, user.tenantId);
+
     return { data: batch };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur creation lot" };
@@ -925,13 +1022,20 @@ export async function assignShipmentsToBatch(formData: Record<string, unknown>) 
     const user = await getSession();
     checkPermission(user.role, "logistics.manage");
     const validated = assignBatchSchema.parse(formData);
+    const canonicalBatch = await LogisticsBatchService.ensureFromConsolidationBatch(
+      validated.batchId,
+      user.tenantId
+    );
 
     const updated = await prisma.shipment.updateMany({
       where: {
         id: { in: validated.shipmentIds },
         order: { tenantId: user.tenantId },
       },
-      data: { consolidationBatchId: validated.batchId },
+      data: {
+        consolidationBatchId: validated.batchId,
+        logisticsBatchId: canonicalBatch?.id,
+      },
     });
 
     return { data: updated.count };
@@ -1017,15 +1121,16 @@ export async function addCustomsDocument(formData: Record<string, unknown>) {
       addedById: user.id,
     };
 
-    await prisma.customsClearance.upsert({
-      where: { shipmentId: validated.shipmentId },
-      update: { documents: [...docs, newDoc] },
-      create: {
-        shipmentId: validated.shipmentId,
-        status: "PENDING",
-        documents: [newDoc],
-      },
-    });
+      await prisma.customsClearance.upsert({
+        where: { shipmentId: validated.shipmentId },
+        update: { documents: [...docs, newDoc] },
+        create: {
+          shipmentId: validated.shipmentId,
+          status: "PENDING",
+          documents: [newDoc],
+        },
+      });
+      await OrderCustomsSummaryService.syncFromShipments(shipment.order.id);
 
     const teamIds = await getOrderTeamUserIds(shipment.order.id);
     await NotificationService.notifyMany(teamIds, {
@@ -1038,6 +1143,7 @@ export async function addCustomsDocument(formData: Record<string, unknown>) {
     });
 
     await refreshShipmentAI(shipment.id);
+    await LogisticsTaskOrchestratorService.syncShipmentWorkflow(shipment.id);
 
     return { data: true };
   } catch (error) {
@@ -1076,15 +1182,16 @@ export async function updateCustomsDocumentStatus(formData: Record<string, unkno
         : doc
     );
 
-    await prisma.customsClearance.upsert({
-      where: { shipmentId: validated.shipmentId },
-      update: { documents: updatedDocs },
-      create: {
-        shipmentId: validated.shipmentId,
-        status: "PENDING",
-        documents: updatedDocs,
-      },
-    });
+      await prisma.customsClearance.upsert({
+        where: { shipmentId: validated.shipmentId },
+        update: { documents: updatedDocs },
+        create: {
+          shipmentId: validated.shipmentId,
+          status: "PENDING",
+          documents: updatedDocs,
+        },
+      });
+      await OrderCustomsSummaryService.syncFromShipments(shipment.order.id);
 
     const teamIds = await getOrderTeamUserIds(shipment.order.id);
     await NotificationService.notifyMany(teamIds, {
@@ -1097,6 +1204,7 @@ export async function updateCustomsDocumentStatus(formData: Record<string, unkno
     });
 
     await refreshShipmentAI(shipment.id);
+    await LogisticsTaskOrchestratorService.syncShipmentWorkflow(shipment.id);
 
     return { data: true };
   } catch (error) {
@@ -1149,20 +1257,21 @@ export async function resolveCustomsIssue(formData: Record<string, unknown>) {
           }
         : null;
 
-    await prisma.customsClearance.upsert({
-      where: { shipmentId: validated.shipmentId },
-      update: {
-        status: "CLEARED",
-        clearedAt: new Date(),
+      await prisma.customsClearance.upsert({
+        where: { shipmentId: validated.shipmentId },
+        update: {
+          status: "CLEARED",
+          clearedAt: new Date(),
         documents: resolutionDoc ? [...docs, resolutionDoc] : docs,
       },
       create: {
         shipmentId: validated.shipmentId,
         status: "CLEARED",
         clearedAt: new Date(),
-        documents: resolutionDoc ? [...docs, resolutionDoc] : docs,
-      },
-    });
+          documents: resolutionDoc ? [...docs, resolutionDoc] : docs,
+        },
+      });
+      await OrderCustomsSummaryService.syncFromShipments(shipment.order.id);
 
     const teamIds = await getOrderTeamUserIds(shipment.order.id);
     await NotificationService.notifyMany(teamIds, {
@@ -1343,6 +1452,7 @@ export async function runLogisticsSlaCheck() {
         tenantId: user.tenantId,
         teamIds,
       });
+      await LogisticsTaskOrchestratorService.syncShipmentWorkflow(shipment.id);
     }
 
     return { data: true };
@@ -1366,6 +1476,7 @@ export async function recalcShipmentAI(shipmentId: string) {
 
     const ai = await refreshShipmentAI(shipmentId);
     if (!ai) return { error: "Expedition introuvable" };
+    await LogisticsTaskOrchestratorService.syncShipmentWorkflow(shipmentId);
     return { data: ai };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur AI" };
@@ -1456,6 +1567,7 @@ export async function createShipmentIncident(formData: Record<string, unknown>) 
     });
 
     await refreshShipmentAI(shipment.id);
+    await LogisticsTaskOrchestratorService.syncShipmentWorkflow(shipment.id);
 
     return { data: incident };
   } catch (error) {
@@ -1497,6 +1609,7 @@ export async function updateShipmentIncident(incidentId: string, formData: Recor
     });
 
     await refreshShipmentAI(incident.shipment.id);
+    await LogisticsTaskOrchestratorService.syncShipmentWorkflow(incident.shipment.id);
 
     return { data: updated };
   } catch (error) {
@@ -1623,7 +1736,6 @@ export async function createWarehouseReceipt(raw: unknown) {
         volumetricWeightKg,
         chargeableWeightKg,
         weightValidatedAt: new Date(),
-        ...(data.readyToShip ? { status: "IN_TRANSIT" } : {}),
       },
     });
 
@@ -1676,6 +1788,11 @@ export async function createWarehouseReceipt(raw: unknown) {
         );
       }
     }
+
+    await refreshShipmentAI(data.shipmentId);
+    await LogisticsTaskOrchestratorService.syncShipmentWorkflow(data.shipmentId);
+    revalidatePath("/logistics");
+    revalidatePath(`/orders/${shipment.order.id}`);
 
     return { data: serializeDecimals(receipt) };
   } catch (error) {

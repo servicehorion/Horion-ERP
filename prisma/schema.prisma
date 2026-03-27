@@ -55,6 +55,7 @@ model Tenant {
   recurringTasks             RecurringTask[]
   notifications              Notification[]
   groupageBatches            GroupageBatch[]
+  logisticsBatches           LogisticsBatch[]
   demandIntakes              DemandIntake[]
   catalogSourcingHistory     CatalogSourcingHistory[]
   marketInsights             SourcingMarketInsight[]
@@ -975,7 +976,9 @@ model ReturnMerchandiseLine {
 }
 
 // ============================================================
-// C2. DOUANES & PROTECTION (lié aux commandes)
+// C2. DOUANES & PROTECTION
+// Canonical truth lives at Shipment -> CustomsClearance.
+// OrderCustomsClearance remains as a legacy order-level summary/projection.
 // ============================================================
 
 enum CustomsClearanceStatus {
@@ -999,6 +1002,8 @@ model OrderCustomsClearance {
   clearedAt         DateTime?
   dapDeliveryStatus String?
   documents         Json                   @default("[]") // [{name, url, type}]
+  syncedShipmentIds Json                   @default("[]")
+  lastSyncedAt      DateTime?
   notes             String?
   createdAt         DateTime               @default(now())
   updatedAt         DateTime               @updatedAt
@@ -1546,6 +1551,7 @@ model GroupageBatch {
   totalWeight Decimal?  @db.Decimal(10, 3)
   etd         DateTime?
   eta         DateTime?
+  logisticsBatchId String? @unique
   notes       String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -1553,6 +1559,7 @@ model GroupageBatch {
   tenant    Tenant              @relation(fields: [tenantId], references: [id])
   items     GroupageBatchItem[]
   shipments Shipment[]
+  logisticsBatch LogisticsBatch? @relation("LegacyGroupageBatch", fields: [logisticsBatchId], references: [id])
 
   @@index([tenantId])
   @@map("groupage_batches")
@@ -1752,6 +1759,13 @@ model Shipment {
   freightPartnerId     String?
   consolidationBatchId String?
   groupageBatchId      String?
+  logisticsBatchId     String?
+  parentShipmentId     String?
+  deliveryScope        ShipmentDeliveryScope @default(FULL)
+  shipmentRole         ShipmentRole   @default(PRIMARY)
+  splitGroupKey        String?
+  segmentIndex         Int?
+  segmentLabel         String?
   origin               String         @default("Guangzhou")
   destination          String         @default("Pointe-Noire")
   trackingProvider     String?
@@ -1783,6 +1797,9 @@ model Shipment {
   freightPartner     FreightPartner?       @relation(fields: [freightPartnerId], references: [id])
   consolidationBatch ConsolidationBatch?   @relation(fields: [consolidationBatchId], references: [id])
   groupageBatch      GroupageBatch?        @relation(fields: [groupageBatchId], references: [id])
+  logisticsBatch     LogisticsBatch?       @relation(fields: [logisticsBatchId], references: [id])
+  parentShipment     Shipment?             @relation("ShipmentHierarchy", fields: [parentShipmentId], references: [id])
+  childShipments     Shipment[]            @relation("ShipmentHierarchy")
   trackingEvents     TrackingEvent[]
   customsClearance   CustomsClearance?
   aiInsight          ShipmentAIInsight?
@@ -1794,6 +1811,9 @@ model Shipment {
 
   @@index([orderId])
   @@index([groupageBatchId])
+  @@index([logisticsBatchId])
+  @@index([parentShipmentId])
+  @@index([splitGroupKey])
   @@map("shipments")
 }
 
@@ -1803,6 +1823,19 @@ enum ShipmentMode {
   RAIL
   ROAD
   MULTIMODAL
+}
+
+enum ShipmentDeliveryScope {
+  FULL
+  PARTIAL
+  MULTI_LEG
+  SPLIT_DELIVERY
+}
+
+enum ShipmentRole {
+  PRIMARY
+  LEG
+  PARTIAL
 }
 
 enum ShipmentStatus {
@@ -1836,13 +1869,46 @@ model ConsolidationBatch {
   id          String   @id @default(cuid())
   batchNumber String   @unique
   status      String   @default("open")
+  logisticsBatchId String? @unique
   notes       String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   shipments Shipment[]
+  logisticsBatch LogisticsBatch? @relation("LegacyConsolidationBatch", fields: [logisticsBatchId], references: [id])
 
   @@map("consolidation_batches")
+}
+
+enum LogisticsBatchType {
+  GROUPAGE
+  CONSOLIDATION
+}
+
+model LogisticsBatch {
+  id                         String              @id @default(cuid())
+  tenantId                   String
+  batchNumber                String              @unique
+  type                       LogisticsBatchType
+  status                     String              @default("OPEN")
+  mode                       ShipmentMode?
+  destination                String?
+  etd                        DateTime?
+  eta                        DateTime?
+  notes                      String?
+  legacyGroupageBatchId      String?             @unique
+  legacyConsolidationBatchId String?             @unique
+  createdAt                  DateTime            @default(now())
+  updatedAt                  DateTime            @updatedAt
+
+  tenant                   Tenant              @relation(fields: [tenantId], references: [id])
+  shipments                Shipment[]
+  legacyGroupageBatch      GroupageBatch?      @relation("LegacyGroupageBatch")
+  legacyConsolidationBatch ConsolidationBatch? @relation("LegacyConsolidationBatch")
+
+  @@index([tenantId, type])
+  @@index([tenantId, status])
+  @@map("logistics_batches")
 }
 
 model CustomsClearance {

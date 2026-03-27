@@ -1,6 +1,10 @@
+import type { ShipmentWorkflowSnapshot } from "@/lib/logistics/types";
+
 export type LogisticsShipment = {
   id: string;
   orderId: string;
+  parentShipmentId?: string | null;
+  logisticsBatchId?: string | null;
   orderNumber: string;
   customerName: string;
   customerPhone?: string;
@@ -10,6 +14,11 @@ export type LogisticsShipment = {
   freightPartner: string;
   freightPartnerId?: string | null;
   mode: string;
+  deliveryScope?: "FULL" | "PARTIAL" | "MULTI_LEG" | "SPLIT_DELIVERY";
+  shipmentRole?: "PRIMARY" | "LEG" | "PARTIAL";
+  splitGroupKey?: string | null;
+  segmentIndex?: number | null;
+  segmentLabel?: string | null;
   origin?: string | null;
   destination?: string | null;
   trackingNumber?: string;
@@ -41,6 +50,19 @@ export type LogisticsShipment = {
   }[];
   customsClearance?: any;
   consolidationBatchId?: string | null;
+  groupageBatchId?: string | null;
+  batchSummary?: {
+    id: string;
+    label: string;
+    type: "GROUPAGE" | "CONSOLIDATION";
+    status: string;
+  } | null;
+  parentShipment?: {
+    id: string;
+    status: string;
+    orderNumber?: string | null;
+  } | null;
+  childShipmentCount?: number;
   apiConnected?: boolean;
   aiInsight?: {
     predictedArrival?: string | Date | null;
@@ -80,6 +102,7 @@ export type LogisticsShipment = {
     createdAt?: string | Date;
     resolvedAt?: string | Date | null;
   }[];
+  workflow?: ShipmentWorkflowSnapshot;
 };
 
 export type LogisticsDashboardData = {

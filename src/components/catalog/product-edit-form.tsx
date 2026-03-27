@@ -350,48 +350,12 @@ export function ProductEditForm({ productId, defaultValues, categories }: Props)
             )}
           />
         </div>
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+          Les metriques derivees du Catalog OS ne s'editeront plus ici.
+          Elles seront recalculees depuis le sourcing, l'entrepot et les commandes reelles.
+        </div>
 
-        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-          <FormField
-            control={form.control}
-            name="weightedAverageCost"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Coût moyen pondéré</FormLabel>
-                <FormControl>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min={0}
-                    value={field.value ?? ""}
-                    onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="estimatedCost"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Coût estimé maison</FormLabel>
-                <FormControl>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min={0}
-                    value={field.value ?? ""}
-                    onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
+        <div className="grid gap-6 md:grid-cols-2">
           <FormField
             control={form.control}
             name="defaultRiskBufferPct"
@@ -432,28 +396,6 @@ export function ProductEditForm({ productId, defaultValues, categories }: Props)
             )}
           />
         </div>
-
-        <FormField
-          control={form.control}
-          name="recommendedSellPrice"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Prix Horion recommandé</FormLabel>
-              <FormControl>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min={0}
-                  value={field.value ?? ""}
-                  onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
-                  placeholder="Calculé à partir du coût réel + buffer + marge"
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
         <FormField
           control={form.control}
           name="specsJson"

@@ -133,12 +133,6 @@ export class OrderService {
           },
           orderBy: { receivedAt: "desc" },
         },
-        customsClearance: {
-          select: {
-            status: true,
-            clearedAt: true,
-          },
-        },
         qcRequests: {
           orderBy: [{ completedAt: "desc" }, { createdAt: "desc" }],
           select: {
@@ -202,13 +196,11 @@ export class OrderService {
     );
     const hasDeliveredShipment =
       shipments.some((shipment) => shipment.status === "DELIVERED") || Boolean(context.actualDelivery);
-    const hasCustomsSignal =
-      Boolean(context.customsClearance && context.customsClearance.status !== "PENDING") ||
-      shipments.some(
-        (shipment) =>
-          Boolean(shipment.customsClearance && shipment.customsClearance.status !== "PENDING") ||
-          ["CUSTOMS", "CLEARED", "IN_DELIVERY", "DELIVERED"].includes(shipment.status),
-      );
+    const hasCustomsSignal = shipments.some(
+      (shipment) =>
+        Boolean(shipment.customsClearance && shipment.customsClearance.status !== "PENDING") ||
+        ["CUSTOMS", "CLEARED", "IN_DELIVERY", "DELIVERED"].includes(shipment.status),
+    );
     const latestQcRequest = context.qcRequests[0] ?? null;
     const latestInspection = context.qcInspections[0] ?? null;
     const qcFailed =

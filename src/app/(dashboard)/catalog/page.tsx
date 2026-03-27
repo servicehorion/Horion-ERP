@@ -11,8 +11,12 @@ import { Progress } from "@/components/ui/progress";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { getCatalogDashboardStats } from "@/lib/actions/catalog.actions";
+import {
+  getCatalogDashboardProjection,
+  getCatalogDashboardStats,
+} from "@/lib/actions/catalog.actions";
 import { ExportProductsButton } from "@/components/catalog/export-products-button";
+import { CatalogDashboardOverview } from "@/components/catalog/catalog-dashboard-overview";
 
 export const metadata = {
   title: "Catalogue OS | Horion ERP",
@@ -34,7 +38,10 @@ const SUPPLIER_STATUS_CONFIG: Record<string, { label: string; color: string }> =
 };
 
 export default async function CatalogDashboardPage() {
-  const result = await getCatalogDashboardStats();
+  const [result, projectionResult] = await Promise.all([
+    getCatalogDashboardStats(),
+    getCatalogDashboardProjection(),
+  ]);
 
   if (result.error) {
     return (
@@ -105,6 +112,10 @@ export default async function CatalogDashboardPage() {
           </Button>
         </div>
       </div>
+
+      {projectionResult.data ? (
+        <CatalogDashboardOverview projection={projectionResult.data} />
+      ) : null}
 
       {/* Bloomberg KPI Strip */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">

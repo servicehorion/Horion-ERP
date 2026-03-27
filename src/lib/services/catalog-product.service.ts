@@ -3,6 +3,16 @@ import { emitEvent } from "@/lib/events";
 import { buildCatalogMatchingFingerprint, normalizeCatalogText, scoreCatalogSimilarity } from "@/lib/catalog-memory";
 import type { ProductStatus, Prisma } from "@prisma/client";
 
+function normalizeJsonRecord(value: Record<string, unknown> | string | undefined) {
+  if (!value) return undefined;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return undefined;
+    return JSON.parse(trimmed) as Record<string, unknown>;
+  }
+  return value;
+}
+
 export class CatalogProductService {
   static async create(tenantId: string, data: {
     name: string;
@@ -11,7 +21,7 @@ export class CatalogProductService {
     aliasesJson?: string[];
     searchKeywordsJson?: string[];
     matchingFingerprint?: string;
-    specsJson?: Record<string, unknown>;
+    specsJson?: Record<string, unknown> | string;
     weightEstimate?: number;
     volumeEstimate?: number;
     qcRecommendedLevel?: string;
@@ -22,26 +32,10 @@ export class CatalogProductService {
     preferredPlatform?: string;
     preferredSupplierId?: string;
     preferredSupplierProductId?: string;
-    weightedAverageCost?: number;
-    estimatedCost?: number;
-    lastActualCost?: number;
-    recommendedSellPrice?: number;
-    averageRealityCoefficient?: number;
-    savingsVsIndicatifPct?: number;
-    priceVolatilityPct?: number;
     defaultRiskBufferPct?: number;
     defaultHiddenMarginPct?: number;
-    historicalOrderCount?: number;
-    successfulOrderCount?: number;
-    stableOrderCount?: number;
-    catalogConfidenceScore?: number;
-    isCertified?: boolean;
-    certifiedAt?: string;
-    lastQuotedAt?: string;
-    lastPurchasedAt?: string;
-    lastVerifiedAt?: string;
-    lastPriceAlertAt?: string;
     shippingHints?: Record<string, unknown>;
+    marketingPack?: Record<string, unknown>;
     notes?: string;
   }) {
     const aliasList = (data.aliasesJson ?? []).map((value) => value.trim()).filter(Boolean);
@@ -49,19 +43,19 @@ export class CatalogProductService {
     const matchingFingerprint =
       data.matchingFingerprint ||
       buildCatalogMatchingFingerprint([data.name, aliasList, keywordList]);
-    const estimatedCost = data.estimatedCost ?? data.weightedAverageCost ?? data.priceMin;
+    const estimatedCost = data.priceMin;
     const defaultRiskBufferPct = data.defaultRiskBufferPct ?? 15;
     const defaultHiddenMarginPct = data.defaultHiddenMarginPct ?? 30;
     const recommendedSellPrice =
-      data.recommendedSellPrice ??
-      (estimatedCost
+      estimatedCost
         ? Number(
             (
               estimatedCost *
               (1 + defaultRiskBufferPct / 100 + defaultHiddenMarginPct / 100)
             ).toFixed(2)
           )
-        : undefined);
+        : undefined;
+    const specsJson = normalizeJsonRecord(data.specsJson);
     const product = await prisma.catalogProduct.create({
       data: {
         tenantId,
@@ -71,7 +65,7 @@ export class CatalogProductService {
         aliasesJson: aliasList,
         searchKeywordsJson: keywordList,
         matchingFingerprint,
-        specsJson: data.specsJson ? JSON.parse(JSON.stringify(data.specsJson)) : undefined,
+        specsJson: specsJson ? JSON.parse(JSON.stringify(specsJson)) : undefined,
         weightEstimate: data.weightEstimate,
         volumeEstimate: data.volumeEstimate,
         qcRecommendedLevel: data.qcRecommendedLevel,
@@ -82,26 +76,12 @@ export class CatalogProductService {
         preferredPlatform: data.preferredPlatform,
         preferredSupplierId: data.preferredSupplierId,
         preferredSupplierProductId: data.preferredSupplierProductId,
-        weightedAverageCost: data.weightedAverageCost,
         estimatedCost,
-        lastActualCost: data.lastActualCost,
         recommendedSellPrice,
-        averageRealityCoefficient: data.averageRealityCoefficient,
-        savingsVsIndicatifPct: data.savingsVsIndicatifPct,
-        priceVolatilityPct: data.priceVolatilityPct,
-        defaultRiskBufferPct: data.defaultRiskBufferPct,
-        defaultHiddenMarginPct: data.defaultHiddenMarginPct,
-        historicalOrderCount: data.historicalOrderCount,
-        successfulOrderCount: data.successfulOrderCount,
-        stableOrderCount: data.stableOrderCount,
-        catalogConfidenceScore: data.catalogConfidenceScore,
-        isCertified: data.isCertified,
-        certifiedAt: data.certifiedAt ? new Date(data.certifiedAt) : undefined,
-        lastQuotedAt: data.lastQuotedAt ? new Date(data.lastQuotedAt) : undefined,
-        lastPurchasedAt: data.lastPurchasedAt ? new Date(data.lastPurchasedAt) : undefined,
-        lastVerifiedAt: data.lastVerifiedAt ? new Date(data.lastVerifiedAt) : undefined,
-        lastPriceAlertAt: data.lastPriceAlertAt ? new Date(data.lastPriceAlertAt) : undefined,
+        defaultRiskBufferPct,
+        defaultHiddenMarginPct,
         shippingHints: data.shippingHints ? JSON.parse(JSON.stringify(data.shippingHints)) : undefined,
+        marketingPack: data.marketingPack ? JSON.parse(JSON.stringify(data.marketingPack)) : undefined,
         notes: data.notes,
       },
       include: { category: true },
@@ -121,7 +101,7 @@ export class CatalogProductService {
     aliasesJson: string[];
     searchKeywordsJson: string[];
     matchingFingerprint: string;
-    specsJson: Record<string, unknown>;
+    specsJson: Record<string, unknown> | string;
     weightEstimate: number;
     volumeEstimate: number;
     qcRecommendedLevel: string;
@@ -132,25 +112,8 @@ export class CatalogProductService {
     preferredPlatform: string;
     preferredSupplierId: string;
     preferredSupplierProductId: string;
-    weightedAverageCost: number;
-    estimatedCost: number;
-    lastActualCost: number;
-    recommendedSellPrice: number;
-    averageRealityCoefficient: number;
-    savingsVsIndicatifPct: number;
-    priceVolatilityPct: number;
     defaultRiskBufferPct: number;
     defaultHiddenMarginPct: number;
-    historicalOrderCount: number;
-    successfulOrderCount: number;
-    stableOrderCount: number;
-    catalogConfidenceScore: number;
-    isCertified: boolean;
-    certifiedAt: string;
-    lastQuotedAt: string;
-    lastPurchasedAt: string;
-    lastVerifiedAt: string;
-    lastPriceAlertAt: string;
     shippingHints: Record<string, unknown>;
     marketingPack: Record<string, unknown>;
     notes: string;
@@ -180,29 +143,21 @@ export class CatalogProductService {
         ]);
     }
     if (
-      data.recommendedSellPrice === undefined &&
-      (data.estimatedCost !== undefined ||
-        data.weightedAverageCost !== undefined ||
+      (data.priceMin !== undefined ||
         data.defaultRiskBufferPct !== undefined ||
         data.defaultHiddenMarginPct !== undefined)
     ) {
       const existingPricing = await prisma.catalogProduct.findUnique({
         where: { id: productId },
         select: {
-          estimatedCost: true,
-          weightedAverageCost: true,
+          priceMin: true,
           defaultRiskBufferPct: true,
           defaultHiddenMarginPct: true,
         },
       });
       const baseCost =
-        data.estimatedCost ??
-        data.weightedAverageCost ??
-        (existingPricing?.estimatedCost != null
-          ? Number(existingPricing.estimatedCost)
-          : existingPricing?.weightedAverageCost != null
-            ? Number(existingPricing.weightedAverageCost)
-            : undefined);
+        data.priceMin ??
+        (existingPricing?.priceMin != null ? Number(existingPricing.priceMin) : undefined);
       const bufferPct =
         data.defaultRiskBufferPct ??
         (existingPricing?.defaultRiskBufferPct != null
@@ -213,20 +168,21 @@ export class CatalogProductService {
         (existingPricing?.defaultHiddenMarginPct != null
           ? Number(existingPricing.defaultHiddenMarginPct)
           : 30);
+      updateData.estimatedCost = baseCost ?? null;
       if (baseCost && baseCost > 0) {
         updateData.recommendedSellPrice = Number(
           (baseCost * (1 + bufferPct / 100 + marginPct / 100)).toFixed(2)
         );
+      } else {
+        updateData.recommendedSellPrice = null;
       }
     }
-    if (data.specsJson) updateData.specsJson = JSON.parse(JSON.stringify(data.specsJson));
+    if (data.specsJson) {
+      const specsJson = normalizeJsonRecord(data.specsJson);
+      updateData.specsJson = specsJson ? JSON.parse(JSON.stringify(specsJson)) : undefined;
+    }
     if (data.shippingHints) updateData.shippingHints = JSON.parse(JSON.stringify(data.shippingHints));
     if (data.marketingPack) updateData.marketingPack = JSON.parse(JSON.stringify(data.marketingPack));
-    if (data.certifiedAt !== undefined) updateData.certifiedAt = data.certifiedAt ? new Date(data.certifiedAt) : null;
-    if (data.lastQuotedAt !== undefined) updateData.lastQuotedAt = data.lastQuotedAt ? new Date(data.lastQuotedAt) : null;
-    if (data.lastPurchasedAt !== undefined) updateData.lastPurchasedAt = data.lastPurchasedAt ? new Date(data.lastPurchasedAt) : null;
-    if (data.lastVerifiedAt !== undefined) updateData.lastVerifiedAt = data.lastVerifiedAt ? new Date(data.lastVerifiedAt) : null;
-    if (data.lastPriceAlertAt !== undefined) updateData.lastPriceAlertAt = data.lastPriceAlertAt ? new Date(data.lastPriceAlertAt) : null;
 
     return prisma.catalogProduct.update({
       where: { id: productId },

@@ -23,6 +23,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { KpiCard, KpiGrid } from "@/components/shared/kpi-card";
 import { LogisticsDashboardData } from "@/components/logistics/types";
 import { LogisticsExportActions } from "@/components/logistics/logistics-export-actions";
+import { LogisticsDashboardOverview } from "@/components/logistics/logistics-dashboard-overview";
 import { ShipmentsTab } from "@/components/logistics/shipments-tab";
 import { PartnersTab } from "@/components/logistics/partners-tab";
 import { CustomsTab } from "@/components/logistics/customs-tab";
@@ -33,6 +34,7 @@ import { WarehouseReceiptForm } from "@/components/logistics/warehouse-receipt-f
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { runLogisticsSlaCheck } from "@/lib/actions/logistics.actions";
+import type { LogisticsDashboardProjection } from "@/lib/logistics/types";
 
 function formatNumber(value: number, digits = 0) {
   return value.toLocaleString("fr-FR", {
@@ -44,9 +46,11 @@ function formatNumber(value: number, digits = 0) {
 export function LogisticsDashboard({
   data,
   canManage,
+  projection,
 }: {
   data: LogisticsDashboardData;
   canManage: boolean;
+  projection: LogisticsDashboardProjection;
 }) {
   const [activeTab, setActiveTab] = useState("shipments");
   const [refreshing, startRefresh] = useTransition();
@@ -73,6 +77,11 @@ export function LogisticsDashboard({
         </Button>
         <LogisticsExportActions />
       </PageHeader>
+
+      <LogisticsDashboardOverview
+        overview={projection.overview}
+        priorityActions={projection.priorityActions}
+      />
 
       <KpiGrid cols={6}>
         <KpiCard

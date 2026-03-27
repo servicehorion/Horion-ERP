@@ -53,9 +53,6 @@ export function ProductForm({ categories }: ProductFormProps) {
       priceMax: undefined,
       priceCurrency: "RMB",
       preferredPlatform: "1688",
-      weightedAverageCost: undefined,
-      estimatedCost: undefined,
-      recommendedSellPrice: undefined,
       defaultRiskBufferPct: 15,
       defaultHiddenMarginPct: 30,
       qcRecommendedLevel: undefined,
@@ -417,56 +414,12 @@ export function ProductForm({ categories }: ProductFormProps) {
             )}
           />
         </div>
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+          Les metriques derivees du Catalog OS sont maintenant calculees automatiquement.
+          Ici, on regle seulement les parametres metier stables; le reste vient du terrain.
+        </div>
 
-        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-          <FormField
-            control={form.control}
-            name="weightedAverageCost"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Coût moyen pondéré</FormLabel>
-                <FormControl>
-                  <Input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={field.value ?? ""}
-                    onChange={(e) =>
-                      field.onChange(
-                        e.target.value === "" ? undefined : Number(e.target.value)
-                      )
-                    }
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="estimatedCost"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Coût estimé maison</FormLabel>
-                <FormControl>
-                  <Input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={field.value ?? ""}
-                    onChange={(e) =>
-                      field.onChange(
-                        e.target.value === "" ? undefined : Number(e.target.value)
-                      )
-                    }
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
+        <div className="grid gap-6 md:grid-cols-2">
           <FormField
             control={form.control}
             name="defaultRiskBufferPct"
@@ -515,32 +468,6 @@ export function ProductForm({ categories }: ProductFormProps) {
             )}
           />
         </div>
-
-        <FormField
-          control={form.control}
-          name="recommendedSellPrice"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Prix Horion recommandé</FormLabel>
-              <FormControl>
-                <Input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={field.value ?? ""}
-                  onChange={(e) =>
-                    field.onChange(
-                      e.target.value === "" ? undefined : Number(e.target.value)
-                    )
-                  }
-                  placeholder="Calculé à partir du coût réel + buffer + marge"
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
         <FormField
           control={form.control}
           name="specsJson"

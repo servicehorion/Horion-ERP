@@ -455,13 +455,13 @@ export function SourcingCommandCenter({
       },
     ],
   };
-  const localPriorityActions: SourcingPriorityAction[] = [
+  const localPriorityActions = [
     slaBreachedCount > 0
       ? {
           id: "breached_cases",
           title: "Traiter les cas hors SLA",
           description: `${slaBreachedCount} dossier(s) sourcing sont deja en retard.`,
-          severity: "critical",
+          severity: "critical" as const,
           count: slaBreachedCount,
         }
       : null,
@@ -470,7 +470,7 @@ export function SourcingCommandCenter({
           id: "unassigned_demands",
           title: "Assigner les demandes sans proprietaire",
           description: "Des demandes qualifiees ou brutes n'ont pas encore de porteur explicite.",
-          severity: "warning",
+          severity: "warning" as const,
           count: demands.filter((d) => !d.assignedTo?.id && ["RAW", "QUALIFIED"].includes(d.status)).length,
         }
       : null,
@@ -479,13 +479,14 @@ export function SourcingCommandCenter({
           id: "selected_cases",
           title: "Verifier les selections fournisseur",
           description: "Des dossiers selectionnes doivent encore etre verrouilles par contrat ou validation.",
-          severity: "warning",
+          severity: "warning" as const,
           count: pipeline.filter((item) => item.status === "SELECTED").length,
         }
       : null,
-  ].filter((item): item is SourcingPriorityAction => Boolean(item));
+  ] satisfies Array<SourcingPriorityAction | null>;
   const resolvedOverview = serverOverview ?? localOverview;
-  const resolvedPriorityActions = serverPriorityActions ?? localPriorityActions;
+  const fallbackPriorityActions = localPriorityActions.filter(Boolean) as SourcingPriorityAction[];
+  const resolvedPriorityActions = serverPriorityActions ?? fallbackPriorityActions;
 
   function handleCreateDemand() {
     startTransition(async () => {

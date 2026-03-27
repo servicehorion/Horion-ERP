@@ -6,6 +6,7 @@ import { CatalogSupplierService } from "@/lib/services/catalog-supplier.service"
 import { CatalogOfferService } from "@/lib/services/catalog-offer.service";
 import { CatalogMediaService } from "@/lib/services/catalog-media.service";
 import { CatalogIntelligenceService } from "@/lib/services/catalog-intelligence.service";
+import { CatalogDashboardProjectionService } from "@/lib/services/catalog-dashboard-projection.service";
 import { AuditService } from "@/lib/services/audit.service";
 import { checkPermission } from "@/lib/permissions";
 import {
@@ -27,6 +28,7 @@ import { toPlainData } from "@/lib/utils";
 function revalidateCatalogCaches(tenantId: string) {
   for (const tag of [
     ...getTenantCacheTags("catalog-dashboard-stats", tenantId),
+    ...getTenantCacheTags("catalog-dashboard-projection", tenantId),
     ...getTenantCacheTags("catalog-analytics", tenantId),
   ]) {
     revalidateTag(tag, "max");
@@ -555,6 +557,23 @@ export async function getCatalogDashboardStats() {
   }
 }
 
+export async function getCatalogDashboardProjection() {
+  try {
+    const user = await getSession();
+    checkPermission(user.role, "catalog.view");
+    const data = await runTenantCached(
+      "catalog-dashboard-projection",
+      user.tenantId,
+      async () => CatalogDashboardProjectionService.get(user.tenantId),
+      45
+    );
+
+    return { data };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Erreur projection catalogue" };
+  }
+}
+
 export async function searchCatalogMemoryMatches(input: {
   query: string;
   categoryName?: string;
@@ -649,6 +668,18 @@ export async function getProductIntelligence(productId: string) {
     return { data: { revenue, crossModule } };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur" };
+  }
+}
+
+export async function getCatalogProductProvenance(productId: string) {
+  try {
+    const user = await getSession();
+    checkPermission(user.role, "catalog.view");
+    const data = await CatalogDashboardProjectionService.getProductProvenance(user.tenantId, productId);
+    if (!data) return { error: "Produit introuvable" };
+    return { data };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Erreur provenance catalogue" };
   }
 }
 

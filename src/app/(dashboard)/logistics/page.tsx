@@ -2,6 +2,7 @@ import { getSession } from "@/lib/session";
 import { hasPermission } from "@/lib/permissions";
 import { getLogisticsDashboard } from "@/lib/actions/logistics.actions";
 import { LogisticsDashboard } from "@/components/logistics/logistics-dashboard";
+import { LogisticsDashboardProjectionService } from "@/lib/services/logistics-dashboard-projection.service";
 
 export const metadata = {
   title: "Logistique | Horion ERP",
@@ -26,6 +27,7 @@ export default async function LogisticsPage() {
   }
 
   const canManage = hasPermission(session.role, "logistics.manage");
+  const projection = await LogisticsDashboardProjectionService.get(session.tenantId);
 
-  return <LogisticsDashboard data={result.data as any} canManage={canManage} />;
+  return <LogisticsDashboard data={result.data as any} canManage={canManage} projection={projection} />;
 }
