@@ -1,223 +1,217 @@
 import Link from "next/link";
 import {
-  DollarSign, TrendingUp, TrendingDown, ArrowUpDown,
-  CreditCard, BarChart3, BookOpen, ArrowRightLeft,
-  AlertTriangle, Percent, ShieldCheck,
+  ArrowRightLeft,
+  BadgeDollarSign,
+  BarChart3,
+  CheckCircle2,
+  CreditCard,
+  ShieldCheck,
+  Wallet,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import {
-  getFinancialKPIs,
-  getCashflowAnalysis,
-  getProfitAndLoss,
-  getAgingReport,
-  getLatestFXRates,
-  getRevenueByClient,
-} from "@/lib/actions/finance.actions";
-import { ExportFinanceButton } from "@/components/finance/export-finance-button";
-import { CashflowChart } from "@/components/finance/cashflow-chart";
-import { PnLPanel } from "@/components/finance/pnl-panel";
-import { AgingPanel } from "@/components/finance/aging-panel";
-import { FXRatesPanel } from "@/components/finance/fx-rates-panel";
-import { RevenueByClient } from "@/components/finance/revenue-by-client";
-import { formatCurrency } from "@/config/currencies";
 
-export const metadata = { title: "Finance Intelligence | Horion ERP" };
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/shared/page-header";
+import { formatCurrency } from "@/config/currencies";
+import { getSession } from "@/lib/session";
+import { checkPermission } from "@/lib/permissions";
+import { FinanceOperationsService } from "@/lib/services/finance-operations.service";
+
+export const metadata = { title: "Finance Operations | Horion ERP" };
+
+const QUICK_LINKS = [
+  { href: "/finance/treasury", label: "Tresorerie & Wallets", icon: Wallet },
+  { href: "/finance/payments", label: "Paiements", icon: CreditCard },
+  { href: "/finance/approvals", label: "Approvals", icon: ShieldCheck },
+  { href: "/finance/invoices", label: "Facturation", icon: BadgeDollarSign },
+  { href: "/finance/margins", label: "Marges", icon: BarChart3 },
+  { href: "/finance/statements", label: "Etats financiers", icon: ArrowRightLeft },
+  { href: "/finance/archive", label: "Archive / Future", icon: ArrowRightLeft },
+];
 
 export default async function FinanceDashboardPage() {
-  const [kpisRes, cashflowRes, pnlRes, agingRes, fxRes, clientRes] = await Promise.all([
-    getFinancialKPIs(),
-    getCashflowAnalysis(6),
-    getProfitAndLoss(),
-    getAgingReport(),
-    getLatestFXRates(),
-    getRevenueByClient(),
-  ]);
+  const user = await getSession();
+  checkPermission(user.role, "finance.view");
 
-  const kpis = kpisRes.data || {
-    mtdInbound: 0, mtdOutbound: 0, mtdNet: 0,
-    avgMarginPercent: 0, totalGrossMargin: 0, totalRevenue: 0, totalCogs: 0,
-    ordersAnalyzed: 0, pendingPayments: 0, activeOrders: 0,
-    collectionRate: 0, avgMonthlyBurn: 0,
-  };
-  const cashflow = cashflowRes.data || [];
-  const pnl = pnlRes.data || {
-    totalRevenue: 0, totalCogs: 0, grossProfit: 0, grossMarginPercent: 0,
-    totalCommission: 0, netProfit: 0, netMarginPercent: 0,
-    expenseByType: {}, ordersAnalyzed: 0, revenueInbound: 0,
-  };
-  const aging = agingRes.data || {
-    aging: { current: [], days30: [], days60: [], days90: [], over90: [] },
-    totals: { current: 0, days30: 0, days60: 0, days90: 0, over90: 0 },
-    totalOutstanding: 0,
-  };
-  const fxRates = fxRes.data || [];
-  const clients = clientRes.data || [];
+  const snapshot = await FinanceOperationsService.getOperationsSnapshot(user.tenantId);
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Finance Intelligence</h1>
-          <p className="text-muted-foreground">
-            Vue Bloomberg — Cash-flow, P&L, Créances, Change
-          </p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap justify-end">
-          <ExportFinanceButton />
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/finance/ledger">
-              <BookOpen className="mr-2 h-4 w-4" />
-              Grand livre
-            </Link>
-          </Button>
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/finance/fx">
-              <ArrowRightLeft className="mr-2 h-4 w-4" />
-              Change
-            </Link>
-          </Button>
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/finance/treasury">
-              <ShieldCheck className="mr-2 h-4 w-4" />
-              Trésorerie
-            </Link>
-          </Button>
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/finance/payments">
-              <CreditCard className="mr-2 h-4 w-4" />
-              Paiements
-            </Link>
-          </Button>
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/finance/margins">
-              <BarChart3 className="mr-2 h-4 w-4" />
-              Marges
-            </Link>
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Finance Operations"
+        description="Pilotage cash-first par commande. Les modules comptables lourds sont sortis du coeur de navigation."
+      />
 
-      {/* Bloomberg KPI Strip */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-1 pt-3 px-4">
-            <CardTitle className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
-              Encaissements MTD
-            </CardTitle>
-            <TrendingUp className="h-3.5 w-3.5 text-green-600" />
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Cash disponible</CardTitle>
           </CardHeader>
-          <CardContent className="px-4 pb-3">
-            <div className="text-lg font-bold text-green-600">
-              {formatCurrency(kpis.mtdInbound, "XAF")}
-            </div>
+          <CardContent>
+            <div className="text-2xl font-semibold">{formatCurrency(snapshot.cash.operatingCash, "XAF")}</div>
+            <p className="mt-1 text-xs text-muted-foreground">Wallets et banques operationnelles en XAF.</p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-1 pt-3 px-4">
-            <CardTitle className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
-              Décaissements MTD
-            </CardTitle>
-            <TrendingDown className="h-3.5 w-3.5 text-red-600" />
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Cash Chine</CardTitle>
           </CardHeader>
-          <CardContent className="px-4 pb-3">
-            <div className="text-lg font-bold text-red-600">
-              {formatCurrency(kpis.mtdOutbound, "XAF")}
-            </div>
+          <CardContent>
+            <div className="text-2xl font-semibold">{formatCurrency(snapshot.cash.chinaCash, "XAF")}</div>
+            <p className="mt-1 text-xs text-muted-foreground">Pouvoir d'achat CNY converti en XAF.</p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-1 pt-3 px-4">
-            <CardTitle className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
-              Cash-flow net
-            </CardTitle>
-            <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Cash bloque</CardTitle>
           </CardHeader>
-          <CardContent className="px-4 pb-3">
-            <div className={`text-lg font-bold ${kpis.mtdNet >= 0 ? "text-green-600" : "text-red-600"}`}>
-              {formatCurrency(kpis.mtdNet, "XAF")}
-            </div>
+          <CardContent>
+            <div className="text-2xl font-semibold">{formatCurrency(snapshot.cash.lockedCash, "XAF")}</div>
+            <p className="mt-1 text-xs text-muted-foreground">Encaissements confirms pas encore rapproches banque.</p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-1 pt-3 px-4">
-            <CardTitle className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
-              Marge moyenne
-            </CardTitle>
-            <Percent className="h-3.5 w-3.5 text-purple-600" />
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Marge nette</CardTitle>
           </CardHeader>
-          <CardContent className="px-4 pb-3">
-            <div className="text-lg font-bold">{kpis.avgMarginPercent.toFixed(1)}%</div>
-            <p className="text-[10px] text-muted-foreground">{kpis.ordersAnalyzed} commande(s)</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-1 pt-3 px-4">
-            <CardTitle className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
-              En attente
-            </CardTitle>
-            <AlertTriangle className="h-3.5 w-3.5 text-yellow-600" />
-          </CardHeader>
-          <CardContent className="px-4 pb-3">
-            <div className="text-lg font-bold text-yellow-600">{kpis.pendingPayments}</div>
-            <p className="text-[10px] text-muted-foreground">{kpis.activeOrders} cmd actives</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-1 pt-3 px-4">
-            <CardTitle className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
-              Recouvrement
-            </CardTitle>
-            <DollarSign className="h-3.5 w-3.5 text-cyan-600" />
-          </CardHeader>
-          <CardContent className="px-4 pb-3">
-            <div className="text-lg font-bold">{kpis.collectionRate.toFixed(0)}%</div>
-            <Progress value={kpis.collectionRate} className="h-1 mt-1" />
+          <CardContent>
+            <div className="text-2xl font-semibold">{formatCurrency(snapshot.operationalPnl.netMargin, "XAF")}</div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {snapshot.operationalPnl.netMarginPercent.toFixed(1)}% sur les flux confirmes.
+            </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Row 2: Cashflow Chart + P&L */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Modules coeur</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-2">
+          {QUICK_LINKS.map((item) => {
+            const Icon = item.icon;
+            return (
+              <Button key={item.href} variant="outline" size="sm" asChild>
+                <Link href={item.href}>
+                  <Icon className="mr-2 h-4 w-4" />
+                  {item.label}
+                </Link>
+              </Button>
+            );
+          })}
+        </CardContent>
+      </Card>
+
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <CashflowChart data={cashflow} />
-        </div>
-        <PnLPanel data={pnl} />
-      </div>
-
-      {/* Row 3: Aging + FX + Revenue by Client */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        <AgingPanel data={aging} />
-        <FXRatesPanel rates={fxRates} />
-        <RevenueByClient data={clients} />
-      </div>
-
-      {/* Burn Rate Alert */}
-      {kpis.avgMonthlyBurn > 0 && (
-        <Card className="border-orange-200">
-          <CardContent className="flex items-center gap-4 py-4">
-            <AlertTriangle className="h-6 w-6 text-orange-600 shrink-0" />
-            <div>
-              <p className="font-medium">Burn rate mensuel moyen</p>
-              <p className="text-sm text-muted-foreground">
-                Décaissements moyens sur 3 mois :{" "}
-                <span className="font-bold text-orange-600">
-                  {formatCurrency(kpis.avgMonthlyBurn, "XAF")}/mois
+        <Card className="lg:col-span-2">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>P&L operationnel</CardTitle>
+            <Badge variant="secondary">Read-only</Badge>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            <div className="flex items-center justify-between">
+              <span>Chiffre d'affaires brut</span>
+              <span className="font-medium">{formatCurrency(snapshot.operationalPnl.grossRevenue, "XAF")}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Achats Chine</span>
+              <span className="font-medium text-red-600">-{formatCurrency(snapshot.operationalPnl.chinaPurchases, "XAF")}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Frais logistiques</span>
+              <span className="font-medium text-red-600">-{formatCurrency(snapshot.operationalPnl.shippingFees, "XAF")}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Frais plateforme</span>
+              <span className="font-medium text-red-600">-{formatCurrency(snapshot.operationalPnl.platformFees, "XAF")}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Remboursements</span>
+              <span className="font-medium text-red-600">-{formatCurrency(snapshot.operationalPnl.refunds, "XAF")}</span>
+            </div>
+            <div className="border-t pt-3 flex items-center justify-between text-base">
+              <span className="font-semibold">Marge nette</span>
+              <span className="font-semibold">
+                {formatCurrency(snapshot.operationalPnl.netMargin, "XAF")}{" "}
+                <span className="text-sm text-muted-foreground">
+                  ({snapshot.operationalPnl.netMarginPercent.toFixed(1)}%)
                 </span>
-              </p>
+              </span>
             </div>
-            <Badge variant="secondary" className="ml-auto shrink-0">Burn rate</Badge>
           </CardContent>
         </Card>
-      )}
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>Approvals & risques</CardTitle>
+            <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent className="space-y-4 text-sm">
+            <div className="flex items-center justify-between">
+              <span>Demandes en attente</span>
+              <Badge>{snapshot.approvals.pendingCount}</Badge>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Cash-out a valider</span>
+              <span className="font-medium">{formatCurrency(snapshot.approvals.pendingCashOutXAF, "XAF")}</span>
+            </div>
+            <div className="rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground">
+              Les modules `Immobilisations`, `Fiscalite`, `Paie`, `Consolidation`, `Periodes` et `Journaux`
+              restent accessibles hors navigation, mais ne pilotent plus l'operation Day 1.
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Wallets</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {snapshot.wallets.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Aucun wallet configure.</p>
+            ) : (
+              snapshot.wallets.map((wallet) => (
+                <div key={wallet.id} className="flex items-center justify-between rounded-lg border p-3">
+                  <div>
+                    <p className="font-medium">{wallet.label}</p>
+                    <p className="text-xs text-muted-foreground">{wallet.currency}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-medium">{wallet.balance.toLocaleString("fr-FR")} {wallet.currency}</p>
+                    <p className="text-xs text-muted-foreground">{formatCurrency(wallet.balanceXAF, "XAF")}</p>
+                  </div>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Passifs operationnels</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            <div className="flex items-center justify-between">
+              <span>Commandes clients non bouclees</span>
+              <span className="font-medium">{formatCurrency(snapshot.balance.liabilitiesCustomerOrders, "XAF")}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Dettes transitaires / partenaires</span>
+              <span className="font-medium">{formatCurrency(snapshot.balance.liabilitiesPartnerPayables, "XAF")}</span>
+            </div>
+            <div className="flex items-center justify-between border-t pt-3">
+              <span className="font-semibold">Position nette simplifiee</span>
+              <span className="font-semibold">{formatCurrency(snapshot.balance.simplifiedEquity, "XAF")}</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

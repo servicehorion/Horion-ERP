@@ -34,12 +34,23 @@ type CompletionBlocker = {
   relatedTaskId?: string;
 };
 
+type ResponsibilitySnapshot = {
+  primaryOwner: { id: string; name: string; role: string } | null;
+  backupOwner: { id: string; name: string; role: string } | null;
+  managerOwner: { id: string; name: string; role: string } | null;
+  escalationAt: string | null;
+  escalationLevel: number;
+  assignmentReason: string | null;
+};
+
 type OperationalImpactSummary = {
   downstreamTaskCount: number;
   downstreamBlockedCount: number;
   impactedModules: string[];
   impactedEntities: Array<{ entityType: string; entityId: string }>;
-  impactedOrders: Array<{ id: string; orderNumber: string }>;
+  impactedOrders: Array<{ id: string; orderNumber: string; clientName: string | null; totalClientXAF: number }>;
+  impactedClients: string[];
+  atRiskRevenueXAF: number;
   nearestDeadline: string | null;
   parentChain: Array<{ id: string; title: string }>;
   summary: string;
@@ -59,6 +70,7 @@ type WorkflowSnapshot = {
     attachmentCount: number;
     commentCount: number;
   };
+  responsibility: ResponsibilitySnapshot;
   operationalImpact: OperationalImpactSummary;
 };
 
@@ -100,6 +112,10 @@ function getWorkflowState(customFields: unknown) {
   return toObject(fields[WORKFLOW_KEY]);
 }
 
+function getResponsibilityState(customFields: unknown) {
+  return toObject(getWorkflowState(customFields).responsibility);
+}
+
 function getUserVisibleCustomFields(customFields: unknown) {
   return Object.entries(toObject(customFields)).reduce<Record<string, unknown>>((acc, [key, value]) => {
     if (!key.startsWith("__")) acc[key] = value;
@@ -117,6 +133,76 @@ function mergeWorkflowState(customFields: unknown, patch: Record<string, unknown
       ...patch,
     },
   };
+}
+
+async function hydrateResponsibilityUsers(customFields: unknown): Promise<ResponsibilitySnapshot> {
+  const responsibility = getResponsibilityState(customFields);
+  const primaryOwnerId = typeof responsibility.primaryOwnerId === "string" ? responsibility.primaryOwnerId : null;
+  const backupOwnerId = typeof responsibility.backupOwnerId === "string" ? responsibility.backupOwnerId : null;
+  const managerOwnerId = typeof responsibility.managerOwnerId === "string" ? responsibility.managerOwnerId : null;
+  const userIds = uniqueByKey(
+    [primaryOwnerId, backupOwnerId, managerOwnerId].filter((value): value is string => Boolean(value)),
+    (value) => value
+  );
+
+  const users = userIds.length
+    ? await prisma.user.findMany({
+        where: { id: { in: userIds } },
+        select: { id: true, name: true, role: true },
+      })
+    : [];
+
+  const userMap = new Map(users.map((user) => [user.id, user]));
+  const toUser = (userId: string | null) => {
+    if (!userId) return null;
+    const user = userMap.get(userId);
+    return user ? { id: user.id, name: user.name, role: user.role } : null;
+  };
+
+  return {
+    primaryOwner: toUser(primaryOwnerId),
+    backupOwner: toUser(backupOwnerId),
+    managerOwner: toUser(managerOwnerId),
+    escalationAt: typeof responsibility.escalationAt === "string" ? responsibility.escalationAt : null,
+    escalationLevel:
+      typeof responsibility.escalationLevel === "number" ? Number(responsibility.escalationLevel) : 0,
+    assignmentReason: typeof responsibility.assignmentReason === "string" ? responsibility.assignmentReason : null,
+  };
+}
+
+async function notifyResponsibilityChain(
+  taskId: string,
+  tenantId: string,
+  title: string,
+  message: string,
+  type: NotificationType,
+  excludeUserId?: string
+) {
+  const task = await prisma.task.findUnique({
+    where: { id: taskId },
+    select: { customFields: true },
+  });
+
+  if (!task) return;
+
+  const responsibility = getResponsibilityState(task.customFields);
+  const userIds = uniqueByKey(
+    [responsibility.backupOwnerId, responsibility.managerOwnerId]
+      .filter((value): value is string => typeof value === "string")
+      .filter((value) => value !== excludeUserId),
+    (value) => value
+  );
+
+  if (userIds.length === 0) return;
+
+  await NotificationService.notifyMany(userIds, {
+    tenantId,
+    type,
+    title,
+    message,
+    entityType: "task",
+    entityId: taskId,
+  });
 }
 
 export class TaskWorkflowService {
@@ -230,8 +316,7 @@ export class TaskWorkflowService {
     }
 
     const unresolvedDependencies = task.dependencies.filter(
-      (dependency) =>
-        dependency.type !== "RELATED" && !isTaskClosed(dependency.dependsOn.status)
+      (dependency) => dependency.type !== "RELATED" && !isTaskClosed(dependency.dependsOn.status)
     );
     if (unresolvedDependencies.length > 0) {
       blockers.push({
@@ -320,6 +405,8 @@ export class TaskWorkflowService {
         impactedModules: [],
         impactedEntities: [],
         impactedOrders: [],
+        impactedClients: [],
+        atRiskRevenueXAF: 0,
         nearestDeadline: null,
         parentChain: [],
         summary: "Aucun impact operationnel detecte.",
@@ -335,7 +422,12 @@ export class TaskWorkflowService {
       entityId: string;
       slaDeadline: Date | null;
       dueDate: Date | null;
-      order: { id: string; orderNumber: string } | null;
+      order: {
+        id: string;
+        orderNumber: string;
+        totalClient: Prisma.Decimal | null;
+        contact: { name: string | null } | null;
+      } | null;
     }> = [];
 
     const visited = new Set<string>();
@@ -358,7 +450,14 @@ export class TaskWorkflowService {
               entityId: true,
               slaDeadline: true,
               dueDate: true,
-              order: { select: { id: true, orderNumber: true } },
+              order: {
+                select: {
+                  id: true,
+                  orderNumber: true,
+                  totalClient: true,
+                  contact: { select: { name: true } },
+                },
+              },
             },
           },
         },
@@ -394,9 +493,29 @@ export class TaskWorkflowService {
     const impactedOrders = uniqueByKey(
       impactedTasks
         .map((task) => task.order)
-        .filter((order): order is { id: string; orderNumber: string } => Boolean(order)),
+        .filter(
+          (
+            order
+          ): order is {
+            id: string;
+            orderNumber: string;
+            totalClient: Prisma.Decimal | null;
+            contact: { name: string | null } | null;
+          } => Boolean(order)
+        )
+        .map((order) => ({
+          id: order.id,
+          orderNumber: order.orderNumber,
+          clientName: order.contact?.name ?? null,
+          totalClientXAF: Number(order.totalClient || 0),
+        })),
       (order) => order.id
     );
+    const impactedClients = uniqueByKey(
+      impactedOrders.map((order) => order.clientName).filter((name): name is string => Boolean(name)),
+      (name) => name
+    );
+    const atRiskRevenueXAF = impactedOrders.reduce((sum, order) => sum + order.totalClientXAF, 0);
     const nearestDeadline = impactedTasks
       .map((task) => firstNonEmptyDate(task))
       .filter((date): date is Date => Boolean(date))
@@ -406,11 +525,13 @@ export class TaskWorkflowService {
     if (impactedTasks.length > 0 || parentChain.length > 0) {
       const parts = [
         impactedTasks.length > 0 ? `${impactedTasks.length} tache(s) aval peuvent etre ralenties` : null,
+        impactedOrders.length > 0 ? `${impactedOrders.length} commande(s) exposee(s)` : null,
+        atRiskRevenueXAF > 0 ? `${Math.round(atRiskRevenueXAF).toLocaleString("fr-FR")} XAF a risque` : null,
         impactedModules.length > 0 ? `modules touches: ${impactedModules.join(", ")}` : null,
         parentChain.length > 0 ? `${parentChain.length} tache(s) parent peuvent etre bloquees` : null,
         nearestDeadline ? `prochaine echeance impactee: ${nearestDeadline.toLocaleString("fr-FR")}` : null,
       ].filter(Boolean);
-      summary = parts.join(" • ");
+      summary = parts.join(" - ");
     }
 
     return {
@@ -419,6 +540,8 @@ export class TaskWorkflowService {
       impactedModules,
       impactedEntities,
       impactedOrders,
+      impactedClients,
+      atRiskRevenueXAF,
       nearestDeadline: nearestDeadline?.toISOString() ?? null,
       parentChain,
       summary,
@@ -431,8 +554,11 @@ export class TaskWorkflowService {
       throw new Error("Tache introuvable");
     }
 
+    const [operationalImpact, responsibility] = await Promise.all([
+      this.computeOperationalImpact(taskId),
+      hydrateResponsibilityUsers(task.customFields),
+    ]);
     const evaluation = this.evaluateTask(task);
-    const operationalImpact = await this.computeOperationalImpact(taskId);
 
     return {
       taskId,
@@ -442,6 +568,7 @@ export class TaskWorkflowService {
       canComplete: evaluation.canComplete,
       canStart: evaluation.canStart,
       metrics: evaluation.metrics,
+      responsibility,
       operationalImpact,
     };
   }
@@ -550,6 +677,10 @@ export class TaskWorkflowService {
         blockedBy: reason,
         customFields: mergeWorkflowState(task.customFields, {
           operationalImpact,
+          responsibility: {
+            ...getResponsibilityState(task.customFields),
+            escalationLevel: 1,
+          },
           lastBlockedReason: reason,
           lastBlockedAt: new Date().toISOString(),
           lastBlockedByUserId: params.blockedByUserId ?? null,
@@ -557,13 +688,14 @@ export class TaskWorkflowService {
       },
     });
 
+    const message = `${reason}. ${operationalImpact.summary}`;
     await NotificationService.notifyTaskAssignees(
       taskId,
       {
         tenantId: task.tenantId,
         type: params.notifyType ?? "TASK_BLOCKED",
         title: `Tache bloquee: ${task.title}`,
-        message: `${reason}. ${operationalImpact.summary}`,
+        message,
       },
       params.blockedByUserId
     );
@@ -574,8 +706,17 @@ export class TaskWorkflowService {
         tenantId: task.tenantId,
         type: params.notifyType ?? "TASK_BLOCKED",
         title: `Tache bloquee: ${task.title}`,
-        message: `${reason}. ${operationalImpact.summary}`,
+        message,
       },
+      params.blockedByUserId
+    );
+
+    await notifyResponsibilityChain(
+      taskId,
+      task.tenantId,
+      `Responsabilite engagee: ${task.title}`,
+      message,
+      params.notifyType ?? "TASK_BLOCKED",
       params.blockedByUserId
     );
 
@@ -625,6 +766,7 @@ export class TaskWorkflowService {
         title: true,
         tenantId: true,
         riskLevel: true,
+        customFields: true,
       },
     });
 
@@ -634,14 +776,25 @@ export class TaskWorkflowService {
         where: { id: task.id },
         data: {
           slaBreach: true,
-          customFields: mergeWorkflowState(
-            (await prisma.task.findUnique({ where: { id: task.id }, select: { customFields: true } }))?.customFields,
-            { operationalImpact, lastSlaBreachAt: new Date().toISOString() }
-          ) as Prisma.InputJsonValue,
+          customFields: mergeWorkflowState(task.customFields, {
+            operationalImpact,
+            responsibility: {
+              ...getResponsibilityState(task.customFields),
+              escalationLevel: 2,
+            },
+            lastSlaBreachAt: new Date().toISOString(),
+          }) as Prisma.InputJsonValue,
         },
       });
 
       await NotificationService.onSLABreach(task.id, tenantId, task.title);
+      await notifyResponsibilityChain(
+        task.id,
+        tenantId,
+        `Escalade SLA: ${task.title}`,
+        operationalImpact.summary,
+        "SLA_BREACH"
+      );
 
       if (operationalImpact.downstreamTaskCount > 0 || ["HIGH", "CRITICAL"].includes(task.riskLevel)) {
         const escalators = await prisma.user.findMany({

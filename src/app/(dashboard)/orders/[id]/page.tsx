@@ -4,7 +4,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { OrderDetail } from "@/components/orders/order-detail";
-import { getOrderById } from "@/lib/actions/order.actions";
+import { getOrderDetailProjection } from "@/lib/actions/order.actions";
 import { serializeDecimals } from "@/lib/utils";
 import { auth } from "@/lib/auth";
 import { hasPermission } from "@/lib/permissions";
@@ -25,7 +25,7 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
     redirect("/login");
   }
 
-  const result = await getOrderById(id);
+  const result = await getOrderDetailProjection(id);
 
   if (result.error || !result.data) {
     notFound();

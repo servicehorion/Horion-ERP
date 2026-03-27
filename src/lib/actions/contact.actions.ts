@@ -8,6 +8,7 @@ import { NotificationService } from "@/lib/services/notification.service";
 import { LeadScoringService } from "@/lib/services/lead-scoring.service";
 import { CrmEmailService } from "@/lib/services/crm-email.service";
 import { LeadSlaService } from "@/lib/services/lead-sla.service";
+import { CrmTaskOrchestratorService } from "@/lib/services/crm-task-orchestrator.service";
 import { OperationalTaskService } from "@/lib/services/operational-task.service";
 import { checkPermission } from "@/lib/permissions";
 import { canExportCrm, getCrmContactScopeWithDelegation, getCrmLeadScopeWithDelegation } from "@/lib/access-control";
@@ -270,6 +271,8 @@ export async function createLead(formData: Record<string, unknown>) {
     });
 
     void LeadScoringService.recalculate(lead.id);
+    await LeadSlaService.updateSla(lead.id, lead.status);
+    await CrmTaskOrchestratorService.syncLeadWorkflow(user.tenantId, lead.id);
 
     await NotificationService.notifyMany(
       uniqueIds([ownerId, ...collaboratorIds]),
@@ -347,7 +350,7 @@ export async function updateLeadStatus(leadId: string, status: string) {
 
     // Fire-and-forget: recalculate score + SLA
     void LeadScoringService.recalculate(leadId);
-    void LeadSlaService.updateSla(leadId, status);
+    await LeadSlaService.updateSla(leadId, status);
 
     if (status === "QUALIFIED") {
       await prisma.contact.update({
@@ -355,6 +358,8 @@ export async function updateLeadStatus(leadId: string, status: string) {
         data: { ownerId: user.id },
       });
     }
+
+    await CrmTaskOrchestratorService.syncLeadWorkflow(user.tenantId, leadId);
 
     await NotificationService.notifyMany(
       uniqueIds([lead.ownerId, ...extractCollaboratorIds(lead.collaborators)]),
@@ -400,6 +405,9 @@ export async function validateLead(leadId: string) {
       where: { id: existing.contactId },
       data: { ownerId: user.id },
     });
+
+    await LeadSlaService.updateSla(leadId, "QUALIFIED");
+    await CrmTaskOrchestratorService.syncLeadWorkflow(user.tenantId, leadId);
 
     await AuditService.log({
       tenantId: user.tenantId,
@@ -489,6 +497,8 @@ export async function updateLead(leadId: string, data: Record<string, unknown>) 
     if (payload.winProbability === undefined) {
       void LeadScoringService.recalculate(leadId);
     }
+    await LeadSlaService.updateSla(leadId, lead.status);
+    await CrmTaskOrchestratorService.syncLeadWorkflow(user.tenantId, leadId);
 
     await NotificationService.notifyMany(
       uniqueIds([lead.ownerId, ...extractCollaboratorIds(lead.collaborators)]),

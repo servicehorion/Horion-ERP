@@ -819,47 +819,7 @@ export async function calculateMargin(orderId: string) {
     });
     if (!order || order.tenantId !== user.tenantId) return { error: "Commande introuvable" };
 
-    const payments = await prisma.payment.findMany({
-      where: { orderId, status: "CONFIRMED" },
-      select: { direction: true, type: true, amountXAF: true },
-    });
-
-    const revenue = payments
-      .filter((p) => p.direction === "INBOUND")
-      .reduce((sum, p) => sum + Number(p.amountXAF), 0);
-
-    const cogsTypes = ["SUPPLIER_PAYMENT", "FREIGHT_PAYMENT", "CUSTOMS_DUTY", "QC_PAYMENT"];
-    const cogs = payments
-      .filter((p) => p.direction === "OUTBOUND" && cogsTypes.includes(p.type))
-      .reduce((sum, p) => sum + Number(p.amountXAF), 0);
-
-    const commission = payments
-      .filter((p) => p.type === "COMMISSION")
-      .reduce((sum, p) => sum + Number(p.amountXAF), 0);
-
-    const grossMargin = revenue - cogs - commission;
-    const marginPercent = revenue > 0 ? (grossMargin / revenue) * 100 : 0;
-
-    const report = await prisma.marginReport.upsert({
-      where: { orderId },
-      update: {
-        revenue,
-        cogs,
-        commission,
-        grossMargin,
-        marginPercent,
-        calculatedAt: new Date(),
-      },
-      create: {
-        orderId,
-        revenue,
-        cogs,
-        commission,
-        grossMargin,
-        marginPercent,
-        currency: "XAF",
-      },
-    });
+    const report = await OrderService.recalculateMarginFromFinance(orderId);
 
     await AuditService.log({
       tenantId: user.tenantId,
@@ -867,7 +827,7 @@ export async function calculateMargin(orderId: string) {
       action: "order.margin_calculated",
       entityType: "order",
       entityId: orderId,
-      newValue: { marginPercent: marginPercent.toFixed(2) },
+      newValue: { marginPercent: Number(report.marginPercent).toFixed(2), source: "finance_transaction" },
     });
 
     revalidatePath(`/orders/${orderId}`);

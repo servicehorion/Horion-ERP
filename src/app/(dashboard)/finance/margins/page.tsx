@@ -11,8 +11,10 @@ import { StatusBadge } from "@/components/shared/status-badge";
 import { CurrencyDisplay } from "@/components/shared/currency-display";
 import { TableSkeleton } from "@/components/shared/loading-skeleton";
 import { EmptyState } from "@/components/shared/empty-state";
-import { getMargins, getAverageMargin } from "@/lib/actions/payment.actions";
 import { formatCurrency } from "@/config/currencies";
+import { getSession } from "@/lib/session";
+import { checkPermission } from "@/lib/permissions";
+import { FinanceTransactionService } from "@/lib/services/finance-transaction.service";
 
 export const metadata = { title: "Marges | Horion ERP" };
 
@@ -37,13 +39,17 @@ export default async function MarginsPage() {
 }
 
 async function MarginsContent() {
-  const [marginsResult, avgResult] = await Promise.all([
-    getMargins({}),
-    getAverageMargin(),
-  ]);
-
-  const reports = marginsResult.data || [];
-  const avg = avgResult.data || { avgMarginPercent: 0, totalGrossMargin: 0, totalRevenue: 0, count: 0 };
+  const user = await getSession();
+  checkPermission(user.role, "finance.view");
+  const reports = await FinanceTransactionService.getMarginByOrder(user.tenantId);
+  const avg = reports.length === 0
+    ? { avgMarginPercent: 0, totalGrossMargin: 0, totalRevenue: 0, count: 0 }
+    : {
+        avgMarginPercent: reports.reduce((sum, report) => sum + report.netMarginPercent, 0) / reports.length,
+        totalGrossMargin: reports.reduce((sum, report) => sum + report.netMargin, 0),
+        totalRevenue: reports.reduce((sum, report) => sum + report.revenue, 0),
+        count: reports.length,
+      };
 
   return (
     <>
@@ -97,26 +103,26 @@ async function MarginsContent() {
             </TableHeader>
             <TableBody>
               {reports.map((report) => {
-                const marginPercent = Number(report.marginPercent);
+                const marginPercent = Number(report.netMarginPercent);
                 return (
-                  <TableRow key={report.id}>
+                  <TableRow key={report.orderId}>
                     <TableCell>
                       <Link href={`/orders/${report.orderId}`} className="font-medium text-primary hover:underline">
-                        {report.order.orderNumber}
+                        {report.orderNumber}
                       </Link>
                     </TableCell>
-                    <TableCell className="text-sm">{report.order.contact.name}</TableCell>
+                    <TableCell className="text-sm">{report.clientName}</TableCell>
                     <TableCell>
-                      <StatusBadge status={report.order.status} />
+                      <StatusBadge status={report.status} />
                     </TableCell>
                     <TableCell className="text-right">
-                      <CurrencyDisplay amount={Number(report.revenue)} currency="XAF" />
+                      <CurrencyDisplay amount={report.revenue} currency="XAF" />
                     </TableCell>
                     <TableCell className="text-right">
-                      <CurrencyDisplay amount={Number(report.cogs)} currency="XAF" />
+                      <CurrencyDisplay amount={report.chinaPurchase + report.shippingFee + report.platformFee + report.refund - report.insuranceFee} currency="XAF" />
                     </TableCell>
                     <TableCell className="text-right font-medium">
-                      <CurrencyDisplay amount={Number(report.grossMargin)} currency="XAF" />
+                      <CurrencyDisplay amount={report.netMargin} currency="XAF" />
                     </TableCell>
                     <TableCell className={`text-right font-bold ${marginPercent >= 15 ? "text-green-600" : marginPercent >= 0 ? "text-yellow-600" : "text-red-600"}`}>
                       {marginPercent.toFixed(1)}%

@@ -23,73 +23,14 @@ import {
   Sparkles, Target, Activity
 } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
-import { KpiCard, KpiGrid } from "@/components/shared/kpi-card";
 import Link from "next/link";
 import { toast } from "sonner";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { copyToClipboard } from "@/lib/clipboard";
+import { CrmDashboardOverview } from "@/components/crm/crm-dashboard-overview";
+import type { CrmOverviewProjection, CrmPriorityAction, Customer, Lead, Prospect } from "@/lib/crm/types";
 
-export interface Customer {
-  id: string;
-  ownerId?: string;
-  churnRisk?: number; // 0.0–1.0 from CustomerAIProfile.predictedChurnRisk
-  name: string;
-  phone: string;
-  email?: string;
-  country: string;
-  city?: string;
-  whatsapp: "Active" | "Inactive";
-  orders: number;
-  ltv: string;
-  tags: string[];
-  riskScore: "Low" | "Medium" | "High";
-  owner: string;
-  onboardedBy: string;
-  aiScore: number;
-  nextAction: string;
-  collaborators: string[];
-  lastContact?: string;
-  notes?: string;
-}
-
-export interface Lead {
-  id: string;
-  ownerId?: string;
-  name: string;
-  phone: string;
-  country: string;
-  product: string;
-  estimatedValue: string;
-  status: "New" | "Qualified" | "Quoted" | "Paid" | "Lost";
-  assignedAgent: string;
-  owner: string;
-  onboardedBy: string;
-  source: string;
-  aiScore: number;
-  nextAction: string;
-  collaborators: string[];
-  lastContact: string;
-  containerType?: "LCL" | "FCL" | "AERIEN";
-  originCountry?: string;
-  notes?: string;
-  updatedAtTs?: number; // Unix timestamp ms — used for SLA calculation
-}
-
-export interface Prospect {
-  id: string;
-  ownerId?: string;
-  name: string;
-  phone: string;
-  country: string;
-  inquiry: string;
-  source: string;
-  owner: string;
-  onboardedBy: string;
-  intentScore: number;
-  collaborators: string[];
-  status: "New" | "Contacted" | "Qualified" | "Rejected";
-  notes?: string;
-}
+export type { Customer, Lead, Prospect } from "@/lib/crm/types";
 
 const customersData: Customer[] = [
   { id: "c1", name: "Okoye Electronics Ltd", phone: "+234 801 234 5678", email: "okoye@example.com", country: "Nigeria", city: "Lagos", whatsapp: "Active", orders: 12, ltv: "$124,500", tags: ["VIP", "Importer"], riskScore: "Low", owner: "Sarah Johnson", onboardedBy: "Awa Mbemba", aiScore: 92, nextAction: "Send Q1 bundle proposal", collaborators: ["Awa Mbemba"], lastContact: "2h ago" },
@@ -117,6 +58,8 @@ export interface CrmDashboardProps {
   initialCustomers?: Customer[];
   initialLeads?: Lead[];
   initialProspects?: Prospect[];
+  overview?: CrmOverviewProjection;
+  priorityActions?: CrmPriorityAction[];
   demoMode?: boolean;
   currentUserName?: string;
   currentUserId?: string;
@@ -150,7 +93,40 @@ const LEAD_SLA_DAYS: Record<Lead["status"], number> = {
   Lost: 0,
 };
 
-function LeadSLABadge({ updatedAtTs, status }: { updatedAtTs?: number; status: Lead["status"] }) {
+function LeadSLABadge({
+  updatedAtTs,
+  status,
+  slaStatus,
+}: {
+  updatedAtTs?: number;
+  status: Lead["status"];
+  slaStatus?: Lead["slaStatus"];
+}) {
+  if (slaStatus === "BREACH") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-1.5 py-0.5 text-[10px] font-semibold text-red-600">
+        <Clock className="h-2.5 w-2.5" />
+        SLA depasse
+      </span>
+    );
+  }
+  if (slaStatus === "WARNING") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-600">
+        <Clock className="h-2.5 w-2.5" />
+        SLA a surveiller
+      </span>
+    );
+  }
+  if (slaStatus === "OK") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-1.5 py-0.5 text-[10px] font-medium text-green-600">
+        <CheckCircle className="h-2.5 w-2.5" />
+        Dans SLA
+      </span>
+    );
+  }
+
   const slaDays = LEAD_SLA_DAYS[status] ?? 0;
   if (!updatedAtTs || slaDays === 0) return null;
   const ageDays = (Date.now() - updatedAtTs) / 86_400_000;
@@ -204,7 +180,16 @@ function ChurnRiskBadge({ churnRisk }: { churnRisk?: number }) {
   );
 }
 
-export function CrmDashboard({ initialCustomers = customersData, initialLeads = leadsData, initialProspects = prospectsData, demoMode = false, currentUserName = "Sarah Johnson", currentUserId = "" }: CrmDashboardProps) {
+export function CrmDashboard({
+  initialCustomers = customersData,
+  initialLeads = leadsData,
+  initialProspects = prospectsData,
+  overview: serverOverview,
+  priorityActions: serverPriorityActions,
+  demoMode = false,
+  currentUserName = "Sarah Johnson",
+  currentUserId = "",
+}: CrmDashboardProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [searchQuery, setSearchQuery] = useState("");
@@ -371,7 +356,7 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
     });
   }, [customers, deferredSearch, selectedCountry, selectedRiskScore, selectedWhatsappStatus, selectedTags, selectedOwner, portfolioScope, currentUserName]);
 
-  const priorityActions = useMemo(() => {
+  const localPriorityActions = useMemo(() => {
     const riskWeight: Record<Customer["riskScore"], number> = {
       Low: 20,
       Medium: 50,
@@ -400,6 +385,41 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
       .sort((a, b) => b.score - a.score)
       .slice(0, 6);
   }, [filteredCustomers, visibleLeads]);
+
+  const localOverview = useMemo<CrmOverviewProjection>(() => ({
+    totalCustomers,
+    activeLeads,
+    newProspects: visibleProspects.filter((prospect) => prospect.status === "New").length,
+    whatsappConnected,
+    whatsappRate: totalCustomers > 0 ? Math.round((whatsappConnected / totalCustomers) * 100) : 0,
+    totalLtvXaf: totalLTV,
+    avgAiScore,
+    highIntentLeads,
+    atRiskCustomers,
+    nextActions,
+    rawDemands: 0,
+    leadsOutsideSla: visibleLeads.filter((lead) => lead.slaStatus === "WARNING" || lead.slaStatus === "BREACH").length,
+    canonicalJourney: [
+      { label: "Contacts", count: totalCustomers + visibleProspects.length, tone: "default" },
+      { label: "Demandes", count: 0, tone: "default" },
+      { label: "Leads", count: visibleLeads.length, tone: "default" },
+      { label: "Sourcing", count: 0, tone: "default" },
+      { label: "Devis", count: visibleLeads.filter((lead) => lead.status === "Quoted").length, tone: "default" },
+      { label: "Commandes", count: visibleLeads.filter((lead) => lead.status === "Paid").length, tone: "success" },
+    ],
+  }), [activeLeads, atRiskCustomers, avgAiScore, highIntentLeads, nextActions, totalCustomers, totalLTV, visibleLeads, visibleProspects, whatsappConnected]);
+
+  const resolvedOverview = serverOverview ?? localOverview;
+  const resolvedPriorityActions = serverPriorityActions ?? localPriorityActions.map((item) => ({
+    id: item.id,
+    entityType: item.type.toLowerCase() === "customer" ? "customer" : "lead",
+    name: item.name,
+    owner: item.owner,
+    score: item.score,
+    nextAction: item.nextAction,
+    tag: item.tag,
+    href: item.type === "Customer" ? `/contacts/${item.id}` : `/crm/leads/${item.id}`,
+  }));
 
   // Sort customers
   const sortedCustomers = useMemo(() => {
@@ -994,93 +1014,7 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
         </Button>
       </PageHeader>
 
-      <KpiGrid cols={4}>
-        <KpiCard
-          label="Clients totaux"
-          value={totalCustomers}
-          sub={filteredCustomers.length + " filtrés"}
-          icon={<Users className="h-4 w-4 text-muted-foreground" />}
-        />
-        <KpiCard
-          label="Leads actifs"
-          value={activeLeads}
-          sub={"+" + visibleProspects.filter(p => p.status === "New").length + " nouveaux"}
-          icon={<UserPlus className="h-4 w-4 text-muted-foreground" />}
-        />
-        <KpiCard
-          label="WhatsApp actif"
-          value={whatsappConnected}
-          sub={(totalCustomers > 0 ? Math.round((whatsappConnected / totalCustomers) * 100) : 0) + "% des clients"}
-          icon={<MessageSquare className="h-4 w-4 text-muted-foreground" />}
-        />
-        <KpiCard
-          label="Valeur client (LTV)"
-          value={"$" + (totalLTV / 1_000_000).toFixed(1) + "M"}
-          sub="total portefeuille"
-          icon={<TrendingUp className="h-4 w-4 text-muted-foreground" />}
-          variant="success"
-        />
-      </KpiGrid>
-
-      <KpiGrid cols={4}>
-        <KpiCard
-          label="Score IA portefeuille"
-          value={avgAiScore + "/100"}
-          sub="Santé globale"
-          icon={<Sparkles className="h-4 w-4 text-muted-foreground" />}
-        />
-        <KpiCard
-          label="Leads forte intention"
-          value={highIntentLeads}
-          sub="Score IA ≥ 75"
-          icon={<Target className="h-4 w-4 text-muted-foreground" />}
-          variant="success"
-        />
-        <KpiCard
-          label="Clients à risque"
-          value={atRiskCustomers}
-          sub="Rétention à lancer"
-          icon={<AlertCircle className="h-4 w-4 text-muted-foreground" />}
-          variant={atRiskCustomers > 0 ? "danger" : "default"}
-        />
-        <KpiCard
-          label="Actions à faire"
-          value={nextActions}
-          sub="Relances en attente"
-          icon={<Activity className="h-4 w-4 text-muted-foreground" />}
-          variant={nextActions > 0 ? "warning" : "default"}
-        />
-      </KpiGrid>
-
-      <Card className="mb-2">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="text-sm font-semibold">Priority Actions</h3>
-              <p className="text-xs text-muted-foreground">AI-ranked next steps across your portfolio</p>
-            </div>
-            <Badge className="bg-primary text-primary-foreground">{priorityActions.length} actions</Badge>
-          </div>
-          {priorityActions.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No priority actions available.</p>
-          ) : (
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {priorityActions.map((action) => (
-                <div key={`${action.type}-${action.id}`} className="rounded-lg border border-border p-3">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">{action.name}</p>
-                      <p className="text-xs text-muted-foreground">{action.type} · Owner: {action.owner}</p>
-                    </div>
-                    <Badge variant="outline" className="text-xs">
-                      {action.tag}
-                    </Badge>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-2">{action.nextAction}</p>
-                </div>
-              ))}
-            </div>
-          )}
-        </Card>
+      <CrmDashboardOverview overview={resolvedOverview} priorityActions={resolvedPriorityActions} />
 
         <Tabs defaultValue="customers" className="space-y-6">
           <TabsList>
@@ -1518,7 +1452,7 @@ export function CrmDashboard({ initialCustomers = customersData, initialLeads = 
                           Next action: <span className="font-medium text-foreground">{lead.nextAction}</span>
                         </p>
                         <div className="mt-1.5 flex gap-1.5 flex-wrap">
-                          <LeadSLABadge updatedAtTs={lead.updatedAtTs} status={lead.status} />
+                          <LeadSLABadge updatedAtTs={lead.updatedAtTs} status={lead.status} slaStatus={lead.slaStatus} />
                         </div>
                       </div>
                       <div className="text-right">

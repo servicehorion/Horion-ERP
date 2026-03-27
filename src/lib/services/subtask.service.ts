@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/db";
 import type { Priority } from "@prisma/client";
+import type { UserRole } from "@prisma/client";
+import { TaskAssignmentEngineService } from "@/lib/services/task-assignment-engine.service";
 
 /**
  * SubtaskService — Parent/child task management with cascading logic.
@@ -21,22 +23,60 @@ export class SubtaskService {
     description?: string;
     priority?: Priority;
     slaHours?: number;
+    dueInHours?: number;
+    dueAt?: Date | null;
     module?: string;
     assigneeId?: string;
+    preferredAssigneeId?: string;
+    assigneeRoles?: UserRole[];
+    fallbackRoles?: UserRole[];
     tags?: string[];
   }) {
     const parent = await prisma.task.findUnique({
       where: { id: data.parentTaskId },
-      select: { tenantId: true, module: true, entityType: true, entityId: true, children: { select: { position: true }, orderBy: { position: "desc" }, take: 1 } },
+      select: {
+        tenantId: true,
+        module: true,
+        entityType: true,
+        entityId: true,
+        projectId: true,
+        children: { select: { position: true }, orderBy: { position: "desc" }, take: 1 },
+        assignments: { select: { userId: true }, take: 1 },
+        customFields: true,
+      },
     });
 
     if (!parent) throw new Error("Parent task not found");
 
     const nextPosition = (parent.children[0]?.position ?? -1) + 1;
 
+    const now = new Date();
     const slaDeadline = data.slaHours
-      ? new Date(Date.now() + data.slaHours * 3600 * 1000)
+      ? new Date(now.getTime() + data.slaHours * 3600 * 1000)
       : undefined;
+    const dueDate = data.dueAt
+      ? data.dueAt
+      : typeof data.dueInHours === "number"
+        ? new Date(now.getTime() + data.dueInHours * 3600 * 1000)
+        : slaDeadline;
+
+    const parentWorkflow =
+      parent.customFields && typeof parent.customFields === "object" && !Array.isArray(parent.customFields)
+        ? ((parent.customFields as Record<string, unknown>).__workflow as Record<string, unknown> | undefined)
+        : undefined;
+
+    const responsibility = await TaskAssignmentEngineService.resolveResponsibility({
+      tenantId: parent.tenantId,
+      module: data.module ?? parent.module,
+      entityType: parent.entityType,
+      entityId: parent.entityId,
+      assigneeId: data.assigneeId ?? parent.assignments[0]?.userId ?? null,
+      preferredAssigneeId: data.preferredAssigneeId ?? parent.assignments[0]?.userId ?? null,
+      assigneeRoles: data.assigneeRoles,
+      fallbackRoles: data.fallbackRoles,
+      dueDate,
+      slaDeadline: slaDeadline ?? null,
+    });
 
     const subtask = await prisma.task.create({
       data: {
@@ -51,16 +91,61 @@ export class SubtaskService {
         priority: data.priority ?? "NORMAL",
         ownerType: "HUMAN",
         slaDeadline,
-        dueDate: slaDeadline,
+        dueDate,
         position: nextPosition,
         tags: data.tags ?? [],
         riskLevel: "LOW",
+        projectId: parent.projectId ?? undefined,
+        customFields: {
+          __workflow: {
+            autoCreated: true,
+            inheritedFromParent: true,
+            taskPolicyVersion: 2,
+            completionRequirements:
+              parentWorkflow && typeof parentWorkflow.completionRequirements === "object"
+                ? parentWorkflow.completionRequirements
+                : {
+                    requireAllSubtasks: false,
+                    requireAllChecklistItems: false,
+                    requiredFieldKeys: [],
+                    requiredAttachmentCount: 0,
+                    requiredComment: false,
+                    requireApprovedDecision: false,
+                  },
+            responsibility: {
+              primaryOwnerId: responsibility.primaryOwnerId,
+              backupOwnerId: responsibility.backupOwnerId,
+              managerOwnerId: responsibility.managerOwnerId,
+              escalationAt: responsibility.escalationAt?.toISOString() ?? null,
+              escalationLevel: responsibility.escalationLevel,
+              assignmentReason: responsibility.assignmentReason,
+              topCandidates: responsibility.candidates.slice(0, 3).map((candidate) => ({
+                userId: candidate.userId,
+                role: candidate.role,
+                score: candidate.score,
+                reasons: candidate.reasons,
+                metrics: candidate.metrics,
+              })),
+            },
+          },
+        },
       },
     });
 
-    if (data.assigneeId) {
+    if (responsibility.primaryOwnerId) {
       await prisma.taskAssignment.create({
-        data: { taskId: subtask.id, userId: data.assigneeId },
+        data: { taskId: subtask.id, userId: responsibility.primaryOwnerId },
+      });
+    }
+
+    const watcherIds = [responsibility.backupOwnerId, responsibility.managerOwnerId]
+      .filter((value): value is string => Boolean(value))
+      .filter((value) => value !== responsibility.primaryOwnerId);
+
+    if (watcherIds.length > 0) {
+      await prisma.taskWatcher.createMany({
+        data: watcherIds.map((userId) => ({ taskId: subtask.id, userId })),
+        skipDuplicates: true,
       });
     }
 

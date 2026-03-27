@@ -7,6 +7,7 @@ import { SubtaskService } from "@/lib/services/subtask.service";
 import { TaskDependencyService } from "@/lib/services/task-dependency.service";
 import { TaskTemplateService } from "@/lib/services/task-template.service";
 import { AgentTaskService } from "@/lib/services/agent-task.service";
+import { OperationalTaskService } from "@/lib/services/operational-task.service";
 import { TaskWorkflowService } from "@/lib/services/task-workflow.service";
 import { NotificationService } from "@/lib/services/notification.service";
 import { AuditService } from "@/lib/services/audit.service";
@@ -27,6 +28,17 @@ function revalidateTask(taskId?: string) {
   revalidatePath("/tasks/board");
   revalidatePath("/dashboard");
   if (taskId) revalidatePath(`/tasks/${taskId}`);
+}
+
+function parseOptionalDateInput(value?: string | Date | null) {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function computeHoursFromBaseline(referenceDate: Date, targetDate?: Date | null) {
+  if (!targetDate) return undefined;
+  return Math.max(0, (targetDate.getTime() - referenceDate.getTime()) / 3_600_000);
 }
 
 // ============================================================
@@ -338,6 +350,7 @@ export async function createManualTask(formData: {
   module: string;
   priority?: string;
   slaHours?: number;
+  dueDate?: string | Date | null;
   assigneeId?: string;
   projectId?: string;
   tags?: string[];
@@ -346,10 +359,9 @@ export async function createManualTask(formData: {
   try {
     const user = await getSession();
     checkPermission(user.role, "task.update");
-
-    const slaDeadline = formData.slaHours
-      ? new Date(Date.now() + formData.slaHours * 3600 * 1000)
-      : null;
+    if (!canAccessTaskModule(user.role, formData.module)) {
+      return { error: "Acces refuse" };
+    }
 
     if (formData.projectId) {
       const project = await prisma.project.findFirst({
@@ -359,33 +371,45 @@ export async function createManualTask(formData: {
       if (!project) return { error: "Projet introuvable" };
     }
 
-    const task = await prisma.task.create({
-      data: {
-        tenantId: user.tenantId,
-        entityType: "manual",
-        entityId: "manual",
-        taskType: "manual",
-        title: formData.title,
-        description: formData.description,
-        module: formData.module,
-        priority: (formData.priority as Priority) || "NORMAL",
-        slaDeadline,
-        dueDate: slaDeadline,
-        ownerType: "HUMAN",
-        status: "PENDING",
-        riskLevel: "LOW",
-        tags: formData.tags ?? [],
-        parentTaskId: formData.parentTaskId,
-        projectId: formData.projectId || undefined,
+    if (formData.assigneeId) {
+      const assignee = await prisma.user.findUnique({
+        where: { id: formData.assigneeId },
+        select: { id: true, role: true, tenantId: true },
+      });
+      if (!assignee || assignee.tenantId !== user.tenantId) return { error: "Utilisateur introuvable" };
+      if (!canAccessTaskModule(assignee.role, formData.module)) {
+        return { error: "Assignation impossible: role non autorise" };
+      }
+    }
+
+    const created = await OperationalTaskService.create({
+      tenantId: user.tenantId,
+      entityType: "manual",
+      entityId: formData.projectId ?? "manual",
+      taskType: "manual",
+      title: formData.title.trim(),
+      description: formData.description,
+      module: formData.module,
+      priority: (formData.priority as Priority) || "NORMAL",
+      ownerType: "HUMAN",
+      status: "PENDING",
+      riskLevel: "LOW",
+      slaHours: formData.slaHours,
+      dueAt: parseOptionalDateInput(formData.dueDate),
+      tags: formData.tags ?? [],
+      parentTaskId: formData.parentTaskId,
+      projectId: formData.projectId || undefined,
+      assigneeId: formData.assigneeId ?? null,
+      preferredAssigneeId: formData.assigneeId ?? null,
+      assignedByName: user.name,
+      reuseIfOpen: false,
+      customFields: {
+        source: "manual_create_dialog",
       },
     });
 
-    if (formData.assigneeId) {
-      await prisma.taskAssignment.create({
-        data: { taskId: task.id, userId: formData.assigneeId, role: "assignee" },
-      });
-      await NotificationService.onTaskAssigned(task.id, user.tenantId, formData.assigneeId, task.title, user.name);
-    }
+    const task = await prisma.task.findUnique({ where: { id: created.taskId } });
+    if (!task) return { error: "Tache creee mais introuvable" };
 
     await AuditService.log({
       tenantId: user.tenantId, userId: user.id,
@@ -513,6 +537,7 @@ export async function createSubtask(parentTaskId: string, data: {
   description?: string;
   priority?: string;
   slaHours?: number;
+  dueDate?: string | Date | null;
   module?: string;
   assigneeId?: string;
 }) {
@@ -537,15 +562,16 @@ export async function createSubtask(parentTaskId: string, data: {
       }
     }
 
-    const subtask = await SubtaskService.createSubtask({
-      parentTaskId,
-      title: data.title,
-      description: data.description,
-      priority: data.priority as Priority,
-      slaHours: data.slaHours,
-      module: data.module,
-      assigneeId: data.assigneeId,
-    });
+      const subtask = await SubtaskService.createSubtask({
+        parentTaskId,
+        title: data.title,
+        description: data.description,
+        priority: data.priority as Priority,
+        slaHours: data.slaHours,
+        dueAt: parseOptionalDateInput(data.dueDate),
+        module: data.module,
+        assigneeId: data.assigneeId,
+      });
 
     await AuditService.log({
       tenantId: user.tenantId, userId: user.id,
@@ -1041,50 +1067,156 @@ export async function duplicateTask(taskId: string) {
 
     const task = await prisma.task.findUnique({
       where: { id: taskId },
-      include: { children: true },
+      include: {
+        assignments: { select: { userId: true } },
+        watchers: { select: { userId: true } },
+        checklists: { select: { text: true, checked: true, position: true }, orderBy: { position: "asc" } },
+        dependencies: { select: { dependsOnId: true, type: true } },
+        children: {
+          include: {
+            assignments: { select: { userId: true } },
+            watchers: { select: { userId: true } },
+            checklists: { select: { text: true, checked: true, position: true }, orderBy: { position: "asc" } },
+            dependencies: { select: { dependsOnId: true, type: true } },
+          },
+          orderBy: { position: "asc" },
+        },
+      },
     });
     if (!task || task.tenantId !== user.tenantId) return { error: "TÃ¢che introuvable" };
     if (!canAccessTaskModule(user.role, task.module)) return { error: "AccÃ¨s refusÃ©" };
 
-    const copy = await prisma.task.create({
-      data: {
-        tenantId: task.tenantId,
-        title: `${task.title} (copie)`,
-        description: task.description,
-        module: task.module,
-        taskType: task.taskType,
-        entityType: task.entityType,
-        entityId: task.entityId,
-        priority: task.priority,
-        riskLevel: task.riskLevel,
-        ownerType: task.ownerType,
-        estimatedHours: task.estimatedHours,
-        tags: task.tags,
-        slaDeadline: task.slaDeadline ? new Date(Date.now() + (task.slaDeadline.getTime() - task.createdAt.getTime())) : null,
-        requiredApproval: task.requiredApproval,
-        automationAllowed: task.automationAllowed,
-      },
+    const parseWorkflowRequirements = (customFields: unknown) => {
+      if (!customFields || typeof customFields !== "object" || Array.isArray(customFields)) return undefined;
+      const workflow = (customFields as Record<string, unknown>).__workflow;
+      if (!workflow || typeof workflow !== "object" || Array.isArray(workflow)) return undefined;
+      const requirements = (workflow as Record<string, unknown>).completionRequirements;
+      if (!requirements || typeof requirements !== "object" || Array.isArray(requirements)) return undefined;
+
+      const record = requirements as Record<string, unknown>;
+      return {
+        requireAllSubtasks: record.requireAllSubtasks === true,
+        requireAllChecklistItems: record.requireAllChecklistItems === true,
+        requiredFieldKeys: Array.isArray(record.requiredFieldKeys)
+          ? record.requiredFieldKeys.filter((value): value is string => typeof value === "string")
+          : undefined,
+        requiredAttachmentCount:
+          typeof record.requiredAttachmentCount === "number" ? record.requiredAttachmentCount : undefined,
+        requiredComment: record.requiredComment === true,
+        requireApprovedDecision: record.requireApprovedDecision === true,
+      };
+    };
+
+    const stripWorkflowMetadata = (customFields: unknown) => {
+      if (!customFields || typeof customFields !== "object" || Array.isArray(customFields)) return undefined;
+      const entries = Object.entries(customFields as Record<string, unknown>).filter(([key]) => key !== "__workflow");
+      return entries.length > 0 ? Object.fromEntries(entries) : undefined;
+    };
+
+    const duplicateRoot = await OperationalTaskService.create({
+      tenantId: task.tenantId,
+      entityType: task.entityType,
+      entityId: task.entityId,
+      taskType: task.taskType,
+      title: `${task.title} (copie)`,
+      description: task.description ?? undefined,
+      module: task.module,
+      priority: task.priority,
+      ownerType: task.ownerType,
+      riskLevel: task.riskLevel,
+      estimatedHours: task.estimatedHours,
+      slaHours: computeHoursFromBaseline(task.createdAt, task.slaDeadline),
+      dueInHours: computeHoursFromBaseline(task.createdAt, task.dueDate),
+      tags: task.tags,
+      customFields: stripWorkflowMetadata(task.customFields),
+      projectId: task.projectId,
+      templateId: task.templateId,
+      requiredApproval: task.requiredApproval,
+      automationAllowed: task.automationAllowed,
+      assigneeId: task.assignments[0]?.userId ?? null,
+      preferredAssigneeId: task.assignments[0]?.userId ?? null,
+      watcherIds: task.watchers.map((watcher) => watcher.userId),
+      assignedByName: user.name,
+      reuseIfOpen: false,
+      completionRequirements: parseWorkflowRequirements(task.customFields),
     });
 
-    // Duplicate children
-    for (const child of task.children) {
-      await prisma.task.create({
-        data: {
-          tenantId: child.tenantId,
-          parentTaskId: copy.id,
-          title: child.title,
-          description: child.description,
-          module: child.module,
-          taskType: child.taskType,
-          entityType: child.entityType,
-          entityId: child.entityId,
-          priority: child.priority,
-          riskLevel: child.riskLevel,
-          ownerType: child.ownerType,
-          tags: child.tags,
-          position: child.position,
-        },
+    const copy = await prisma.task.findUnique({
+      where: { id: duplicateRoot.taskId },
+      include: { children: true },
+    });
+    if (!copy) return { error: "Copie creee mais introuvable" };
+
+    if (task.checklists.length > 0) {
+      await prisma.taskChecklist.createMany({
+        data: task.checklists.map((item) => ({
+          taskId: copy.id,
+          text: item.text,
+          checked: item.checked,
+          position: item.position,
+        })),
       });
+    }
+
+    for (const dependency of task.dependencies) {
+      await TaskDependencyService.addDependency(copy.id, dependency.dependsOnId, dependency.type).catch(() => null);
+    }
+
+    const childIdMap = new Map<string, string>();
+
+    for (const child of task.children) {
+      const duplicatedChild = await OperationalTaskService.create({
+        tenantId: child.tenantId,
+        entityType: child.entityType,
+        entityId: child.entityId,
+        taskType: child.taskType,
+        title: child.title,
+        description: child.description ?? undefined,
+        module: child.module,
+        priority: child.priority,
+        ownerType: child.ownerType,
+        riskLevel: child.riskLevel,
+        estimatedHours: child.estimatedHours,
+        slaHours: computeHoursFromBaseline(child.createdAt, child.slaDeadline),
+        dueInHours: computeHoursFromBaseline(child.createdAt, child.dueDate),
+        tags: child.tags,
+        customFields: stripWorkflowMetadata(child.customFields),
+        parentTaskId: copy.id,
+        projectId: child.projectId,
+        templateId: child.templateId,
+        requiredApproval: child.requiredApproval,
+        automationAllowed: child.automationAllowed,
+        assigneeId: child.assignments[0]?.userId ?? null,
+        preferredAssigneeId: child.assignments[0]?.userId ?? null,
+        watcherIds: child.watchers.map((watcher) => watcher.userId),
+        assignedByName: user.name,
+        reuseIfOpen: false,
+        completionRequirements: parseWorkflowRequirements(child.customFields),
+      });
+
+      childIdMap.set(child.id, duplicatedChild.taskId);
+
+      if (child.checklists.length > 0) {
+        await prisma.taskChecklist.createMany({
+          data: child.checklists.map((item) => ({
+            taskId: duplicatedChild.taskId,
+            text: item.text,
+            checked: item.checked,
+            position: item.position,
+          })),
+        });
+      }
+    }
+
+    for (const child of task.children) {
+      const duplicatedChildId = childIdMap.get(child.id);
+      if (!duplicatedChildId) continue;
+
+      for (const dependency of child.dependencies) {
+        const mappedDependsOnId = childIdMap.get(dependency.dependsOnId) ?? dependency.dependsOnId;
+        if (mappedDependsOnId === duplicatedChildId) continue;
+        await TaskDependencyService.addDependency(duplicatedChildId, mappedDependsOnId, dependency.type).catch(() => null);
+      }
     }
 
     revalidateTask();

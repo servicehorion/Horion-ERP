@@ -2,6 +2,7 @@
 
 import { getSession } from "@/lib/session";
 import { OrderService } from "@/lib/services/order.service";
+import { OrderDetailProjectionService } from "@/lib/services/order-detail-projection.service";
 import { AuditService } from "@/lib/services/audit.service";
 import { NotificationService } from "@/lib/services/notification.service";
 import { EmailNotificationChannel, WhatsAppNotificationChannel } from "@/lib/services/notification-channels.service";
@@ -348,6 +349,23 @@ export async function archiveOrder(orderId: string) {
     return { data: order };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur lors de l'archivage" };
+  }
+}
+
+export async function getOrderDetailProjection(orderId: string) {
+  try {
+    const user = await getSession();
+    checkPermission(user.role, "order.view");
+
+    const order = await OrderDetailProjectionService.get(orderId);
+    if (!order || order.tenantId !== user.tenantId) {
+      return { error: "Commande introuvable" };
+    }
+
+    return { data: order };
+  } catch (error) {
+    console.error("Error fetching order detail projection:", error);
+    return { error: error instanceof Error ? error.message : "Erreur lors de la recuperation de la commande" };
   }
 }
 

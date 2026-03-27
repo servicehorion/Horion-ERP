@@ -11,6 +11,8 @@ import {
 } from "@/components/ui/table";
 import { prisma } from "@/lib/db";
 import { PageHeader } from "@/components/shared/page-header";
+import { FinanceTransactionService } from "@/lib/services/finance-transaction.service";
+import { formatCurrency } from "@/config/currencies";
 
 export const metadata = { title: "Banques & Reconciliation | Horion ERP" };
 
@@ -47,6 +49,7 @@ export default async function FinanceBanksPage() {
     BankService.listConnections(user.tenantId),
     BankService.listTransactions(user.tenantId),
   ]);
+  const ledgerTransactions = await FinanceTransactionService.getBankLedger(user.tenantId);
 
   const ledgerEntryIds = transactions
     .map((t) => (t.metadata as Record<string, unknown> | null)?.ledgerEntryId)
@@ -87,7 +90,7 @@ export default async function FinanceBanksPage() {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Transactions</CardTitle>
+            <CardTitle>Flux bancaires unifies</CardTitle>
             <form action={autoReconcileBankTransactionsAction}>
               <Button size="sm" variant="outline">Auto-reconcile</Button>
             </form>
@@ -131,6 +134,49 @@ export default async function FinanceBanksPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Date</TableHead>
+                  <TableHead>Wallet</TableHead>
+                  <TableHead>Source</TableHead>
+                  <TableHead>Direction</TableHead>
+                  <TableHead>Montant</TableHead>
+                  <TableHead>Statut</TableHead>
+                  <TableHead>Reference</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {ledgerTransactions.map((t) => (
+                  <TableRow key={t.id}>
+                    <TableCell>{(t.completedAt || t.createdAt).toLocaleDateString("fr-FR")}</TableCell>
+                    <TableCell>{t.walletCode}</TableCell>
+                    <TableCell>{t.sourceType}</TableCell>
+                    <TableCell>{t.direction}</TableCell>
+                    <TableCell>{formatCurrency(Number(t.amountXAF), "XAF")}</TableCell>
+                    <TableCell>{t.status}</TableCell>
+                    <TableCell>{t.reference || "-"}</TableCell>
+                  </TableRow>
+                ))}
+                {ledgerTransactions.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center text-sm text-muted-foreground">
+                      Aucune transaction
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Transactions bancaires brutes</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
                   <TableHead>Compte</TableHead>
                   <TableHead>Direction</TableHead>
                   <TableHead>Montant</TableHead>
@@ -159,7 +205,7 @@ export default async function FinanceBanksPage() {
                 ))}
                 {transactions.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-sm text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center text-sm text-muted-foreground">
                       Aucune transaction
                     </TableCell>
                   </TableRow>

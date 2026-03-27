@@ -6,6 +6,7 @@ import type { DemandSource, DemandStatus, DemandUrgency, Prisma } from "@prisma/
 import { prisma } from "@/lib/db";
 import { checkPermission } from "@/lib/permissions";
 import { getSession } from "@/lib/session";
+import { CrmTaskOrchestratorService } from "@/lib/services/crm-task-orchestrator.service";
 import { OperationalTaskService } from "@/lib/services/operational-task.service";
 import { SourcingTicketService } from "@/lib/services/sourcing-ticket.service";
 
@@ -199,9 +200,11 @@ export async function createDemandIntake(data: {
     });
 
     await SourcingTicketService.ensureFromDemand(demand.id);
+    await CrmTaskOrchestratorService.syncDemandWorkflow(user.tenantId, demand.id);
 
     revalidatePath("/sourcing");
     revalidatePath("/tasks");
+    revalidatePath("/crm");
     return { data: demand };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur création demande" };
@@ -241,8 +244,10 @@ export async function qualifyDemandIntake(
     });
 
     await SourcingTicketService.ensureFromDemand(updated.id);
+    await CrmTaskOrchestratorService.syncDemandWorkflow(user.tenantId, updated.id);
 
     revalidatePath("/sourcing");
+    revalidatePath("/crm");
     return { data: updated };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur qualification" };
@@ -293,9 +298,11 @@ export async function assignSourcingTask(id: string, assigneeId?: string) {
     );
 
     await SourcingTicketService.ensureFromDemand(updated.id);
+    await CrmTaskOrchestratorService.syncDemandWorkflow(user.tenantId, updated.id);
 
     revalidatePath("/sourcing");
     revalidatePath("/tasks");
+    revalidatePath("/crm");
     return { data: updated };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur assignation sourcing" };
@@ -322,8 +329,10 @@ export async function linkQuoteToDemand(demandId: string, quoteId: string, order
     });
 
     await SourcingTicketService.ensureFromDemand(updated.id);
+    await CrmTaskOrchestratorService.syncDemandWorkflow(user.tenantId, updated.id);
 
     revalidatePath("/sourcing");
+    revalidatePath("/crm");
     return { data: updated };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur liaison devis" };
@@ -347,8 +356,10 @@ export async function markDemandLost(id: string, reason: string) {
     });
 
     await SourcingTicketService.ensureFromDemand(updated.id);
+    await CrmTaskOrchestratorService.syncDemandWorkflow(user.tenantId, updated.id);
 
     revalidatePath("/sourcing");
+    revalidatePath("/crm");
     return { data: updated };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur mise à jour statut" };
@@ -371,8 +382,10 @@ export async function convertDemand(demandId: string, orderId: string) {
     });
 
     await SourcingTicketService.ensureFromDemand(updated.id);
+    await CrmTaskOrchestratorService.syncDemandWorkflow(user.tenantId, updated.id);
 
     revalidatePath("/sourcing");
+    revalidatePath("/crm");
     return { data: updated };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur conversion" };
@@ -395,6 +408,8 @@ export async function advanceDemandStatus(demandId: string, newStatus: DemandSta
     });
 
     revalidatePath("/sourcing");
+    await CrmTaskOrchestratorService.syncDemandWorkflow(user.tenantId, updated.id);
+    revalidatePath("/crm");
     return { data: updated };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur avancement statut" };
@@ -449,6 +464,7 @@ export async function createDemandFromWhatsAppIntent(params: {
     });
 
     await SourcingTicketService.ensureFromDemand(demand.id);
+    await CrmTaskOrchestratorService.syncDemandWorkflow(params.tenantId, demand.id);
 
     // Notify CM
     if (cm) {

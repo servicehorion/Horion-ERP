@@ -3,6 +3,7 @@ import { checkPermission } from "@/lib/permissions";
 import { prisma } from "@/lib/db";
 import { InvoiceService } from "@/lib/services/invoice.service";
 import { createInvoice, updateInvoiceStatus, addInvoiceReminder, addInvoiceSchedule, autoSendInvoiceReminders } from "@/lib/actions/finance-advanced.actions";
+import { FinanceTransactionService } from "@/lib/services/finance-transaction.service";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { formatCurrency } from "@/config/currencies";
 
 export const metadata = { title: "Facturation AP/AR | Horion ERP" };
 
@@ -17,12 +19,12 @@ export default async function FinanceInvoicesPage() {
   const user = await getSession();
   checkPermission(user.role, "finance.view");
 
-  const [invoices, contacts, suppliers, orders, aging] = await Promise.all([
+  const [invoiceOpsRows, invoices, contacts, suppliers, orders] = await Promise.all([
+    FinanceTransactionService.getInvoiceRows(user.tenantId),
     InvoiceService.list(user.tenantId),
     prisma.contact.findMany({ where: { tenantId: user.tenantId }, orderBy: { name: "asc" }, take: 200 }),
     prisma.supplier.findMany({ orderBy: { name: "asc" }, take: 200 }),
     prisma.order.findMany({ where: { tenantId: user.tenantId }, orderBy: { createdAt: "desc" }, take: 100 }),
-    InvoiceService.getAging(user.tenantId),
   ]);
 
   return (
@@ -79,8 +81,51 @@ export default async function FinanceInvoicesPage() {
 
       <Card>
         <CardHeader>
+          <CardTitle>Facturation operationnelle</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Commande</TableHead>
+                  <TableHead>Client</TableHead>
+                  <TableHead>Facture</TableHead>
+                  <TableHead>Statut</TableHead>
+                  <TableHead>Montant facture</TableHead>
+                  <TableHead>Encaisse</TableHead>
+                  <TableHead>Reste</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {invoiceOpsRows.map((row) => (
+                  <TableRow key={row.orderId}>
+                    <TableCell className="font-mono">{row.orderNumber}</TableCell>
+                    <TableCell>{row.clientName}</TableCell>
+                    <TableCell>{row.invoiceNumber || "-"}</TableCell>
+                    <TableCell>{row.invoiceStatus}</TableCell>
+                    <TableCell>{formatCurrency(row.billedAmount, row.currency as any)}</TableCell>
+                    <TableCell>{formatCurrency(row.collectedAmount, "XAF")}</TableCell>
+                    <TableCell>{formatCurrency(row.outstandingAmount, "XAF")}</TableCell>
+                  </TableRow>
+                ))}
+                {invoiceOpsRows.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center text-sm text-muted-foreground">
+                      Aucun flux de facturation operationnelle.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Factures ({invoices.length})</CardTitle>
+            <CardTitle>Registre factures ({invoices.length})</CardTitle>
             <form action={autoSendInvoiceReminders}>
               <Button size="sm" variant="outline">Relances automatiques</Button>
             </form>
@@ -160,16 +205,18 @@ export default async function FinanceInvoicesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {aging.map((row: any) => (
-                  <TableRow key={row.id}>
-                    <TableCell className="font-mono">{row.invoiceNumber}</TableCell>
-                    <TableCell>{row.contactName || "-"}</TableCell>
-                    <TableCell>{Number(row.total).toFixed(0)} {row.currency}</TableCell>
-                    <TableCell>{row.dueAt ? new Date(row.dueAt).toLocaleDateString("fr-FR") : "-"}</TableCell>
-                    <TableCell>{row.daysLate}</TableCell>
+                {invoiceOpsRows
+                  .filter((row) => row.outstandingAmount > 0)
+                  .map((row) => (
+                  <TableRow key={row.orderId}>
+                    <TableCell className="font-mono">{row.invoiceNumber || row.orderNumber}</TableCell>
+                    <TableCell>{row.clientName || "-"}</TableCell>
+                    <TableCell>{formatCurrency(row.outstandingAmount, "XAF")}</TableCell>
+                    <TableCell>{row.lastCollectedAt ? new Date(row.lastCollectedAt).toLocaleDateString("fr-FR") : "-"}</TableCell>
+                    <TableCell>{row.outstandingAmount > 0 ? "Ouvert" : "Solde"}</TableCell>
                   </TableRow>
                 ))}
-                {aging.length === 0 && (
+                {invoiceOpsRows.filter((row) => row.outstandingAmount > 0).length === 0 && (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center text-sm text-muted-foreground">
                       Aucune creance en retard

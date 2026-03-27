@@ -18,6 +18,7 @@ import { InvoiceService } from "@/lib/services/invoice.service";
 import { ConsolidationService } from "@/lib/services/consolidation.service";
 import { MarketService } from "@/lib/services/market.service";
 import { FinanceApprovalService } from "@/lib/services/finance-approval.service";
+import { FinanceTransactionService } from "@/lib/services/finance-transaction.service";
 import { prisma } from "@/lib/db";
 
 const toNumber = (value: FormDataEntryValue | null, field: string) => {
@@ -746,17 +747,19 @@ export async function syncBankTransactions(connectionId: string) {
 
     const result = await BankService.syncTransactions({ connectionId });
 
-    await AuditService.log({
-      tenantId: user.tenantId,
-      userId: user.id,
-      action: "bank.transactions_synced",
+      await AuditService.log({
+        tenantId: user.tenantId,
+        userId: user.id,
+        action: "bank.transactions_synced",
       entityType: "bank_connection",
       entityId: connectionId,
       newValue: { imported: result.imported, error: result.error || null },
-    });
+      });
 
-    revalidatePath("/finance/banks");
-    return { data: result };
+      await FinanceTransactionService.syncTenant(user.tenantId);
+      revalidatePath("/finance/banks");
+      revalidatePath("/finance/statements");
+      return { data: result };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur sync banque" };
   }
@@ -791,17 +794,19 @@ export async function addBankTransaction(formData: FormData) {
       reference,
     });
 
-    await AuditService.log({
-      tenantId: user.tenantId,
-      userId: user.id,
-      action: "bank.transaction_added",
+      await AuditService.log({
+        tenantId: user.tenantId,
+        userId: user.id,
+        action: "bank.transaction_added",
       entityType: "bank_transaction",
       entityId: tx.id,
       newValue: { connectionId, amount, currency, direction },
-    });
+      });
 
-    revalidatePath("/finance/banks");
-    return { data: tx };
+      await FinanceTransactionService.syncTenant(user.tenantId);
+      revalidatePath("/finance/banks");
+      revalidatePath("/finance/statements");
+      return { data: tx };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur" };
   }
@@ -814,17 +819,19 @@ export async function reconcileBankTransaction(transactionId: string, paymentId?
 
     const tx = await BankService.reconcileTransaction({ transactionId, paymentId: paymentId || undefined });
 
-    await AuditService.log({
-      tenantId: user.tenantId,
-      userId: user.id,
-      action: "bank.transaction_reconciled",
+      await AuditService.log({
+        tenantId: user.tenantId,
+        userId: user.id,
+        action: "bank.transaction_reconciled",
       entityType: "bank_transaction",
       entityId: tx.id,
       newValue: { paymentId: paymentId || null },
-    });
+      });
 
-    revalidatePath("/finance/banks");
-    return { data: tx };
+      await FinanceTransactionService.syncTenant(user.tenantId);
+      revalidatePath("/finance/banks");
+      revalidatePath("/finance/statements");
+      return { data: tx };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur" };
   }
@@ -1273,17 +1280,19 @@ export async function autoReconcileBankTransactions() {
 
     const result = await BankService.autoReconcile(user.tenantId);
 
-    await AuditService.log({
-      tenantId: user.tenantId,
-      userId: user.id,
-      action: "bank.auto_reconcile",
+      await AuditService.log({
+        tenantId: user.tenantId,
+        userId: user.id,
+        action: "bank.auto_reconcile",
       entityType: "bank_transactions",
       entityId: "bulk",
       newValue: { reconciled: result.reconciled },
-    });
+      });
 
-    revalidatePath("/finance/banks");
-    return { data: result };
+      await FinanceTransactionService.syncTenant(user.tenantId);
+      revalidatePath("/finance/banks");
+      revalidatePath("/finance/statements");
+      return { data: result };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur" };
   }

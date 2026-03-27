@@ -177,7 +177,7 @@ export default async function TaskDetailPage({ params }: PageProps) {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4 text-sm">
-                <div className="grid gap-3 md:grid-cols-2">
+                <div className="grid gap-3 md:grid-cols-3">
                   <div className="rounded-lg border bg-background/70 p-3">
                     <p className="font-medium">Conditions de cloture</p>
                     <div className="mt-2 space-y-1 text-muted-foreground">
@@ -213,6 +213,8 @@ export default async function TaskDetailPage({ params }: PageProps) {
                     <div className="mt-2 space-y-1 text-muted-foreground">
                       <div>Taches aval impactees: {workflow.operationalImpact.downstreamTaskCount}</div>
                       <div>Deja bloquees en aval: {workflow.operationalImpact.downstreamBlockedCount}</div>
+                      <div>Clients exposes: {workflow.operationalImpact.impactedClients.length}</div>
+                      <div>Revenu a risque: {workflow.operationalImpact.atRiskRevenueXAF.toLocaleString("fr-FR")} XAF</div>
                       <div>Modules touches: {workflow.operationalImpact.impactedModules.join(", ") || "Aucun"}</div>
                       <div>
                         Prochaine echeance impactee:{" "}
@@ -222,6 +224,33 @@ export default async function TaskDetailPage({ params }: PageProps) {
                       </div>
                     </div>
                     <p className="mt-3 text-xs text-muted-foreground">{workflow.operationalImpact.summary}</p>
+                  </div>
+
+                  <div className="rounded-lg border bg-background/70 p-3">
+                    <p className="font-medium">Responsabilite</p>
+                    <div className="mt-2 space-y-1 text-muted-foreground">
+                      <div>
+                        Responsable principal: {workflow.responsibility.primaryOwner?.name ?? "Non defini"}
+                      </div>
+                      <div>
+                        Backup: {workflow.responsibility.backupOwner?.name ?? "Non defini"}
+                      </div>
+                      <div>
+                        Manager: {workflow.responsibility.managerOwner?.name ?? "Non defini"}
+                      </div>
+                      <div>
+                        Niveau d'escalade: {workflow.responsibility.escalationLevel}
+                      </div>
+                      <div>
+                        Escalade a partir du:{" "}
+                        {workflow.responsibility.escalationAt
+                          ? formatDate(new Date(workflow.responsibility.escalationAt), true)
+                          : "Non planifiee"}
+                      </div>
+                    </div>
+                    {workflow.responsibility.assignmentReason && (
+                      <p className="mt-3 text-xs text-muted-foreground">{workflow.responsibility.assignmentReason}</p>
+                    )}
                   </div>
                 </div>
 

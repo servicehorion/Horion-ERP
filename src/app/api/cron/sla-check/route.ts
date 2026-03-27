@@ -1,13 +1,9 @@
 ﻿import { NextResponse } from "next/server";
-import type { UserRole } from "@prisma/client";
-
 import { prisma } from "@/lib/db";
 import { notifyShipmentSlaIfNeeded } from "@/lib/services/logistics-sla.service";
 import { LeadSlaService } from "@/lib/services/lead-sla.service";
+import { TaskWorkflowService } from "@/lib/services/task-workflow.service";
 import { requireSecretHeader } from "@/lib/api/secret-auth";
-
-// Task types that are time-critical and must escalate to OS managers on breach
-const CRITICAL_TASK_TYPES = ["ceo_payment_validation", "quote_approval", "client_notification"];
 
 async function getOrderTeamUserIds(orderId: string): Promise<string[]> {
   const order = await prisma.order.findUnique({
@@ -64,53 +60,23 @@ export async function POST(req: Request) {
       await LeadSlaService.updateSla(lead.id, lead.status);
     }
 
-    // ── Escalade SLA tâches critiques (CEO validation, COO approval, notification client) ──
-    const overdueTasks = await prisma.task.findMany({
-      where: {
-        taskType: { in: CRITICAL_TASK_TYPES },
-        status: { notIn: ["COMPLETED", "CANCELLED"] },
-        slaDeadline: { lt: new Date() },
-        slaBreach: false,
-        ...(tenantId ? { tenantId } : {}),
-      },
-      include: {
-        assignments: { select: { userId: true } },
-      },
-    });
-
     let tasksEscalated = 0;
-    for (const task of overdueTasks) {
-      // Mark as breached
-      await prisma.task.update({ where: { id: task.id }, data: { slaBreach: true } });
+    const tenantIds = tenantId
+      ? [tenantId]
+      : (
+          await prisma.task.findMany({
+            where: {
+              status: { notIn: ["COMPLETED", "CANCELLED"] },
+              slaDeadline: { lt: new Date() },
+              slaBreach: false,
+            },
+            select: { tenantId: true },
+            distinct: ["tenantId"],
+          })
+        ).map((task) => task.tenantId);
 
-      // Escalate to OS manager based on module
-      const escalateeRoles: UserRole[] =
-        task.taskType === "ceo_payment_validation"
-          ? ["CEO", "DIRECTION", "ADMIN"]
-          : task.taskType === "quote_approval"
-            ? ["LOGISTICS_MANAGER", "DIRECTION", "CEO", "ADMIN"]
-            : ["COMMUNITY_MANAGER", "DIRECTION", "ADMIN"]; // client_notification
-
-      const escalatees = await prisma.user.findMany({
-        where: { tenantId: task.tenantId, role: { in: escalateeRoles } },
-        select: { id: true },
-      });
-
-      for (const esc of escalatees) {
-        await prisma.notification.create({
-          data: {
-            tenantId: task.tenantId,
-            userId: esc.id,
-            type: "SLA_BREACH",
-            title: `SLA dépassé — ${task.title.slice(0, 80)}`,
-            message: `La tâche "${task.title}" a dépassé son échéance SLA. Action immédiate requise.`,
-            entityType: "task",
-            entityId: task.id,
-          },
-        });
-      }
-
-      tasksEscalated += 1;
+    for (const currentTenantId of tenantIds) {
+      tasksEscalated += await TaskWorkflowService.checkSLABreachesWithConsequences(currentTenantId);
     }
 
     return NextResponse.json({
@@ -118,6 +84,7 @@ export async function POST(req: Request) {
         shipmentsChecked: shipments.length,
         shipmentsNotified: notified,
         leadsChecked: leads.length,
+        tasksEscalated,
         criticalTasksEscalated: tasksEscalated,
       },
     });

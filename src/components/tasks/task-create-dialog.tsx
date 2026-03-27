@@ -7,14 +7,23 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import {
-  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { createManualTask } from "@/lib/actions/task.actions";
 
 interface TaskCreateDialogProps {
@@ -27,7 +36,7 @@ const MODULES = [
   { value: "sourcing", label: "Sourcing" },
   { value: "logistics", label: "Logistique" },
   { value: "finance", label: "Finance" },
-  { value: "qc", label: "Contrôle Qualité" },
+  { value: "qc", label: "Controle qualite" },
   { value: "crm", label: "CRM" },
   { value: "catalog", label: "Catalogue" },
   { value: "manual", label: "Manuel" },
@@ -60,6 +69,7 @@ export function TaskCreateDialog({ teamMembers = [], projects = [] }: TaskCreate
   const [module, setModule] = useState("manual");
   const [priority, setPriority] = useState("NORMAL");
   const [slaHours, setSlaHours] = useState<string>("");
+  const [dueDate, setDueDate] = useState("");
   const [assigneeId, setAssigneeId] = useState<string>("");
   const [projectId, setProjectId] = useState<string>("none");
 
@@ -78,6 +88,7 @@ export function TaskCreateDialog({ teamMembers = [], projects = [] }: TaskCreate
         module,
         priority,
         slaHours: slaHours ? Number(slaHours) : undefined,
+        dueDate: dueDate || undefined,
         assigneeId: assigneeId || undefined,
         projectId: projectId === "none" ? undefined : projectId,
       });
@@ -87,12 +98,12 @@ export function TaskCreateDialog({ teamMembers = [], projects = [] }: TaskCreate
         return;
       }
 
-      toast.success("Tâche créée avec succès");
+      toast.success("Tache creee avec succes");
       setOpen(false);
       resetForm();
       router.refresh();
     } catch {
-      toast.error("Erreur lors de la création");
+      toast.error("Erreur lors de la creation");
     } finally {
       setIsSubmitting(false);
     }
@@ -104,6 +115,7 @@ export function TaskCreateDialog({ teamMembers = [], projects = [] }: TaskCreate
     setModule("manual");
     setPriority("NORMAL");
     setSlaHours("");
+    setDueDate("");
     setAssigneeId("");
     setProjectId("none");
   }
@@ -113,14 +125,14 @@ export function TaskCreateDialog({ teamMembers = [], projects = [] }: TaskCreate
       <DialogTrigger asChild>
         <Button size="sm">
           <Plus className="mr-2 h-4 w-4" />
-          Nouvelle tâche
+          Nouvelle tache
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[520px]">
         <DialogHeader>
-          <DialogTitle>Créer une tâche</DialogTitle>
+          <DialogTitle>Creer une tache</DialogTitle>
           <DialogDescription>
-            Créez une tâche manuelle pour votre équipe. Les tâches automatiques sont générées par le système.
+            Creez une tache manuelle pour votre equipe. Les taches automatiques restent gerees par le systeme.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -140,7 +152,7 @@ export function TaskCreateDialog({ teamMembers = [], projects = [] }: TaskCreate
               id="description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Détails de la tâche..."
+              placeholder="Details de la tache..."
               rows={3}
             />
           </div>
@@ -153,22 +165,26 @@ export function TaskCreateDialog({ teamMembers = [], projects = [] }: TaskCreate
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {MODULES.map((m) => (
-                    <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                  {MODULES.map((item) => (
+                    <SelectItem key={item.value} value={item.value}>
+                      {item.label}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-2">
-              <Label>Priorité</Label>
+              <Label>Priorite</Label>
               <Select value={priority} onValueChange={setPriority}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {PRIORITIES.map((p) => (
-                    <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                  {PRIORITIES.map((item) => (
+                    <SelectItem key={item.value} value={item.value}>
+                      {item.label}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -177,14 +193,16 @@ export function TaskCreateDialog({ teamMembers = [], projects = [] }: TaskCreate
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>SLA (délai)</Label>
+              <Label>SLA interne</Label>
               <Select value={slaHours} onValueChange={setSlaHours}>
                 <SelectTrigger>
                   <SelectValue placeholder="Pas de SLA" />
                 </SelectTrigger>
                 <SelectContent>
-                  {SLA_OPTIONS.map((s) => (
-                    <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                  {SLA_OPTIONS.map((item) => (
+                    <SelectItem key={item.value} value={item.value}>
+                      {item.label}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -192,19 +210,34 @@ export function TaskCreateDialog({ teamMembers = [], projects = [] }: TaskCreate
 
             {teamMembers.length > 0 && (
               <div className="space-y-2">
-                <Label>Assigner à</Label>
+                <Label>Assigner a</Label>
                 <Select value={assigneeId} onValueChange={setAssigneeId}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Non assigné" />
+                    <SelectValue placeholder="Assignation auto" />
                   </SelectTrigger>
                   <SelectContent>
-                    {teamMembers.map((m) => (
-                      <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                    {teamMembers.map((member) => (
+                      <SelectItem key={member.id} value={member.id}>
+                        {member.name}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
             )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="dueDate">Echeance metier</Label>
+            <Input
+              id="dueDate"
+              type="datetime-local"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Cette date represente la cible operationnelle. Elle reste distincte du SLA interne.
+            </p>
           </div>
 
           {projects.length > 0 && (
@@ -216,8 +249,10 @@ export function TaskCreateDialog({ teamMembers = [], projects = [] }: TaskCreate
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Aucun</SelectItem>
-                  {projects.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                  {projects.map((project) => (
+                    <SelectItem key={project.id} value={project.id}>
+                      {project.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -230,7 +265,7 @@ export function TaskCreateDialog({ teamMembers = [], projects = [] }: TaskCreate
             </Button>
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Créer la tâche
+              Creer la tache
             </Button>
           </div>
         </form>

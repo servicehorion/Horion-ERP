@@ -169,6 +169,20 @@ type MarginReport = {
   calculatedAt: Date;
 };
 
+type OrderDetailProjection = {
+  subsystemStates: {
+    commercial: { label: string; detail: string; tone: "neutral" | "success" | "warning" | "danger" };
+    payment: { label: string; detail: string; tone: "neutral" | "success" | "warning" | "danger"; collectedXAF: number; outstandingXAF: number };
+    logistics: { label: string; detail: string; tone: "neutral" | "success" | "warning" | "danger" };
+    quality: { label: string; detail: string; tone: "neutral" | "success" | "warning" | "danger" };
+    execution: { label: string; detail: string; tone: "neutral" | "success" | "warning" | "danger"; openTasks: number; blockedTasks: number; overdueTasks: number };
+    finance: { label: string; detail: string; tone: "neutral" | "success" | "warning" | "danger"; netMarginXAF: number; netMarginPct: number; spendXAF: number };
+  };
+  transitionReadiness: { status: string; label: string; ready: boolean; blockers: string[] }[];
+  activeBlockers: string[];
+  nextRecommendedStatus: { status: string; label: string; ready: boolean } | null;
+};
+
 type OrderDetailProps = {
   order: {
     id: string;
@@ -287,6 +301,7 @@ type OrderDetailProps = {
     }[];
     revisions?: { id: string; revisionNumber: number; reason?: string | null; createdAt: Date }[];
     ediTransmissions?: { id: string; provider: string; status: string; sentAt?: Date | null }[];
+    projection?: OrderDetailProjection | null;
   };
   canUpdateStatus?: boolean;
   canEdit?: boolean;
@@ -681,6 +696,39 @@ export function OrderDetail({
                 Mettre à jour
               </Button>
             </div>
+            {order.projection ? (
+              <div className="mt-4 space-y-3 rounded-lg border bg-muted/20 p-3">
+                {order.projection.nextRecommendedStatus ? (
+                  <div className="flex flex-wrap items-center gap-2 text-sm">
+                    <span className="font-medium">Prochaine etape recommandee :</span>
+                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-primary">
+                      {order.projection.nextRecommendedStatus.label}
+                    </span>
+                    <span className={order.projection.nextRecommendedStatus.ready ? "text-green-600" : "text-amber-600"}>
+                      {order.projection.nextRecommendedStatus.ready ? "prete a etre lancee" : "encore bloquee"}
+                    </span>
+                  </div>
+                ) : null}
+
+                {order.projection.activeBlockers.length > 0 ? (
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Blocages actifs
+                    </p>
+                    <ul className="space-y-1 text-sm text-muted-foreground">
+                      {order.projection.activeBlockers.slice(0, 3).map((blocker) => (
+                        <li key={blocker} className="flex items-start gap-2">
+                          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                          <span>{blocker}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : (
+                  <p className="text-sm text-green-600">Aucun blocage critique detecte pour la progression immediate.</p>
+                )}
+              </div>
+            ) : null}
           </CardContent>
         </Card>
       )}
@@ -741,6 +789,7 @@ export function OrderDetail({
               sourcingCases: order.sourcingCases,
               shipments: order.shipments,
               timeline: order.timeline,
+              projection: order.projection ?? null,
             }}
           />
         </TabsContent>

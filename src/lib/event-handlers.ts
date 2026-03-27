@@ -6,6 +6,7 @@ import { SubtaskService } from "@/lib/services/subtask.service";
 import { CustomerIntelligenceService } from "@/lib/services/customer-intelligence.service";
 import { IndicatifSourcingOrchestratorService } from "@/lib/services/indicatif-sourcing-orchestrator.service";
 import { OperationalTaskService } from "@/lib/services/operational-task.service";
+import { FinanceTransactionService } from "@/lib/services/finance-transaction.service";
 import { QcUpsellService } from "@/lib/services/qc-upsell.service";
 import {
   cancelQuoteWorkflowTasks,
@@ -444,6 +445,11 @@ const handleQuotePaymentConfirmed: EventHandler = async (event) => {
       method: true,
       confirmedAt: true,
       paidAt: true,
+      order: {
+        select: {
+          tenantId: true,
+        },
+      },
     },
   });
 
@@ -466,6 +472,7 @@ const handleQuotePaymentConfirmed: EventHandler = async (event) => {
   await completePaymentWorkflowTasks(payment.orderId);
   await QcUpsellService.ensureGhostRequestAfterPayment(payment.orderId);
   await syncDemandStatusForQuote(activeQuote.id);
+  await FinanceTransactionService.syncTenant(payment.order.tenantId);
 };
 
 const handleQuotePaymentCancelled: EventHandler = async (event) => {
@@ -480,6 +487,7 @@ const handleQuotePaymentCancelled: EventHandler = async (event) => {
         select: {
           id: true,
           status: true,
+          tenantId: true,
         },
       },
     },
@@ -512,6 +520,9 @@ const handleQuotePaymentCancelled: EventHandler = async (event) => {
     excludingQuoteId: activeQuote.id,
   });
   await syncDemandStatusForQuote(activeQuote.id);
+  if (payment.order?.tenantId) {
+    await FinanceTransactionService.syncTenant(payment.order.tenantId);
+  }
 };
 
 const handleCustomerIntelligenceFromDispute: EventHandler = async (event) => {

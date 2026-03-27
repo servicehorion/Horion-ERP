@@ -10,6 +10,7 @@ import { AuditService } from "@/lib/services/audit.service";
 import { AccountingService } from "@/lib/services/accounting.service";
 import { FxRevaluationService } from "@/lib/services/fx-revaluation.service";
 import { NotificationService } from "@/lib/services/notification.service";
+import { FinanceTransactionService } from "@/lib/services/finance-transaction.service";
 import { checkPermission } from "@/lib/permissions";
 import {
   createLedgerAccountSchema,
@@ -595,7 +596,7 @@ export async function createTreasuryTransaction(formData: Record<string, unknown
       result.updatedAccount.alertBelowAmount != null &&
       Number(result.updatedAccount.balance) < Number(result.updatedAccount.alertBelowAmount);
 
-    if (belowThreshold) {
+      if (belowThreshold) {
       const leadership = await prisma.user.findMany({
         where: {
           tenantId: user.tenantId,
@@ -618,10 +619,15 @@ export async function createTreasuryTransaction(formData: Record<string, unknown
           }
         );
       }
-    }
+      }
 
-    revalidatePath("/finance/treasury");
-    return { data: result };
+      await FinanceTransactionService.syncTenant(user.tenantId);
+  
+      revalidatePath("/finance/treasury");
+      revalidatePath("/finance/approvals");
+      revalidatePath("/finance/margins");
+      revalidatePath("/finance/statements");
+      return { data: result };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur creation mouvement de tresorerie" };
   }

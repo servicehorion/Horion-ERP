@@ -3684,6 +3684,82 @@ enum TreasuryReconciliationStatus {
   IGNORED
 }
 
+enum FinanceWalletCode {
+  PAWAPAY
+  BANK_CONGO
+  ALIPAY_CNY
+  CASH_DESK
+  USD_SETTLEMENT
+  PARTNER_PAYABLE
+  OPERATIONS
+}
+
+enum FinanceTransactionDirection {
+  IN
+  OUT
+}
+
+enum FinanceTransactionCategory {
+  CLIENT_PAYMENT
+  CLIENT_REFUND
+  CHINA_PURCHASE
+  SHIPPING_FEE
+  PARTNER_PAYMENT
+  BANK_SETTLEMENT
+  PLATFORM_FEE
+  FX_TOPUP
+  FX_LOSS
+  FX_GAIN
+  INSURANCE_FEE
+  INSURANCE_PAYOUT
+  MANUAL_ADJUSTMENT
+}
+
+enum FinanceTransactionStatus {
+  PENDING_APPROVAL
+  COMPLETED
+  CANCELLED
+}
+
+enum FinanceTransactionSourceType {
+  PAYMENT
+  TREASURY
+  BANK
+  MANUAL
+}
+
+model FinanceTransaction {
+  id                     String                      @id @default(cuid())
+  tenantId               String
+  orderId                String?
+  externalRef            String                      @unique
+  walletCode             FinanceWalletCode
+  sourceType             FinanceTransactionSourceType
+  sourceId               String?
+  direction              FinanceTransactionDirection
+  category               FinanceTransactionCategory
+  amountLocal            Decimal                     @db.Decimal(15, 2)
+  currency               String
+  exchangeRate           Decimal?                    @db.Decimal(15, 6)
+  amountXAF              Decimal                     @db.Decimal(15, 2)
+  status                 FinanceTransactionStatus    @default(COMPLETED)
+  createdById            String?
+  approvedById           String?
+  reference              String?
+  notes                  String?
+  completedAt            DateTime?
+  reversalOfTransactionId String?
+  metadata               Json                        @default("{}")
+  createdAt              DateTime                    @default(now())
+  updatedAt              DateTime                    @updatedAt
+
+  @@index([tenantId, orderId])
+  @@index([tenantId, walletCode])
+  @@index([tenantId, status])
+  @@index([tenantId, category])
+  @@map("finance_transactions")
+}
+
 enum ProductStatus {
   TESTING
   TESTED

@@ -7,6 +7,7 @@ import {
   createFinanceApprovalRule,
   deleteFinanceApprovalRule,
 } from "@/lib/actions/finance-advanced.actions";
+import { FinanceTransactionService } from "@/lib/services/finance-transaction.service";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +15,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { PageHeader } from "@/components/shared/page-header";
+import { formatCurrency } from "@/config/currencies";
 
 export const metadata = { title: "Approvals Finance | Horion ERP" };
 
@@ -41,7 +43,8 @@ export default async function FinanceApprovalsPage() {
   const user = await getSession();
   checkPermission(user.role, "finance.view");
 
-  const [approvals, rules] = await Promise.all([
+  const [pendingCashOuts, approvals, rules] = await Promise.all([
+    FinanceTransactionService.getPendingApprovals(user.tenantId),
     prisma.financeApproval.findMany({
       where: { tenantId: user.tenantId },
       include: { requestedBy: true, approvedBy: true, rule: true },
@@ -56,7 +59,51 @@ export default async function FinanceApprovalsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Workflows d'Approbation" description="Validation des paiements, factures, budgets" />
+      <PageHeader
+        title="Approvals operationnels"
+        description="Validation des cash-outs et lecture des workflows avances. Le noyau prioritaire reste le decaissement lie aux commandes."
+      />
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Cash-outs a valider ({pendingCashOuts.length})</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Commande</TableHead>
+                  <TableHead>Wallet</TableHead>
+                  <TableHead>Categorie</TableHead>
+                  <TableHead>Reference</TableHead>
+                  <TableHead>Montant</TableHead>
+                  <TableHead>Statut</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {pendingCashOuts.map((tx) => (
+                  <TableRow key={tx.id}>
+                    <TableCell className="font-mono text-xs">{tx.orderId || "-"}</TableCell>
+                    <TableCell>{tx.walletCode}</TableCell>
+                    <TableCell>{tx.category}</TableCell>
+                    <TableCell>{tx.reference || "-"}</TableCell>
+                    <TableCell>{formatCurrency(Number(tx.amountXAF), "XAF")}</TableCell>
+                    <TableCell>{tx.status}</TableCell>
+                  </TableRow>
+                ))}
+                {pendingCashOuts.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center text-sm text-muted-foreground">
+                      Aucun cash-out en attente de validation.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -74,7 +121,7 @@ export default async function FinanceApprovalsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Regles actives ({rules.length})</CardTitle>
+          <CardTitle>Regles avancees ({rules.length})</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <form action={createFinanceApprovalRuleAction} className="grid grid-cols-1 md:grid-cols-6 gap-3">
@@ -107,7 +154,7 @@ export default async function FinanceApprovalsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Demandes en cours</CardTitle>
+          <CardTitle>Workflows avances en cours</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="rounded-md border">

@@ -9,30 +9,24 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { EmptyState } from "@/components/shared/empty-state";
 import { CurrencyDisplay } from "@/components/shared/currency-display";
 import { ProofReviewList, WaitingList } from "@/components/finance/payment-proof-review";
-import { getAgentComptablePayments, getPayments } from "@/lib/actions/payment.actions";
+import { getAgentComptablePayments } from "@/lib/actions/payment.actions";
 import { getPaymentMethodLabel } from "@/lib/payments/config";
 import { formatDate } from "@/lib/utils";
+import { getSession } from "@/lib/session";
+import { checkPermission } from "@/lib/permissions";
+import { FinanceTransactionService } from "@/lib/services/finance-transaction.service";
 
 export const metadata = { title: "Paiements | Horion ERP" };
 
-const TYPE_LABELS: Record<string, string> = {
-  CLIENT_DEPOSIT: "Acompte client",
-  CLIENT_BALANCE: "Solde client",
-  SUPPLIER_PAYMENT: "Paiement fournisseur",
-  FREIGHT_PAYMENT: "Fret",
-  CUSTOMS_DUTY: "Droits de douane",
-  QC_PAYMENT: "QC",
-  COMMISSION: "Commission",
-  REFUND: "Remboursement",
-};
-
 const STATUS_COLORS: Record<string, string> = {
   PENDING: "bg-gray-100 text-gray-800",
+  PENDING_APPROVAL: "bg-amber-100 text-amber-800",
   PROCESSING: "bg-blue-100 text-blue-800",
   PENDING_PROOF: "bg-amber-100 text-amber-800",
   PROOF_UPLOADED: "bg-sky-100 text-sky-800",
   PROOF_REJECTED: "bg-rose-100 text-rose-800",
   CONFIRMED: "bg-green-100 text-green-800",
+  COMPLETED: "bg-green-100 text-green-800",
   FAILED: "bg-red-100 text-red-800",
   CANCELLED: "bg-gray-200 text-gray-500",
   EXPIRED: "bg-zinc-200 text-zinc-700",
@@ -41,11 +35,13 @@ const STATUS_COLORS: Record<string, string> = {
 
 const STATUS_LABELS: Record<string, string> = {
   PENDING: "En attente",
+  PENDING_APPROVAL: "A approuver",
   PROCESSING: "Traitement",
   PENDING_PROOF: "Preuve attendue",
   PROOF_UPLOADED: "Preuve recue",
   PROOF_REJECTED: "Preuve rejetee",
   CONFIRMED: "Confirme",
+  COMPLETED: "Complete",
   FAILED: "Echoue",
   CANCELLED: "Annule",
   EXPIRED: "Expire",
@@ -171,18 +167,15 @@ export default async function PaymentsPage() {
 }
 
 async function PaymentsList({ direction }: { direction?: string }) {
-  const result = await getPayments({ direction });
+  const user = await getSession();
+  checkPermission(user.role, "finance.view");
+  const transactions = await FinanceTransactionService.getRecentTransactions(user.tenantId, {
+    limit: 200,
+    sourceType: "PAYMENT",
+    direction: direction === "INBOUND" ? "IN" : direction === "OUTBOUND" ? "OUT" : undefined,
+  });
 
-  if (result.error) {
-    return (
-      <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-center text-destructive">
-        {result.error}
-      </div>
-    );
-  }
-
-  const payments = result.data || [];
-  if (payments.length === 0) {
+  if (transactions.length === 0) {
     return (
       <EmptyState
         title="Aucun paiement"
@@ -203,44 +196,45 @@ async function PaymentsList({ direction }: { direction?: string }) {
         <TableHeader>
           <TableRow>
             <TableHead>Commande</TableHead>
-            <TableHead>Type</TableHead>
+            <TableHead>Categorie</TableHead>
             <TableHead>Direction</TableHead>
             <TableHead>Montant</TableHead>
             <TableHead>Statut</TableHead>
-            <TableHead>Methode</TableHead>
+            <TableHead>Reference</TableHead>
             <TableHead>Date</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {payments.map((payment) => (
-            <TableRow key={payment.id}>
+          {transactions.map((transaction) => (
+            <TableRow key={transaction.id}>
               <TableCell>
-                <Link href={`/orders/${payment.orderId}`} className="font-medium text-primary hover:underline">
-                  {payment.order.orderNumber}
-                </Link>
-                <p className="text-xs text-muted-foreground">{payment.order.contact.name}</p>
+                {transaction.orderId ? (
+                  <Link href={`/orders/${transaction.orderId}`} className="font-medium text-primary hover:underline">
+                    {transaction.orderId}
+                  </Link>
+                ) : (
+                  <span className="text-muted-foreground">-</span>
+                )}
               </TableCell>
-              <TableCell className="text-sm">{TYPE_LABELS[payment.type] || payment.type}</TableCell>
+              <TableCell className="text-sm">{transaction.category}</TableCell>
               <TableCell>
                 <Badge
                   variant="outline"
-                  className={payment.direction === "INBOUND" ? "text-green-700" : "text-red-700"}
+                  className={transaction.direction === "IN" ? "text-green-700" : "text-red-700"}
                 >
-                  {payment.direction === "INBOUND" ? "Entrant" : "Sortant"}
+                  {transaction.direction === "IN" ? "Entrant" : "Sortant"}
                 </Badge>
               </TableCell>
               <TableCell className="font-medium">
-                <CurrencyDisplay amount={Number(payment.amountXAF)} currency="XAF" />
+                <CurrencyDisplay amount={Number(transaction.amountXAF || 0)} currency="XAF" />
               </TableCell>
               <TableCell>
-                <Badge className={STATUS_COLORS[payment.status] || ""}>
-                  {STATUS_LABELS[payment.status] || payment.status}
+                <Badge className={STATUS_COLORS[transaction.status] || ""}>
+                  {STATUS_LABELS[transaction.status] || transaction.status}
                 </Badge>
               </TableCell>
-              <TableCell className="text-sm text-muted-foreground">
-                {getPaymentMethodLabel(payment.method) || "-"}
-              </TableCell>
-              <TableCell className="text-sm">{formatDate(payment.createdAt)}</TableCell>
+              <TableCell className="text-sm text-muted-foreground">{transaction.reference || "-"}</TableCell>
+              <TableCell className="text-sm">{formatDate(transaction.completedAt || transaction.createdAt)}</TableCell>
             </TableRow>
           ))}
         </TableBody>
