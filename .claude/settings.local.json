@@ -162,7 +162,20 @@
       "Bash(node -e \"require\\(''qrcode''\\); console.log\\(''qrcode ok''\\)\")",
       "Bash(node -e \"const q = require\\(''qrcode''\\); console.log\\(typeof q.toDataURL\\)\")",
       "Skill(update-config)",
-      "Skill(update-config:*)"
+      "Skill(update-config:*)",
+      "Bash(ls \"c:/Users/jafred Parker242/Desktop/Horion service/src/app/\\(dashboard\\)/pilotage/\")",
+      "Bash(ls \"c:/Users/jafred Parker242/Desktop/Horion service/src/app/\\(dashboard\\)/quotes/\")",
+      "Bash(ls \"c:/Users/jafred Parker242/Desktop/Horion service/src/app/\\(dashboard\\)/logistics/shipments/\")",
+      "Bash(ls \"c:/Users/jafred Parker242/Desktop/Horion service/src/app/\\(dashboard\\)/logistics/warehouse-bridge/\")",
+      "Bash(git -C \"c:/Users/jafred Parker242/Desktop/Horion service\" log --oneline -15)",
+      "Bash(cat 'c:/Users/jafred Parker242/Desktop/Horion service/src/app/\\(dashboard\\)/pilotage/intelligence/page.tsx')",
+      "Bash(git -C \"c:/Users/jafred Parker242/Desktop/Horion service\" log --oneline --since=\"2026-01-01\")",
+      "Bash(git -C \"c:/Users/jafred Parker242/Desktop/Horion service\" log --oneline --since=\"2026-03-01\")",
+      "Bash(ls \"c:/Users/jafred Parker242/Desktop/Horion service/src/app/\\(dashboard\\)/finance/treasury/\")",
+      "Bash(cat 'c:/Users/jafred Parker242/Desktop/Horion service/src/app/\\(dashboard\\)/logistics/shipments/page.tsx')",
+      "Bash(cat 'c:/Users/jafred Parker242/Desktop/Horion service/src/app/\\(dashboard\\)/logistics/warehouse-bridge/page.tsx')",
+      "Bash(ls \"c:/Users/jafred Parker242/Desktop/Horion service/src/app/\\(dashboard\\)/finance/margins/\")",
+      "Bash(ls \"c:/Users/jafred Parker242/Desktop/Horion service/src/app/\\(dashboard\\)/finance/risk/\")"
     ]
   },
   "hooks": {
