@@ -390,4 +390,67 @@ export class SourcingTicketService {
       )
     );
   }
+
+  static async syncForSourcingCase(caseId: string) {
+    const sourcingCase = await prisma.sourcingCase.findUnique({
+      where: { id: caseId },
+      select: {
+        id: true,
+        orderId: true,
+        status: true,
+        order: {
+          select: {
+            tenantId: true,
+            contactId: true,
+            leadId: true,
+          },
+        },
+      },
+    });
+
+    if (!sourcingCase) return;
+
+    const nextStatus: SourcingTicketStatus =
+      sourcingCase.status === "CONFIRMED" ? "ORDERED" : "CONVERTED";
+
+    const relatedDemands = await prisma.demandIntake.findMany({
+      where: {
+        OR: [{ convertedCaseId: caseId }, { orderId: sourcingCase.orderId }],
+      },
+      select: { id: true },
+    });
+
+    const tickets = await prisma.sourcingTicket.findMany({
+      where: {
+        tenantId: sourcingCase.order.tenantId,
+        OR: [
+          { orderId: sourcingCase.orderId },
+          ...(relatedDemands.length > 0 ? [{ demandId: { in: relatedDemands.map((item) => item.id) } }] : []),
+          {
+            contactId: sourcingCase.order.contactId,
+            orderId: null,
+            status: { notIn: ["LOST", "ORDERED"] },
+          },
+        ],
+      },
+      orderBy: { updatedAt: "desc" },
+    });
+
+    if (tickets.length === 0) return;
+
+    await prisma.$transaction(
+      tickets.map((ticket) =>
+        prisma.sourcingTicket.update({
+          where: { id: ticket.id },
+          data: {
+            orderId: sourcingCase.orderId,
+            contactId: ticket.contactId ?? sourcingCase.order.contactId,
+            leadId: ticket.leadId ?? sourcingCase.order.leadId,
+            status: ticket.status === "LOST" ? ticket.status : nextStatus,
+            convertedAt: ticket.convertedAt ?? new Date(),
+          },
+        })
+      )
+    );
+  }
 }

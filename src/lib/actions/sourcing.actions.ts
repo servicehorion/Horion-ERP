@@ -19,6 +19,8 @@ import { SourcingSlaService } from "@/lib/services/sourcing-sla.service";
 import { SourcingSlaAlertService } from "@/lib/services/sourcing-sla-alert.service";
 import { SourcingAssignmentService } from "@/lib/services/sourcing-assignment.service";
 import { SourcingIngestionService } from "@/lib/services/sourcing-ingestion.service";
+import { SourcingTaskOrchestratorService } from "@/lib/services/sourcing-task-orchestrator.service";
+import { SourcingTicketService } from "@/lib/services/sourcing-ticket.service";
 import { OrderService } from "@/lib/services/order.service";
 import { SupplierContractService } from "@/lib/services/supplier-contract.service";
 import { convertCurrency } from "@/config/currencies";
@@ -36,6 +38,7 @@ export async function createSourcingCase(formData: Record<string, unknown>) {
 
     const validated = createSourcingCaseSchema.parse(formData);
     let contractId = validated.contractId;
+    let assignedToId = validated.assignedToId;
 
     // Verify order belongs to tenant
     const order = await prisma.order.findUnique({
@@ -45,12 +48,21 @@ export async function createSourcingCase(formData: Record<string, unknown>) {
     if (!order || order.tenantId !== user.tenantId) {
       return { error: "Commande introuvable" };
     }
-    if (validated.assignedToId) {
+    if (assignedToId) {
       const assignee = await prisma.user.findFirst({
-        where: { id: validated.assignedToId, tenantId: user.tenantId },
+        where: { id: assignedToId, tenantId: user.tenantId },
         select: { id: true },
       });
       if (!assignee) return { error: "Assigne introuvable" };
+    }
+
+    if (!assignedToId) {
+      const suggestedAssignee = await SourcingAssignmentService.pickAssignee(user.tenantId, {
+        entityType: "sourcing_case",
+        category: validated.category ?? null,
+        pipelineType: validated.pipelineType ?? null,
+      });
+      assignedToId = suggestedAssignee?.id ?? undefined;
     }
 
     if (validated.supplierId) {
@@ -86,7 +98,11 @@ export async function createSourcingCase(formData: Record<string, unknown>) {
     const sc = await SourcingCaseService.create({
       ...validated,
       contractId,
+      assignedToId,
     });
+
+    await SourcingTicketService.syncForSourcingCase(sc.id);
+    await SourcingTaskOrchestratorService.syncCaseWorkflow(sc.id);
 
     await AuditService.log({
       tenantId: user.tenantId,
@@ -154,6 +170,8 @@ export async function updateSourcingStatus(id: string, formData: Record<string, 
 
     const { status } = updateSourcingStatusSchema.parse(formData);
     const sc = await SourcingCaseService.updateStatus(id, status);
+    await SourcingTicketService.syncForSourcingCase(id);
+    await SourcingTaskOrchestratorService.syncCaseWorkflow(id);
 
     await AuditService.log({
       tenantId: user.tenantId,
@@ -194,6 +212,7 @@ export async function addOfferToSourcing(formData: Record<string, unknown>) {
       ...validated,
       validTo: validated.validTo ? new Date(validated.validTo) : undefined,
     });
+    await SourcingTaskOrchestratorService.syncCaseWorkflow(validated.sourcingCaseId);
 
     revalidatePath(`/sourcing/cases/${validated.sourcingCaseId}`);
     return { data: offer };
@@ -230,6 +249,7 @@ export async function selectSourcingSupplier(id: string, formData: Record<string
       sourcingCaseId: id,
       contractId: contract.id,
     });
+    await SourcingTaskOrchestratorService.syncCaseWorkflow(id);
 
     await AuditService.log({
       tenantId: user.tenantId,
@@ -262,6 +282,8 @@ export async function confirmSourcingSelection(id: string) {
     }
 
     const sc = await SourcingCaseService.confirmSelection(id);
+    await SourcingTicketService.syncForSourcingCase(id);
+    await SourcingTaskOrchestratorService.syncCaseWorkflow(id);
 
     await AuditService.log({
       tenantId: user.tenantId,
@@ -298,6 +320,7 @@ export async function addNegotiationLog(formData: Record<string, unknown>) {
     }
 
     const log = await SourcingCaseService.addNegotiationLog(validated);
+    await SourcingTaskOrchestratorService.syncCaseWorkflow(validated.sourcingCaseId);
 
     revalidatePath(`/sourcing/cases/${validated.sourcingCaseId}`);
     return { data: log };

@@ -35,6 +35,8 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { SourcingCommandCenterOverview } from "@/components/sourcing/sourcing-command-center-overview";
+import type { SourcingOverviewProjection, SourcingPriorityAction } from "@/lib/sourcing/types";
 
 import {
   addDemandAttachment,
@@ -231,6 +233,8 @@ interface SourcingCommandCenterProps {
   performance: PerformanceData;
   groupageBatches: GroupageBatch[];
   assignees: Assignee[];
+  overview?: SourcingOverviewProjection;
+  priorityActions?: SourcingPriorityAction[];
 }
 
 const DEMAND_STATUS_STYLE: Record<string, string> = {
@@ -314,6 +318,8 @@ export function SourcingCommandCenter({
   performance,
   groupageBatches,
   assignees,
+  overview: serverOverview,
+  priorityActions: serverPriorityActions,
 }: SourcingCommandCenterProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -408,6 +414,78 @@ export function SourcingCommandCenter({
   }, {});
   const urgentCount = demands.filter((d) => d.urgency !== "NORMAL").length;
   const conversionRate = demands.length ? Math.round((convertedCount / demands.length) * 100) : 0;
+  const localOverview: SourcingOverviewProjection = {
+    demandInbox: rawCount,
+    qualifiedDemandQueue: qualifiedCount,
+    activeCases: pipeline.length,
+    confirmedCases: pipeline.filter((item) => item.status === "CONFIRMED").length,
+    breachedCases: slaBreachedCount,
+    warningCases: slaWarningCount,
+    conversionRate,
+    canonicalJourney: [
+      {
+        key: "inbound",
+        label: "Demandes brutes",
+        count: rawCount,
+        description: "Besoins entrants a qualifier avant toute promesse sourcing.",
+      },
+      {
+        key: "pre_sourcing",
+        label: "Pre-sourcing",
+        count: qualifiedCount,
+        description: "Demandes deja qualifiees a transformer en travail exploitable.",
+      },
+      {
+        key: "quote",
+        label: "Devis / indicatif",
+        count: demands.filter((d) => ["QUOTE_DRAFT", "QUOTE_PENDING_APPROVAL", "QUOTE_APPROVED", "QUOTE_SENT"].includes(d.status)).length,
+        description: "Moments ou le besoin est assez cadre pour une proposition economique.",
+      },
+      {
+        key: "execution",
+        label: "Sourcing profond",
+        count: pipeline.filter((item) => !["CONFIRMED", "CANCELLED"].includes(item.status)).length,
+        description: "Dossiers fournisseurs actifs lies a une execution reelle.",
+      },
+      {
+        key: "confirmed",
+        label: "Decision confirmee",
+        count: pipeline.filter((item) => item.status === "CONFIRMED").length,
+        description: "Dossiers prets a alimenter la logistique et la commande.",
+      },
+    ],
+  };
+  const localPriorityActions: SourcingPriorityAction[] = [
+    slaBreachedCount > 0
+      ? {
+          id: "breached_cases",
+          title: "Traiter les cas hors SLA",
+          description: `${slaBreachedCount} dossier(s) sourcing sont deja en retard.`,
+          severity: "critical",
+          count: slaBreachedCount,
+        }
+      : null,
+    demands.filter((d) => !d.assignedTo?.id && ["RAW", "QUALIFIED"].includes(d.status)).length > 0
+      ? {
+          id: "unassigned_demands",
+          title: "Assigner les demandes sans proprietaire",
+          description: "Des demandes qualifiees ou brutes n'ont pas encore de porteur explicite.",
+          severity: "warning",
+          count: demands.filter((d) => !d.assignedTo?.id && ["RAW", "QUALIFIED"].includes(d.status)).length,
+        }
+      : null,
+    pipeline.filter((item) => item.status === "SELECTED").length > 0
+      ? {
+          id: "selected_cases",
+          title: "Verifier les selections fournisseur",
+          description: "Des dossiers selectionnes doivent encore etre verrouilles par contrat ou validation.",
+          severity: "warning",
+          count: pipeline.filter((item) => item.status === "SELECTED").length,
+        }
+      : null,
+  ].filter((item): item is SourcingPriorityAction => Boolean(item));
+  const resolvedOverview = serverOverview ?? localOverview;
+  const resolvedPriorityActions = serverPriorityActions ?? localPriorityActions;
 
   function handleCreateDemand() {
     startTransition(async () => {
@@ -729,69 +807,11 @@ export function SourcingCommandCenter({
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border bg-gradient-to-br from-slate-50 via-white to-blue-50 p-6 shadow-sm">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="space-y-1">
-            <h1 className="text-3xl font-bold">Sourcing OS</h1>
-            <p className="text-sm text-muted-foreground">
-              Orchestration des demandes, décisions fournisseurs et exécution logistique.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="secondary" className="px-3 py-1">Inbox {rawCount}</Badge>
-            <Badge variant="secondary" className="px-3 py-1">Qualifiées {qualifiedCount}</Badge>
-            <Badge variant="secondary" className="px-3 py-1">Converties {convertedCount}</Badge>
-            <Badge variant="secondary" className="px-3 py-1">
-              SLA {slaBreachedCount} dépassées / {slaWarningCount} alertes
-            </Badge>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card className="transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Demandes entrantes</CardTitle>
-            <Inbox className="h-4 w-4 text-blue-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{demands.length}</div>
-            <p className="text-xs text-muted-foreground">Sources multi-canaux</p>
-          </CardContent>
-        </Card>
-        <Card className="transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Pipeline actif</CardTitle>
-            <ClipboardCheck className="h-4 w-4 text-emerald-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{pipeline.length}</div>
-            <p className="text-xs text-muted-foreground">Cas en traitement</p>
-          </CardContent>
-        </Card>
-        <Card className="transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Fournisseurs actifs</CardTitle>
-            <Factory className="h-4 w-4 text-purple-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{suppliers.length}</div>
-            <p className="text-xs text-muted-foreground">Base fournisseurs</p>
-          </CardContent>
-        </Card>
-        <Card className="transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Alertes SLA</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-amber-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{slaBreachedCount}</div>
-            <p className="text-xs text-muted-foreground">
-              {slaWarningCount} warning(s) en cours
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+      <SourcingCommandCenterOverview
+        overview={resolvedOverview}
+        priorityActions={resolvedPriorityActions}
+        supplierCount={suppliers.length}
+      />
 
       <Tabs defaultValue="intake" className="space-y-4">
         <TabsList className="flex flex-wrap">

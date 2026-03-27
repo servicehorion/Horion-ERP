@@ -3,6 +3,7 @@ import { Ticket } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { SourcingCommandCenter } from "@/components/sourcing/command-center";
+import { SourcingCommandCenterProjectionService } from "@/lib/services/sourcing-command-center-projection.service";
 import {
   getDemandIntakes,
   getGroupageBatches,
@@ -13,11 +14,14 @@ import {
   getSourcingPipelineAdvanced,
   getSuppliersForSourcing,
 } from "@/lib/actions/sourcing.actions";
+import { getSession } from "@/lib/session";
 
 export const metadata = { title: "Sourcing Command Center | Horion ERP" };
 
 export default async function SourcingPage() {
+  const session = await getSession();
   const [
+    projection,
     demandsRes,
     pipelineRes,
     suppliersRes,
@@ -27,6 +31,7 @@ export default async function SourcingPage() {
     groupageRes,
     assigneesRes,
   ] = await Promise.all([
+    SourcingCommandCenterProjectionService.get(session.tenantId),
     getDemandIntakes(),
     getSourcingPipelineAdvanced(),
     getSuppliersForSourcing(),
@@ -59,6 +64,8 @@ export default async function SourcingPage() {
         ) as any}
         groupageBatches={(groupageRes.data ?? []) as any}
         assignees={(assigneesRes.data ?? []) as any}
+        overview={projection.overview}
+        priorityActions={projection.priorityActions}
       />
     </div>
   );

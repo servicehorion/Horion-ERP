@@ -23,6 +23,7 @@ import { AddOfferForm } from "@/components/sourcing/add-offer-form";
 import { NegotiationForm } from "@/components/sourcing/negotiation-form";
 import { ConfirmSelectionButton } from "@/components/sourcing/confirm-selection-button";
 import { ProfondPanel } from "@/components/sourcing/profond-panel";
+import { SourcingGovernanceService, SOURCING_STATUS_LABELS } from "@/lib/services/sourcing-governance.service";
 import { SourcingSlaService } from "@/lib/services/sourcing-sla.service";
 
 export const metadata = { title: "Détail cas sourcing | Horion ERP" };
@@ -55,10 +56,11 @@ export default async function SourcingCaseDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [caseResult, suppliersResult, session] = await Promise.all([
+  const [caseResult, suppliersResult, session, workflowSnapshot] = await Promise.all([
     getSourcingCaseById(id),
     getSuppliersForSourcing(),
     getSession().catch(() => null),
+    SourcingGovernanceService.getCaseWorkflowSnapshot(id),
   ]);
 
   if (caseResult.error || !caseResult.data) return notFound();
@@ -250,6 +252,62 @@ export default async function SourcingCaseDetailPage({
               </div>
             </CardContent>
           </Card>
+
+          {workflowSnapshot && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Gates sourcing</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="rounded-lg border bg-muted/30 p-3">
+                  <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Prochaine action recommandee
+                  </div>
+                  <div className="mt-1 font-medium">{workflowSnapshot.nextAction}</div>
+                </div>
+
+                {workflowSnapshot.blockers.length > 0 ? (
+                  <div className="space-y-2">
+                    <div className="text-sm font-medium text-red-700">Bloquants actifs</div>
+                    <ul className="space-y-2 text-sm text-muted-foreground">
+                      {workflowSnapshot.blockers.map((blocker) => (
+                        <li key={blocker} className="rounded border border-red-200 bg-red-50 p-2">
+                          {blocker}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+
+                <div className="space-y-2">
+                  <div className="text-sm font-medium">Transitions autorisees</div>
+                  <div className="grid gap-2 md:grid-cols-2">
+                    {workflowSnapshot.allowedTransitions.map((transition) => (
+                      <div key={transition.status} className="rounded border p-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="font-medium">
+                            {SOURCING_STATUS_LABELS[transition.status] || transition.label}
+                          </div>
+                          <Badge variant={transition.allowed ? "default" : "secondary"}>
+                            {transition.allowed ? "Pret" : "Bloque"}
+                          </Badge>
+                        </div>
+                        {!transition.allowed && transition.blockers.length > 0 ? (
+                          <div className="mt-2 text-xs text-muted-foreground">
+                            {transition.blockers[0]}
+                          </div>
+                        ) : (
+                          <div className="mt-2 text-xs text-muted-foreground">
+                            Transition compatible avec les gates du dossier.
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Profond Panel */}
           <ProfondPanel

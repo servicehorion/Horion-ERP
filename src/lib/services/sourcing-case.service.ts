@@ -1,14 +1,6 @@
 import { prisma } from "@/lib/db";
+import { SourcingGovernanceService } from "@/lib/services/sourcing-governance.service";
 import type { PipelineType, Prisma, SourcingLevel, SourcingStatus } from "@prisma/client";
-
-const VALID_TRANSITIONS: Record<SourcingStatus, SourcingStatus[]> = {
-  SEARCHING: ["OFFERS_RECEIVED", "CANCELLED"],
-  OFFERS_RECEIVED: ["NEGOTIATING", "SELECTED", "CANCELLED"],
-  NEGOTIATING: ["SELECTED", "OFFERS_RECEIVED", "CANCELLED"],
-  SELECTED: ["CONFIRMED", "NEGOTIATING", "CANCELLED"],
-  CONFIRMED: [],
-  CANCELLED: ["SEARCHING"],
-};
 
 export class SourcingCaseService {
   static async create(data: {
@@ -70,6 +62,7 @@ export class SourcingCaseService {
           },
         },
         supplier: { select: { id: true, name: true, country: true, city: true, rating: true } },
+        assignedTo: { select: { id: true, name: true, email: true, role: true } },
         contract: { select: { id: true, contractNumber: true, status: true, endAt: true } },
         offers: {
           include: {
@@ -81,6 +74,7 @@ export class SourcingCaseService {
         negotiations: {
           orderBy: { createdAt: "desc" },
         },
+        _count: { select: { offers: true, negotiations: true } },
       },
     });
   }
@@ -128,15 +122,7 @@ export class SourcingCaseService {
   }
 
   static async updateStatus(id: string, newStatus: SourcingStatus) {
-    const current = await prisma.sourcingCase.findUnique({ where: { id } });
-    if (!current) throw new Error("Cas de sourcing introuvable");
-
-    const allowed = VALID_TRANSITIONS[current.status];
-    if (!allowed.includes(newStatus)) {
-      throw new Error(
-        `Transition invalide : ${current.status} → ${newStatus}. Transitions permises : ${allowed.join(", ")}`
-      );
-    }
+    await SourcingGovernanceService.assertCaseTransition(id, newStatus);
 
     return prisma.sourcingCase.update({
       where: { id },
@@ -185,8 +171,10 @@ export class SourcingCaseService {
     const current = await prisma.sourcingCase.findUnique({ where: { id } });
     if (!current) throw new Error("Cas de sourcing introuvable");
     if (current.status !== "SELECTED") {
-      throw new Error("Un fournisseur doit être sélectionné avant de confirmer");
+      throw new Error("Un fournisseur doit etre selectionne avant de confirmer");
     }
+
+    await SourcingGovernanceService.assertCaseTransition(id, "CONFIRMED");
 
     return prisma.sourcingCase.update({
       where: { id },
