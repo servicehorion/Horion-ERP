@@ -767,7 +767,7 @@ export default async function TaskDetailPage({ params }: PageProps) {
                 <Link href="/tasks"><ArrowLeft className="mr-2 h-4 w-4" />Toutes les tâches</Link>
               </Button>
               <Button variant="outline" size="sm" className="w-full justify-start" asChild>
-                <Link href="/tasks/board"><Layers className="mr-2 h-4 w-4" />Vue Kanban</Link>
+                <Link href="/tasks/board"><Layers className="mr-2 h-4 w-4" />Vue tableau</Link>
               </Button>
               {task.module && task.module !== "manual" && (
                 <Button variant="outline" size="sm" className="w-full justify-start" asChild>

@@ -27,7 +27,7 @@ export default async function RootLayout({
   const session = hasAuthCookie ? await auth().catch(() => null) : null;
 
   return (
-    <html lang="fr">
+    <html lang="fr" suppressHydrationWarning>
       <body className="font-sans antialiased">
         <a
           href="#main-content"

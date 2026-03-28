@@ -9,8 +9,8 @@ import { getKanbanTasks, getTeamMembers } from "@/lib/actions/task.actions";
 import { getProjects } from "@/lib/actions/project.actions";
 
 export const metadata = {
-  title: "Kanban Tâches | Horion ERP",
-  description: "Vue Kanban collaborative — glisser-déposer",
+  title: "Tableau Kanban | Horion ERP",
+  description: "Vue tableau collaborative — glisser-déposer",
 };
 
 interface PageProps {
@@ -56,7 +56,7 @@ export default async function TasksBoardPage({ searchParams }: PageProps) {
             </Link>
           </Button>
           <div>
-            <h1 className="text-3xl font-bold">Kanban Board</h1>
+            <h1 className="text-3xl font-bold">Tableau Kanban</h1>
             <p className="text-muted-foreground">
               Glisser-déposer pour changer le statut des tâches
             </p>

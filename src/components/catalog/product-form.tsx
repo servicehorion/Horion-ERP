@@ -71,7 +71,7 @@ export function ProductForm({ categories }: ProductFormProps) {
         try {
           payload.specsJson = JSON.parse(payload.specsJson as string);
         } catch {
-          toast.error("Le JSON des specifications est invalide");
+          toast.error("Le JSON des spécifications est invalide");
           setIsSubmitting(false);
           return;
         }
@@ -84,7 +84,7 @@ export function ProductForm({ categories }: ProductFormProps) {
         return;
       }
 
-      toast.success("Produit cree avec succes");
+      toast.success("Produit créé avec succès");
       router.push("/catalog/products");
     } catch (error) {
       toast.error("Une erreur est survenue");
@@ -117,14 +117,14 @@ export function ProductForm({ categories }: ProductFormProps) {
             name="categoryId"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Categorie</FormLabel>
+                <FormLabel>Catégorie</FormLabel>
                 <Select
                   onValueChange={field.onChange}
                   defaultValue={field.value}
                 >
                   <FormControl>
                     <SelectTrigger>
-                      <SelectValue placeholder="Selectionner une categorie" />
+                      <SelectValue placeholder="Sélectionner une catégorie" />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
@@ -296,7 +296,7 @@ export function ProductForm({ categories }: ProductFormProps) {
                 >
                   <FormControl>
                     <SelectTrigger>
-                      <SelectValue placeholder="Selectionner un niveau" />
+                      <SelectValue placeholder="Sélectionner un niveau" />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
@@ -341,7 +341,7 @@ export function ProductForm({ categories }: ProductFormProps) {
             name="volumeEstimate"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Volume estime (m3)</FormLabel>
+                <FormLabel>Volume estimé (m³)</FormLabel>
                 <FormControl>
                   <Input
                     {...field}
@@ -500,7 +500,7 @@ export function ProductForm({ categories }: ProductFormProps) {
               <FormControl>
                 <Textarea
                   {...field}
-                  placeholder="Informations supplementaires..."
+                  placeholder="Informations supplémentaires..."
                   rows={3}
                 />
               </FormControl>

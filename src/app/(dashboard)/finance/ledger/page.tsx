@@ -117,9 +117,17 @@ export default async function LedgerPage() {
                     const typeConfig = TYPE_LABELS[a.type] || { label: a.type, color: "", icon: Minus };
                     const balance = Number(a.balance);
                     return (
-                      <TableRow key={a.id}>
-                        <TableCell className="font-mono font-medium">{a.code}</TableCell>
-                        <TableCell className="font-medium">{a.name}</TableCell>
+                      <TableRow key={a.id} className="cursor-pointer hover:bg-muted/40">
+                        <TableCell className="font-mono font-medium">
+                          <Link href={`/finance/ledger/${a.id}`} className="hover:underline text-primary">
+                            {a.code}
+                          </Link>
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          <Link href={`/finance/ledger/${a.id}`} className="hover:underline">
+                            {a.name}
+                          </Link>
+                        </TableCell>
                         <TableCell>
                           <Badge variant="secondary" className={typeConfig.color}>
                             {typeConfig.label}

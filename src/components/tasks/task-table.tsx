@@ -163,7 +163,7 @@ export const taskColumns: ColumnDef<TaskTableRow>[] = [
               {task.entityType === "Order" ? (
                 <Link href={`/orders/${task.entityId}`}>Voir la commande</Link>
               ) : (
-                <span>Voir l'entité</span>
+                <span>{"Voir l'entité"}</span>
               )}
             </DropdownMenuItem>
           </DropdownMenuContent>
