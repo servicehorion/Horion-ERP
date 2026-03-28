@@ -9,8 +9,8 @@ import { FinanceIntelligenceService } from "@/lib/services/finance-intelligence.
 import { getCrmLeadScopeWithDelegation } from "@/lib/access-control";
 
 export const metadata = {
-  title: "Pilotage | Horion ERP",
-  description: "Vue d'ensemble des operations Horion",
+  title: "Dashboard Quotidien | Horion ERP",
+  description: "Cockpit quotidien par role pour piloter l'activite Horion",
 };
 
 export default async function DashboardPage() {

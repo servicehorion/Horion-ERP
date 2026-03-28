@@ -4,8 +4,8 @@ import { RiskCommand } from "@/components/pilotage/risk-command";
 import { getRiskCommandData } from "@/lib/actions/pilotage.actions";
 
 export const metadata = {
-  title: "Risk Command | Horion ERP",
-  description: "Critical risk registry, escalation flow, and mitigation command",
+  title: "Commande Risque | Horion ERP",
+  description: "Registre de risques critiques, escalade et plan de mitigation",
 };
 
 export default async function PilotageRiskPage() {
@@ -17,9 +17,9 @@ export default async function PilotageRiskPage() {
       <div className="flex items-center gap-3">
         <ShieldAlert className="h-7 w-7 text-primary" />
         <div>
-          <h1 className="text-3xl font-bold">Risk Command</h1>
+          <h1 className="text-3xl font-bold">Commande risque</h1>
           <p className="text-muted-foreground">
-            Detect, escalate, and mitigate critical enterprise risks before they spread.
+            Detecter, escalader et mitiger les risques critiques avant qu'ils ne se propagent.
           </p>
         </div>
       </div>

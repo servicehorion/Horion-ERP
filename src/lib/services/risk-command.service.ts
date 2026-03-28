@@ -81,6 +81,8 @@ function addMonths(date: Date, amount: number) {
 }
 
 export class RiskCommandService {
+  private static readonly REGISTRY_ACTIVITY_WINDOW_HOURS = 24;
+
   private static async resolveOwnerId(tenantId: string, category: StrategicRiskCategory) {
     const users = await prisma.user.findMany({
       where: { tenantId, isActive: true },
@@ -559,8 +561,6 @@ export class RiskCommandService {
   }
 
   static async getDashboard(tenantId: string) {
-    const sync = await this.syncRegistry(tenantId);
-
     const [risks, timeline, owners] = await Promise.all([
       prisma.strategicRisk.findMany({
         where: { tenantId },
@@ -598,6 +598,20 @@ export class RiskCommandService {
       }),
     ]);
 
+    const activityWindowStart = new Date(
+      Date.now() - this.REGISTRY_ACTIVITY_WINDOW_HOURS * 3_600_000
+    );
+    const recentRegistryActivity = {
+      created: risks.filter((risk) => risk.createdAt >= activityWindowStart).length,
+      updated: risks.filter((risk) => risk.updatedAt >= activityWindowStart).length,
+      escalated: risks.filter(
+        (risk) => risk.escalatedAt && risk.escalatedAt >= activityWindowStart
+      ).length,
+      resolved: risks.filter(
+        (risk) => risk.resolvedAt && risk.resolvedAt >= activityWindowStart
+      ).length,
+    };
+
     const summary = {
       open: risks.filter((risk) => risk.status === "OPEN").length,
       mitigating: risks.filter((risk) => risk.status === "MITIGATING").length,
@@ -614,7 +628,7 @@ export class RiskCommandService {
         label: RISK_CATEGORY_LABELS[category as StrategicRiskCategory] || category,
         count,
       })),
-      sync,
+      sync: recentRegistryActivity,
     };
 
     const suggestedActions = risks
@@ -629,8 +643,19 @@ export class RiskCommandService {
         severity: risk.severity,
       }));
 
+    const latestRiskTimestamp = risks.reduce<number>(
+      (latest, risk) =>
+        Math.max(latest, risk.lastDetectedAt?.getTime() ?? 0, risk.updatedAt?.getTime() ?? 0),
+      0
+    );
+    const latestTimelineTimestamp = timeline.reduce<number>(
+      (latest, entry) => Math.max(latest, new Date(entry.createdAt).getTime()),
+      0
+    );
+    const syncedAt = Math.max(latestRiskTimestamp, latestTimelineTimestamp, Date.now());
+
     return {
-      syncedAt: new Date().toISOString(),
+      syncedAt: new Date(syncedAt).toISOString(),
       summary,
       risks,
       timeline,

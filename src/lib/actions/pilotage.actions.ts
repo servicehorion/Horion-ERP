@@ -1,15 +1,16 @@
 ﻿"use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/session";
 import { checkPermission } from "@/lib/permissions";
+import { getTenantCacheTags } from "@/lib/server-cache";
 import { TaskIntelligenceService } from "@/lib/services/task-intelligence.service";
 import { NotificationService } from "@/lib/services/notification.service";
+import { OperationalTaskService } from "@/lib/services/operational-task.service";
+import { PilotageSnapshotService } from "@/lib/services/pilotage-snapshot.service";
 import { RiskCommandService } from "@/lib/services/risk-command.service";
 import { StrategicDecisionService } from "@/lib/services/strategic-decision.service";
-import { StrategicForecastService } from "@/lib/services/strategic-forecast.service";
-import { StrategicIntelligenceService } from "@/lib/services/strategic-intelligence.service";
 import type {
   Priority,
   RiskLevel,
@@ -74,6 +75,41 @@ const mapDecisionPriorityToTask = (value: StrategicDecisionPriority): Priority =
   if (value === "LOW") return "LOW";
   return "NORMAL";
 };
+
+const PILOTAGE_CACHE_NAMESPACES = [
+  "pilotage-intelligence",
+  "pilotage-forecast",
+  "pilotage-risk-dashboard",
+];
+
+function revalidatePilotageCaches(tenantId: string) {
+  for (const namespace of PILOTAGE_CACHE_NAMESPACES) {
+    for (const tag of getTenantCacheTags(namespace, tenantId)) {
+      revalidateTag(tag, "max");
+    }
+  }
+}
+
+function mapRiskLevelToTaskPriority(value?: RiskLevel | null): Priority {
+  if (value === "CRITICAL") return "URGENT";
+  if (value === "HIGH") return "HIGH";
+  if (value === "LOW") return "LOW";
+  return "NORMAL";
+}
+
+function mapRiskLevelToSlaHours(value?: RiskLevel | null) {
+  if (value === "CRITICAL") return 6;
+  if (value === "HIGH") return 12;
+  if (value === "MEDIUM") return 24;
+  return 48;
+}
+
+function taskPriorityScore(value: Priority) {
+  if (value === "URGENT") return 40;
+  if (value === "HIGH") return 25;
+  if (value === "NORMAL") return 10;
+  return 0;
+}
 
 export async function getStrategicDecisions() {
   try {
@@ -140,6 +176,7 @@ export async function createStrategicDecision(data: {
 
     revalidatePath("/pilotage/decisions");
     revalidatePath("/dashboard");
+    revalidatePilotageCaches(user.tenantId);
     return { data: decision };
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Erreur creation decision" };
@@ -195,6 +232,7 @@ export async function updateStrategicDecision(
     });
 
     revalidatePath("/pilotage/decisions");
+    revalidatePilotageCaches(user.tenantId);
     return { data: updated };
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Erreur mise a jour decision" };
@@ -213,6 +251,9 @@ export async function executeStrategicDecision(decisionId: string) {
 
     if (decision.status === "CANCELLED" || decision.status === "COMPLETED") {
       return { error: "Decision deja terminee" };
+    }
+    if (decision.status === "EXECUTING") {
+      return { error: "Decision deja en cours d'execution" };
     }
 
     let executionPlan = (decision.executionPlan as ExecutionPlan) || {};
@@ -243,10 +284,12 @@ export async function executeStrategicDecision(decisionId: string) {
         }
       : null;
 
-    const result = await prisma.$transaction(async (tx) => {
+    const executionStart = new Date();
+
+    const initialExecution = await prisma.$transaction(async (tx) => {
       await tx.strategicDecision.update({
         where: { id: decisionId },
-        data: { status: "EXECUTING", executedAt: new Date() },
+        data: { status: "EXECUTING", executedAt: executionStart },
       });
 
       let projectId: string | null = null;
@@ -272,49 +315,74 @@ export async function executeStrategicDecision(decisionId: string) {
             type: "CREATE_PROJECT",
             status: "EXECUTED",
             payload: { projectId },
-            executedAt: new Date(),
+            executedAt: executionStart,
           },
         });
       }
 
-      const taskIds: string[] = [];
+      return { projectId };
+    });
+
+    const taskIds: string[] = [];
+    try {
       for (const task of tasksPlan) {
         if (!task?.title?.trim()) continue;
-        const module = normalizeModule(task.module);
-        const priority = task.priority
-          ? mapPriority(task.priority)
-          : mapDecisionPriorityToTask(decision.priority);
-        const slaDeadline = task.slaHours
-          ? new Date(Date.now() + task.slaHours * 3600 * 1000)
-          : null;
 
-        const created = await tx.task.create({
-          data: {
-            tenantId: decision.tenantId,
-            entityType: "pilotage",
-            entityId: decisionId,
-            taskType: "strategic",
-            title: task.title.trim(),
-            description: task.description?.trim() || undefined,
-            module,
-            priority,
-            status: "PENDING",
-            ownerType: "HUMAN",
-            riskLevel: "LOW",
-            tags: ["pilotage", "decision"],
-            slaDeadline,
-            projectId: projectId || undefined,
+        const created = await OperationalTaskService.create({
+          tenantId: decision.tenantId,
+          entityType: "pilotage",
+          entityId: decisionId,
+          taskType: "strategic",
+          title: task.title.trim(),
+          description: task.description?.trim() || undefined,
+          module: normalizeModule(task.module),
+          priority: task.priority
+            ? mapPriority(task.priority)
+            : mapDecisionPriorityToTask(decision.priority),
+          ownerType: "HUMAN",
+          riskLevel: decision.riskLevel || "LOW",
+          tags: ["pilotage", "decision"],
+          projectId: initialExecution.projectId || undefined,
+          assigneeId: decision.ownerId || undefined,
+          preferredAssigneeId: decision.ownerId || undefined,
+          slaHours: task.slaHours,
+          watcherRoles: ["DIRECTION"],
+          assignedByName: "Decision Engine Horion",
+          customFields: {
+            strategicDecisionId: decisionId,
+            impactAreas: decision.impactAreas,
+            objective: decision.objective,
+            targetMetric: decision.targetMetric,
+            targetValue: decision.targetValue,
           },
         });
-        taskIds.push(created.id);
 
-        if (decision.ownerId) {
-          await tx.taskAssignment.create({
-            data: { taskId: created.id, userId: decision.ownerId, role: "assignee" },
-          });
-        }
+        taskIds.push(created.taskId);
       }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Erreur creation taches";
 
+      await prisma.$transaction(async (tx) => {
+        await tx.decisionAction.create({
+          data: {
+            decisionId,
+            type: "CREATE_TASKS",
+            status: "FAILED",
+            payload: { taskIds, attemptedTasks: tasksPlan.length },
+            error: message,
+          },
+        });
+
+        await tx.strategicDecision.update({
+          where: { id: decisionId },
+          data: { status: "ACTIVE" },
+        });
+      });
+
+      return { error: message };
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
       if (taskIds.length > 0) {
         await tx.decisionAction.create({
           data: {
@@ -332,13 +400,14 @@ export async function executeStrategicDecision(decisionId: string) {
         data: { status: "COMPLETED", completedAt: new Date() },
       });
 
-      return { projectId, taskIds };
+      return { projectId: initialExecution.projectId, taskIds };
     });
 
     revalidatePath("/pilotage/decisions");
     revalidatePath("/dashboard");
     revalidatePath("/projects");
     revalidatePath("/tasks");
+    revalidatePilotageCaches(user.tenantId);
 
     return { data: result };
   } catch (err) {
@@ -447,17 +516,74 @@ export async function redeployTasks(params: {
     if (!params.fromUserId || !params.toUserId) return { error: "Parametres invalides" };
     if (params.fromUserId === params.toUserId) return { error: "Meme utilisateur" };
 
-    const tasks = await prisma.task.findMany({
-      where: {
-        tenantId: user.tenantId,
-        status: { notIn: ["COMPLETED", "CANCELLED"] },
-        assignments: { some: { userId: params.fromUserId } },
-        ...(params.module ? { module: params.module } : {}),
-      },
-      orderBy: [{ slaBreach: "desc" }, { priority: "desc" }, { slaDeadline: "asc" }],
-      take: limit,
-      select: { id: true, title: true },
-    });
+    const [targetContext, candidateTasks] = await Promise.all([
+      prisma.task.findMany({
+        where: {
+          tenantId: user.tenantId,
+          status: { notIn: ["COMPLETED", "CANCELLED"] },
+          assignments: { some: { userId: params.toUserId } },
+        },
+        select: { entityType: true, entityId: true, module: true },
+      }),
+      prisma.task.findMany({
+        where: {
+          tenantId: user.tenantId,
+          status: { notIn: ["COMPLETED", "CANCELLED"] },
+          assignments: { some: { userId: params.fromUserId } },
+          ...(params.module ? { module: params.module } : {}),
+        },
+        select: {
+          id: true,
+          title: true,
+          module: true,
+          priority: true,
+          slaBreach: true,
+          slaDeadline: true,
+          entityType: true,
+          entityId: true,
+          createdAt: true,
+        },
+      }),
+    ]);
+
+    const targetEntityKeys = new Set(
+      targetContext.map((task) => `${task.entityType}:${task.entityId}`)
+    );
+    const targetModules = new Map<string, number>();
+    for (const task of targetContext) {
+      targetModules.set(task.module, (targetModules.get(task.module) || 0) + 1);
+    }
+
+    const tasks = candidateTasks
+      .map((task) => {
+        const sameEntity = targetEntityKeys.has(`${task.entityType}:${task.entityId}`);
+        const sameModuleLoad = targetModules.get(task.module) || 0;
+        const ageHours = Math.max(
+          0,
+          (Date.now() - new Date(task.createdAt).getTime()) / 3_600_000
+        );
+
+        const score =
+          taskPriorityScore(task.priority) +
+          (task.slaBreach ? 30 : 0) +
+          (sameEntity ? 25 : 0) +
+          (sameModuleLoad > 0 ? 12 : 0) +
+          (ageHours > 24 ? 6 : 0) -
+          (sameEntity ? 0 : task.entityType === "order" ? 8 : 0);
+
+        return { ...task, score };
+      })
+      .sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        if (a.slaDeadline && b.slaDeadline) {
+          return a.slaDeadline.getTime() - b.slaDeadline.getTime();
+        }
+        if (a.slaDeadline) return -1;
+        if (b.slaDeadline) return 1;
+        return 0;
+      })
+      .slice(0, limit)
+      .map(({ score: _score, ...task }) => task);
 
     if (tasks.length === 0) return { error: "Aucune tache a reassigner" };
 
@@ -530,7 +656,7 @@ export async function getStrategicIntelligence() {
     const user = await getSession();
     checkPermission(user.role, "pilotage.view");
 
-    const snapshot = await StrategicIntelligenceService.getSnapshot(user.tenantId);
+    const snapshot = await PilotageSnapshotService.getStrategicIntelligence(user.tenantId);
     return { data: snapshot };
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Erreur intelligence" };
@@ -542,7 +668,7 @@ export async function getRiskCommandData() {
     const user = await getSession();
     checkPermission(user.role, "pilotage.view");
 
-    const data = await RiskCommandService.getDashboard(user.tenantId);
+    const data = await PilotageSnapshotService.getRiskDashboard(user.tenantId);
     return { data };
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Erreur risk command" };
@@ -557,6 +683,7 @@ export async function syncRiskRegistry() {
     const data = await RiskCommandService.syncRegistry(user.tenantId);
     revalidatePath("/pilotage/risk");
     revalidatePath("/pilotage/intelligence");
+    revalidatePilotageCaches(user.tenantId);
     return { data };
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Erreur synchronisation risques" };
@@ -628,6 +755,7 @@ export async function updateStrategicRisk(
     }
 
     revalidatePath("/pilotage/risk");
+    revalidatePilotageCaches(user.tenantId);
     return { data: true };
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Erreur mise a jour risque" };
@@ -670,6 +798,7 @@ export async function addRiskMitigationEntry(data: {
     });
 
     revalidatePath("/pilotage/risk");
+    revalidatePilotageCaches(user.tenantId);
     return { data: true };
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Erreur plan mitigation" };
@@ -701,82 +830,66 @@ export async function escalateStrategicRisk(riskId: string) {
     const taskId =
       existingTask?.id ||
       (
-        await prisma.$transaction(async (tx) => {
-          const createdTask = await tx.task.create({
-            data: {
-              tenantId: user.tenantId,
-              entityType: "strategicRisk",
-              entityId: riskId,
-              taskType: "risk_mitigation",
-              title: `Mitigate risk: ${risk.title}`,
-              description: `${risk.description || ""}\n\nMitigation plan: ${JSON.stringify(risk.mitigationPlan)}`,
-              module: RiskCommandService.moduleForCategory(risk.category),
-              priority:
-                risk.severity === "CRITICAL"
-                  ? "URGENT"
-                  : risk.severity === "HIGH"
-                    ? "HIGH"
-                    : risk.severity === "MEDIUM"
-                      ? "NORMAL"
-                      : "LOW",
-              status: "PENDING",
-              ownerType: "HUMAN",
-              riskLevel: risk.severity,
-              requiredApproval: risk.severity === "CRITICAL",
-              tags: ["pilotage", "risk"],
-            },
-          });
-
-          if (risk.ownerId) {
-            await tx.taskAssignment.upsert({
-              where: {
-                taskId_userId: {
-                  taskId: createdTask.id,
-                  userId: risk.ownerId,
-                },
-              },
-              update: {},
-              create: {
-                taskId: createdTask.id,
-                userId: risk.ownerId,
-                role: "assignee",
-              },
-            });
-          }
-
-          await tx.strategicRisk.update({
-            where: { id: riskId },
-            data: {
-              status: "ESCALATED",
-              escalatedAt: new Date(),
-            },
-          });
-
-          await tx.riskMitigationEntry.create({
-            data: {
-              riskId,
-              type: "ESCALATED",
-              title: "Risk escalated",
-              detail: "Mitigation task created from Risk Command.",
-              meta: { taskId: createdTask.id },
-              createdById: user.id,
-            },
-          });
-
-          await tx.auditLog.create({
-            data: {
-              tenantId: user.tenantId,
-              userId: user.id,
-              action: "risk.escalated",
-              entityType: "strategicRisk",
-              entityId: riskId,
-              newValue: { taskId: createdTask.id },
-            },
-          });
-
-          return createdTask;
+        await OperationalTaskService.create({
+          tenantId: user.tenantId,
+          entityType: "strategicRisk",
+          entityId: riskId,
+          taskType: "risk_mitigation",
+          title: `Mitiger le risque : ${risk.title}`,
+          description: `${risk.description || ""}\n\nPlan de mitigation : ${JSON.stringify(risk.mitigationPlan)}`,
+          module: RiskCommandService.moduleForCategory(risk.category),
+          priority: mapRiskLevelToTaskPriority(risk.severity),
+          ownerType: "HUMAN",
+          riskLevel: risk.severity,
+          requiredApproval: risk.severity === "CRITICAL",
+          tags: ["pilotage", "risk"],
+          assigneeId: risk.ownerId || undefined,
+          preferredAssigneeId: risk.ownerId || undefined,
+          watcherRoles: ["DIRECTION"],
+          assignedByName: "Risk Command Horion",
+          slaHours: mapRiskLevelToSlaHours(risk.severity),
+          customFields: {
+            strategicRiskId: riskId,
+            category: risk.category,
+            linkedHref: risk.linkedHref,
+            mitigationPlan: risk.mitigationPlan,
+          },
         })
-      ).id;
+      ).taskId;
+
+    if (!existingTask) {
+      await prisma.$transaction(async (tx) => {
+        await tx.strategicRisk.update({
+          where: { id: riskId },
+          data: {
+            status: "ESCALATED",
+            escalatedAt: new Date(),
+          },
+        });
+
+        await tx.riskMitigationEntry.create({
+          data: {
+            riskId,
+            type: "ESCALATED",
+            title: "Risk escalated",
+            detail: "Mitigation task created from Risk Command.",
+            meta: { taskId },
+            createdById: user.id,
+          },
+        });
+
+        await tx.auditLog.create({
+          data: {
+            tenantId: user.tenantId,
+            userId: user.id,
+            action: "risk.escalated",
+            entityType: "strategicRisk",
+            entityId: riskId,
+            newValue: { taskId },
+          },
+        });
+      });
+    }
 
     if (existingTask && risk.status !== "ESCALATED") {
       await prisma.$transaction(async (tx) => {
@@ -814,6 +927,7 @@ export async function escalateStrategicRisk(riskId: string) {
 
     revalidatePath("/pilotage/risk");
     revalidatePath("/tasks");
+    revalidatePilotageCaches(user.tenantId);
 
     return { data: { taskId } };
   } catch (err) {
@@ -826,7 +940,7 @@ export async function getStrategicForecast() {
     const user = await getSession();
     checkPermission(user.role, "pilotage.view");
 
-    const data = await StrategicForecastService.getSnapshot(user.tenantId);
+    const data = await PilotageSnapshotService.getStrategicForecast(user.tenantId);
     return { data };
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Erreur forecast" };
@@ -841,6 +955,7 @@ export async function evaluateDecisionRules() {
 
     revalidatePath("/pilotage/decisions");
     revalidatePath("/pilotage/intelligence");
+    revalidatePilotageCaches(user.tenantId);
     return { data: { activated: result.activated } };
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Erreur evaluation rules" };

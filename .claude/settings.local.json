@@ -175,7 +175,10 @@
       "Bash(cat 'c:/Users/jafred Parker242/Desktop/Horion service/src/app/\\(dashboard\\)/logistics/shipments/page.tsx')",
       "Bash(cat 'c:/Users/jafred Parker242/Desktop/Horion service/src/app/\\(dashboard\\)/logistics/warehouse-bridge/page.tsx')",
       "Bash(ls \"c:/Users/jafred Parker242/Desktop/Horion service/src/app/\\(dashboard\\)/finance/margins/\")",
-      "Bash(ls \"c:/Users/jafred Parker242/Desktop/Horion service/src/app/\\(dashboard\\)/finance/risk/\")"
+      "Bash(ls \"c:/Users/jafred Parker242/Desktop/Horion service/src/app/\\(dashboard\\)/finance/risk/\")",
+      "Bash(cat \"c:/Users/jafred Parker242/Desktop/Horion service/src/app/\\(dashboard\\)/layout.tsx\")",
+      "Bash(cat \"c:/Users/jafred Parker242/Desktop/Horion service/src/app/\\(dashboard\\)/dashboard/page.tsx\")",
+      "Bash(grep -roh process.env.[A-Z_]* 'c:/Users/jafred Parker242/Desktop/Horion service/src/' 'c:/Users/jafred Parker242/Desktop/Horion service/middleware.ts' 'c:/Users/jafred Parker242/Desktop/Horion service/next.config.ts')"
     ]
   },
   "hooks": {

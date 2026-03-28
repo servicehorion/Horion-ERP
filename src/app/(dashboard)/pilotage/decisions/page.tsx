@@ -8,8 +8,8 @@ import {
 import { DecisionEngine } from "@/components/pilotage/decision-engine";
 
 export const metadata = {
-  title: "Pilotage Decisions | Horion ERP",
-  description: "Decision engine and strategy execution",
+  title: "Decisions Strategiques | Horion ERP",
+  description: "Moteur de decision et execution strategique",
 };
 
 export default async function PilotageDecisionsPage() {
@@ -28,9 +28,9 @@ export default async function PilotageDecisionsPage() {
       <div className="flex items-center gap-3">
         <Target className="h-7 w-7 text-primary" />
         <div>
-          <h1 className="text-3xl font-bold">Decision Engine</h1>
+          <h1 className="text-3xl font-bold">Moteur de decision</h1>
           <p className="text-muted-foreground">
-            Turn strategy into projects and tasks for execution.
+            Transformer la strategie en projets, arbitrages et taches d'execution.
           </p>
         </div>
       </div>

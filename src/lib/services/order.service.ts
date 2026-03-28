@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/db";
 import { emitEvent } from "@/lib/events";
 import { ORDER_STATUS_LABELS, ORDER_STATUS_TRANSITIONS, canTransition } from "@/config/order-statuses";
-import type { OrderStatus, Priority, Prisma } from "@prisma/client";
+import { Prisma, type OrderStatus, type Priority } from "@prisma/client";
 import type { CreateOrderInput } from "@/lib/validators/order";
 import { convertCurrency } from "@/config/currencies";
 import { RiskCalculatorService } from "@/lib/services/risk-calculator.service";

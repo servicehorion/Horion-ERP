@@ -155,7 +155,10 @@ export function RiskCommand({ data }: { data: RiskCommandData }) {
         toast.error(res.error);
         return;
       }
-      toast.success("Risk registry synchronized");
+      const summary = res.data;
+      toast.success(
+        `Registre synchronise : ${summary?.created || 0} crees, ${summary?.updated || 0} maj, ${summary?.resolved || 0} resolus`
+      );
       refreshPage();
     });
   }
@@ -263,13 +266,13 @@ export function RiskCommand({ data }: { data: RiskCommandData }) {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base">
-              <ShieldCheck className="h-4 w-4 text-emerald-500" /> Latest sync
+              <ShieldCheck className="h-4 w-4 text-emerald-500" /> Recent registry activity
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-1 text-sm">
-            <div>Created: {data.summary.sync.created}</div>
-            <div>Updated: {data.summary.sync.updated}</div>
-            <div>Resolved: {data.summary.sync.resolved}</div>
+            <div>Created 24h: {data.summary.sync.created}</div>
+            <div>Updated 24h: {data.summary.sync.updated}</div>
+            <div>Resolved 24h: {data.summary.sync.resolved}</div>
           </CardContent>
         </Card>
       </div>

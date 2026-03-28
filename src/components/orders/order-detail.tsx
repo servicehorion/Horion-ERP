@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 
@@ -135,18 +136,56 @@ function PipelineStepper({ status }: { status: string }) {
     </div>
   );
 }
-import { OrderQuotes } from "@/components/orders/order-quotes";
-import { OrderPayments } from "@/components/orders/order-payments";
-import { OrderAttachments } from "@/components/orders/order-attachments";
-import { OrderTeam } from "@/components/orders/order-team";
-import { OrderShipments, type Shipment } from "@/components/orders/order-shipments";
-import { OrderQc, type QcRequest } from "@/components/orders/order-qc";
-import { OrderDisputes, type Dispute } from "@/components/orders/order-disputes";
-import { OrderReturns, type ReturnMerchandise } from "@/components/orders/order-returns";
-import { OrderSynthesisTab } from "@/components/orders/order-synthesis-tab";
-import { OrderApprovals } from "@/components/orders/order-approvals";
-import { OrderCustoms, type ShipmentWithCustoms } from "@/components/orders/order-customs";
+import type { Shipment } from "@/components/orders/order-shipments";
+import type { QcRequest } from "@/components/orders/order-qc";
+import type { Dispute } from "@/components/orders/order-disputes";
+import type { ReturnMerchandise } from "@/components/orders/order-returns";
+import type { ShipmentWithCustoms } from "@/components/orders/order-customs";
 import { createOrderPortalLink, recalculateOrderBudget, sendOrderEdi } from "@/lib/actions/order.actions";
+
+const tabLoading = () => (
+  <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
+    Chargement du module...
+  </div>
+);
+
+const OrderQuotes = dynamic(() => import("@/components/orders/order-quotes").then((mod) => mod.OrderQuotes), {
+  loading: tabLoading,
+});
+const OrderPayments = dynamic(() => import("@/components/orders/order-payments").then((mod) => mod.OrderPayments), {
+  loading: tabLoading,
+});
+const OrderAttachments = dynamic(
+  () => import("@/components/orders/order-attachments").then((mod) => mod.OrderAttachments),
+  { loading: tabLoading },
+);
+const OrderTeam = dynamic(() => import("@/components/orders/order-team").then((mod) => mod.OrderTeam), {
+  loading: tabLoading,
+});
+const OrderShipments = dynamic(() => import("@/components/orders/order-shipments").then((mod) => mod.OrderShipments), {
+  loading: tabLoading,
+});
+const OrderQc = dynamic(() => import("@/components/orders/order-qc").then((mod) => mod.OrderQc), {
+  loading: tabLoading,
+});
+const OrderDisputes = dynamic(
+  () => import("@/components/orders/order-disputes").then((mod) => mod.OrderDisputes),
+  { loading: tabLoading },
+);
+const OrderReturns = dynamic(() => import("@/components/orders/order-returns").then((mod) => mod.OrderReturns), {
+  loading: tabLoading,
+});
+const OrderSynthesisTab = dynamic(
+  () => import("@/components/orders/order-synthesis-tab").then((mod) => mod.OrderSynthesisTab),
+  { loading: tabLoading },
+);
+const OrderApprovals = dynamic(
+  () => import("@/components/orders/order-approvals").then((mod) => mod.OrderApprovals),
+  { loading: tabLoading },
+);
+const OrderCustoms = dynamic(() => import("@/components/orders/order-customs").then((mod) => mod.OrderCustoms), {
+  loading: tabLoading,
+});
 
 type SourcingCase = {
   id: string;

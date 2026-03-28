@@ -4,8 +4,8 @@ import { getStrategicIntelligence } from "@/lib/actions/pilotage.actions";
 import { StrategicIntelligence } from "@/components/pilotage/strategic-intelligence";
 
 export const metadata = {
-  title: "Strategic Intelligence | Horion ERP",
-  description: "Cross-OS strategic intelligence and signals",
+  title: "Intelligence Strategique | Horion ERP",
+  description: "Lecture directionnelle cross-OS, signaux et priorites d'arbitrage",
 };
 
 export default async function PilotageIntelligencePage() {
@@ -17,9 +17,9 @@ export default async function PilotageIntelligencePage() {
       <div className="flex items-center gap-3">
         <Brain className="h-7 w-7 text-primary" />
         <div>
-          <h1 className="text-3xl font-bold">Strategic Intelligence</h1>
+          <h1 className="text-3xl font-bold">Intelligence strategique</h1>
           <p className="text-muted-foreground">
-            Cross-OS health, anomalies, and priorities for decision-making.
+            Vue directionnelle stable des OS, anomalies critiques et priorites d'arbitrage.
           </p>
         </div>
       </div>

@@ -4,8 +4,8 @@ import { StrategicForecast } from "@/components/pilotage/strategic-forecast";
 import { getStrategicForecast } from "@/lib/actions/pilotage.actions";
 
 export const metadata = {
-  title: "Strategic Forecast | Horion ERP",
-  description: "Strategic revenue, margin, volume, and runway projections",
+  title: "Forecast Strategique | Horion ERP",
+  description: "Projection directionnelle revenu, marge, volume et cash runway",
 };
 
 export default async function PilotageForecastPage() {
@@ -17,9 +17,9 @@ export default async function PilotageForecastPage() {
       <div className="flex items-center gap-3">
         <LineChart className="h-7 w-7 text-primary" />
         <div>
-          <h1 className="text-3xl font-bold">Strategic Forecast</h1>
+          <h1 className="text-3xl font-bold">Forecast strategique</h1>
           <p className="text-muted-foreground">
-            Compare strategic scenarios on revenue, margin, volume, and cash runway.
+            Comparer les scenarios directionnels sur le revenu, la marge, le volume et le runway cash.
           </p>
         </div>
       </div>

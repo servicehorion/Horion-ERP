@@ -4,8 +4,8 @@ import { getResourceCommandData } from "@/lib/actions/pilotage.actions";
 import { ResourceCommand } from "@/components/pilotage/resource-command";
 
 export const metadata = {
-  title: "Pilotage Resources | Horion ERP",
-  description: "Resource command and workload reallocation",
+  title: "Capacite Equipe | Horion ERP",
+  description: "Pilotage de charge et reallocation des ressources",
 };
 
 export default async function PilotageResourcesPage() {
@@ -17,9 +17,9 @@ export default async function PilotageResourcesPage() {
       <div className="flex items-center gap-3">
         <UsersRound className="h-7 w-7 text-primary" />
         <div>
-          <h1 className="text-3xl font-bold">Resource Command</h1>
+          <h1 className="text-3xl font-bold">Commande capacite</h1>
           <p className="text-muted-foreground">
-            Reallocate teams and agents to protect strategic outcomes.
+            Redistribuer les ressources pour proteger les objectifs strategiques.
           </p>
         </div>
       </div>

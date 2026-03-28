@@ -30,13 +30,28 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: process.cwd(),
   },
-  // Prisma, pg, and bcrypt use Node.js native APIs — must not be bundled by Turbopack
+  experimental: {
+    // Tree-shake barrel packages: avoids parsing all 563 lucide icons on every file import.
+    // Without this, compilation is 3-5x slower for large icon/chart libraries.
+    optimizePackageImports: [
+      "lucide-react",
+      "recharts",
+      "@tanstack/react-query",
+      "@tanstack/react-table",
+      "@tanstack/react-virtual",
+      "date-fns",
+      "@hello-pangea/dnd",
+      "radix-ui",
+    ],
+  },
+  // Prisma, pg, bcrypt, and heavy server-only libs — must not be bundled by Turbopack
   serverExternalPackages: [
     "@prisma/client",
     "@prisma/adapter-pg",
     "pg",
     "pg-native",
     "bcryptjs",
+    "@react-pdf/renderer",
   ],
   async headers() {
     return [
