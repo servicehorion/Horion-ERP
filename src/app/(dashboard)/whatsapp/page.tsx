@@ -5,6 +5,7 @@ import { WhatsAppClient } from "@/components/whatsapp/whatsapp-client";
 import { getSession } from "@/lib/session";
 import {
   getWhatsAppAccounts,
+  getWhatsAppAssignableUsers,
   getWhatsAppCampaigns,
   getWhatsAppConversations,
   getWhatsAppDashboard,
@@ -27,6 +28,7 @@ export default async function WhatsAppPage() {
     templatesResult,
     accountsResult,
     botFlowsResult,
+    assignableUsersResult,
   ] = await Promise.all([
     getWhatsAppDashboard(),
     getWhatsAppConversations(),
@@ -36,6 +38,7 @@ export default async function WhatsAppPage() {
     getWhatsAppTemplates(),
     getWhatsAppAccounts(),
     getWhatsAppBotFlows(),
+    getWhatsAppAssignableUsers(),
   ]);
 
   const stats = statsResult.data ?? {
@@ -45,6 +48,8 @@ export default async function WhatsAppPage() {
     messagesToday: 0,
     groupsActive: 0,
     broadcastsScheduled: 0,
+    needsReply: 0,
+    unlinkedConversations: 0,
   };
 
   return (
@@ -68,6 +73,7 @@ export default async function WhatsAppPage() {
         templates={templatesResult.data ?? []}
         accounts={accountsResult.data ?? []}
         botFlows={botFlowsResult.data ?? []}
+        assignableUsers={assignableUsersResult.data ?? []}
         viewerId={user.id}
       />
     </div>

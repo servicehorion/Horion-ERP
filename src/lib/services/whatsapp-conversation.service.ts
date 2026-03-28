@@ -3,6 +3,43 @@ import { WhatsappAuditService } from "@/lib/services/whatsapp-audit.service";
 import { WhatsappSlaService } from "@/lib/services/whatsapp-sla.service";
 
 export class WhatsappConversationService {
+  private static async resolveDefaultOwners(params: { tenantId: string; waContactId: string }) {
+    const waContact = await prisma.whatsappContact.findUnique({
+      where: { id: params.waContactId },
+      select: {
+        linkedContact: {
+          select: {
+            ownerId: true,
+            onboardedById: true,
+          },
+        },
+      },
+    });
+
+    const contactOwnerId = waContact?.linkedContact?.ownerId ?? waContact?.linkedContact?.onboardedById ?? null;
+    if (contactOwnerId) {
+      return { ownerId: contactOwnerId, assignedToId: contactOwnerId };
+    }
+
+    const fallback = await prisma.user.findFirst({
+      where: {
+        tenantId: params.tenantId,
+        isActive: true,
+        role: { in: ["COMMUNITY_MANAGER", "CRM_MANAGER", "OPS", "DIRECTION", "ADMIN", "CEO"] as any[] },
+      },
+      orderBy: [
+        { role: "asc" },
+        { createdAt: "asc" },
+      ],
+      select: { id: true },
+    });
+
+    return {
+      ownerId: fallback?.id ?? null,
+      assignedToId: fallback?.id ?? null,
+    };
+  }
+
   static async getOrCreateConversation(params: {
     tenantId: string;
     accountId: string;
@@ -21,13 +58,24 @@ export class WhatsappConversationService {
 
     if (existing) return existing;
 
+    const defaults =
+      params.ownerId || params.assignedToId
+        ? {
+            ownerId: params.ownerId ?? null,
+            assignedToId: params.assignedToId ?? null,
+          }
+        : await this.resolveDefaultOwners({
+            tenantId: params.tenantId,
+            waContactId: params.waContactId,
+          });
+
     const created = await prisma.whatsappConversation.create({
       data: {
         tenantId: params.tenantId,
         accountId: params.accountId,
         waContactId: params.waContactId,
-        ownerId: params.ownerId ?? null,
-        assignedToId: params.assignedToId ?? null,
+        ownerId: defaults.ownerId,
+        assignedToId: defaults.assignedToId,
         priority: (params.priority ?? "NORMAL") as any,
       },
     });

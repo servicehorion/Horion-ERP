@@ -14,6 +14,11 @@ import {
   Zap,
   CalendarDays,
   Send,
+  Link2,
+  ShieldAlert,
+  BriefcaseBusiness,
+  PackageCheck,
+  Clock3,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -32,12 +37,15 @@ import {
   addWhatsAppConversationTags,
   assignWhatsAppConversation,
   approveWhatsAppTemplateVersion,
+  createDemandFromWhatsAppConversation,
   createWhatsAppCampaign,
+  createWhatsAppConversationTask,
   createWhatsAppTemplate,
   addWhatsAppTemplateVersion,
   convertWhatsAppIntentToCrm,
   createWhatsAppBotFlow,
   createLeadFromWhatsAppConversation,
+  ensureWhatsAppConversationContact,
   getWhatsAppConversationMessages,
   sendWhatsAppMessage,
   updateWhatsAppBotFlow,
@@ -47,6 +55,7 @@ import {
 import { EmptyState } from "@/components/shared/empty-state";
 import type {
   WhatsAppAccountItem,
+  WhatsAppAssignableUserItem,
   WhatsAppCampaignItem,
   WhatsAppConversationItem,
   WhatsAppDashboardStats,
@@ -66,10 +75,21 @@ interface Props {
   templates: WhatsAppTemplateItem[];
   accounts: WhatsAppAccountItem[];
   botFlows: WhatsAppBotFlowItem[];
+  assignableUsers: WhatsAppAssignableUserItem[];
   viewerId?: string;
 }
 
 const INTENT_STAGES = ["DETECTED", "QUALIFIED", "TRANSFERRED", "WON", "LOST"] as const;
+const QUICK_QUALIFICATION_TAGS = [
+  "prospect-chaud",
+  "client-existant",
+  "sourcing-requis",
+  "simple-info",
+  "sav",
+  "paiement",
+  "logistique",
+  "litige",
+] as const;
 
 export function WhatsAppClient({
   stats,
@@ -80,6 +100,7 @@ export function WhatsAppClient({
   templates,
   accounts,
   botFlows,
+  assignableUsers,
   viewerId,
 }: Props) {
   const router = useRouter();
@@ -145,6 +166,14 @@ export function WhatsAppClient({
       openConversation(target);
     }
   }, [activeConversation?.id, conversations, searchParams]);
+
+  useEffect(() => {
+    if (!activeConversation?.id) return;
+    const refreshed = conversations.find((conversation) => conversation.id === activeConversation.id);
+    if (refreshed) {
+      setActiveConversation(refreshed);
+    }
+  }, [activeConversation?.id, conversations]);
 
 
   return (
@@ -257,33 +286,130 @@ export function WhatsAppClient({
                           {activeConversation.linkedContactId ? "Aucun lead lie" : "Aucun lead ni contact CRM"}
                         </Badge>
                       )}
+                      {activeConversation.linkedDemandId ? (
+                        <Badge variant="secondary" className="text-xs">
+                          Demande {activeConversation.linkedDemandStatus ?? "-"}
+                        </Badge>
+                      ) : null}
+                      {activeConversation.latestOrderNumber ? (
+                        <Badge variant="secondary" className="text-xs">
+                          Cmd {activeConversation.latestOrderNumber} · {activeConversation.latestOrderStatus ?? "-"}
+                        </Badge>
+                      ) : null}
                     </div>
 
-                    {!activeConversation.linkedLeadId && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="w-full text-xs"
-                        onClick={() => {
-                          startTransition(async () => {
-                            const res = await createLeadFromWhatsAppConversation(activeConversation.id);
-                            if (res?.error) {
-                              toast.error(res.error);
-                              return;
-                            }
-                            toast.success(
-                              activeConversation.linkedContactId
-                                ? "Lead cree depuis la conversation"
-                                : "Contact CRM et lead crees depuis la conversation"
-                            );
-                            router.refresh();
-                          });
-                        }}
-                      >
-                        {activeConversation.linkedContactId
-                          ? "+ Creer un lead depuis cette conversation"
-                          : "+ Creer le contact CRM et le lead"}
-                      </Button>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                      {!activeConversation.linkedContactId ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-xs"
+                          onClick={() => {
+                            startTransition(async () => {
+                              const res = await ensureWhatsAppConversationContact(activeConversation.id);
+                              if (res?.error) {
+                                toast.error(res.error);
+                                return;
+                              }
+                              toast.success(res.data?.created ? "Contact CRM cree et lie" : "Contact CRM lie");
+                              router.refresh();
+                            });
+                          }}
+                        >
+                          <Link2 className="mr-1.5 h-3.5 w-3.5" />
+                          Creer / lier contact
+                        </Button>
+                      ) : null}
+                      {!activeConversation.linkedLeadId && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-xs"
+                          onClick={() => {
+                            startTransition(async () => {
+                              const res = await createLeadFromWhatsAppConversation(activeConversation.id);
+                              if (res?.error) {
+                                toast.error(res.error);
+                                return;
+                              }
+                              toast.success(
+                                activeConversation.linkedContactId
+                                  ? "Lead cree depuis la conversation"
+                                  : "Contact CRM et lead crees depuis la conversation"
+                              );
+                              router.refresh();
+                            });
+                          }}
+                        >
+                          <BriefcaseBusiness className="mr-1.5 h-3.5 w-3.5" />
+                          Creer lead
+                        </Button>
+                      )}
+                      {!activeConversation.linkedDemandId ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-xs"
+                          onClick={() => {
+                            startTransition(async () => {
+                              const res = await createDemandFromWhatsAppConversation(activeConversation.id);
+                              if (res?.error) {
+                                toast.error(res.error);
+                                return;
+                              }
+                              toast.success(
+                                res.data?.created
+                                  ? "Demand Intake creee depuis la conversation"
+                                  : "Demand Intake deja existante"
+                              );
+                              router.refresh();
+                            });
+                          }}
+                        >
+                          <PackageCheck className="mr-1.5 h-3.5 w-3.5" />
+                          Creer demande
+                        </Button>
+                      ) : (
+                        <Link href="/crm/demands" className="inline-flex">
+                          <Button size="sm" variant="outline" className="text-xs">
+                            Voir les demandes
+                          </Button>
+                        </Link>
+                      )}
+                    </div>
+
+                    {(activeConversation.latestOrderNumber || activeConversation.linkedDemandId) && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                        <div className="rounded-md border bg-white/70 p-2 space-y-1">
+                          <div className="font-medium">Contexte commande</div>
+                          {activeConversation.latestOrderNumber ? (
+                            <>
+                              <div>{activeConversation.latestOrderNumber}</div>
+                              <div className="text-muted-foreground">
+                                Statut {activeConversation.latestOrderStatus ?? "-"}
+                                {activeConversation.latestPaymentStatus ? ` · Paiement ${activeConversation.latestPaymentStatus}` : ""}
+                                {activeConversation.latestShipmentStatus ? ` · Shipment ${activeConversation.latestShipmentStatus}` : ""}
+                              </div>
+                            </>
+                          ) : (
+                            <div className="text-muted-foreground">Aucune commande reliee</div>
+                          )}
+                        </div>
+                        <div className="rounded-md border bg-white/70 p-2 space-y-1">
+                          <div className="font-medium">Contexte demande</div>
+                          {activeConversation.linkedDemandId ? (
+                            <>
+                              <div>{activeConversation.linkedDemandId}</div>
+                              <div className="text-muted-foreground">
+                                {activeConversation.linkedDemandStatus ?? "-"}
+                                {activeConversation.linkedDemandUrgency ? ` · Urgence ${activeConversation.linkedDemandUrgency}` : ""}
+                              </div>
+                            </>
+                          ) : (
+                            <div className="text-muted-foreground">Pas encore de demande structuree</div>
+                          )}
+                        </div>
+                      </div>
                     )}
                   </div>
 
@@ -316,33 +442,73 @@ export function WhatsAppClient({
                     </div>
                     <div className="space-y-1">
                       <div className="text-xs text-muted-foreground">Assignation</div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={pending}
-                        onClick={async () => {
-                          if (!activeConversation || !viewerId) {
-                            toast.error("Assignee introuvable");
-                            return;
-                          }
-                          startTransition(async () => {
-                            const res = await assignWhatsAppConversation(activeConversation.id, viewerId);
-                            if (res?.error) toast.error(res.error);
-                            else {
-                              setActiveConversation((prev) => (prev ? { ...prev, assignedTo: "Moi" } : prev));
-                              toast.success("Conversation assignee");
-                              router.refresh();
+                      <div className="space-y-2">
+                        <Select
+                          value={activeConversation.assignedToId ?? "none"}
+                          onValueChange={(value) => {
+                            if (value === "none") return;
+                            startTransition(async () => {
+                              const res = await assignWhatsAppConversation(activeConversation.id, value);
+                              if (res?.error) toast.error(res.error);
+                              else {
+                                const selected = assignableUsers.find((entry) => entry.id === value);
+                                setActiveConversation((prev) =>
+                                  prev
+                                    ? {
+                                        ...prev,
+                                        assignedTo: selected?.name ?? prev.assignedTo,
+                                        assignedToId: value,
+                                      }
+                                    : prev
+                                );
+                                toast.success("Conversation assignee");
+                                router.refresh();
+                              }
+                            });
+                          }}
+                        >
+                          <SelectTrigger className="h-8">
+                            <SelectValue placeholder="Choisir owner" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Non assignee</SelectItem>
+                            {assignableUsers.map((entry) => (
+                              <SelectItem key={entry.id} value={entry.id}>
+                                {entry.name} · {entry.role}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={pending}
+                          onClick={async () => {
+                            if (!activeConversation || !viewerId) {
+                              toast.error("Assignee introuvable");
+                              return;
                             }
-                          });
-                        }}
-                        className="h-8 w-full"
-                      >
-                        Assigner a moi
-                      </Button>
+                            startTransition(async () => {
+                              const res = await assignWhatsAppConversation(activeConversation.id, viewerId);
+                              if (res?.error) toast.error(res.error);
+                              else {
+                                setActiveConversation((prev) =>
+                                  prev ? { ...prev, assignedTo: "Moi", assignedToId: viewerId } : prev
+                                );
+                                toast.success("Conversation assignee");
+                                router.refresh();
+                              }
+                            });
+                          }}
+                          className="h-8 w-full"
+                        >
+                          Assigner a moi
+                        </Button>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3 text-xs text-muted-foreground">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs text-muted-foreground">
                     <div>
                       <div className="uppercase">Intent</div>
                       <div className="mt-1">
@@ -355,7 +521,22 @@ export function WhatsAppClient({
                     </div>
                     <div>
                       <div className="uppercase">SLA</div>
-                      <div className="mt-1">{activeConversation.slaDueAt ? formatDateSafe(activeConversation.slaDueAt) : "-"}</div>
+                      <div className="mt-1 space-y-1">
+                        <div>{activeConversation.slaDueAt ? formatDateSafe(activeConversation.slaDueAt) : "-"}</div>
+                        {activeConversation.slaState && activeConversation.slaState !== "NO_SLA" ? (
+                          <SlaBadge state={activeConversation.slaState} />
+                        ) : null}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="uppercase">Reponse</div>
+                      <div className="mt-1">
+                        {activeConversation.responseState ? <ResponseBadge state={activeConversation.responseState} /> : "-"}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="uppercase">Owner</div>
+                      <div className="mt-1">{activeConversation.assignedTo ?? activeConversation.ownerName ?? "-"}</div>
                     </div>
                   </div>
 
@@ -569,10 +750,10 @@ function WhatsAppOverview({
       <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
         <KpiCard label="Convos ouvertes" value={stats.openConversations} color="emerald" />
         <KpiCard label="SLA en retard" value={stats.slaBreaches} color="red" urgent={stats.slaBreaches > 0} />
-        <KpiCard label="Intents high" value={stats.highIntents} color="orange" />
+        <KpiCard label="Attendent reponse" value={stats.needsReply} color="orange" urgent={stats.needsReply > 0} />
         <KpiCard label="Messages jour" value={stats.messagesToday} color="blue" />
-        <KpiCard label="Groupes actifs" value={stats.groupsActive} color="purple" />
-        <KpiCard label="Broadcasts" value={stats.broadcastsScheduled} color="indigo" />
+        <KpiCard label="Convos non liees" value={stats.unlinkedConversations} color="purple" urgent={stats.unlinkedConversations > 0} />
+        <KpiCard label="Intents high" value={stats.highIntents} color="indigo" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -774,9 +955,10 @@ function WhatsAppInbox({
               <TableRow>
                 <TableHead>Contact</TableHead>
                 <TableHead>Dernier message</TableHead>
+                <TableHead>Contexte</TableHead>
                 <TableHead>Statut</TableHead>
                 <TableHead>Assignation</TableHead>
-                <TableHead>Intent</TableHead>
+                <TableHead>Reponse</TableHead>
                 <TableHead>SLA</TableHead>
               </TableRow>
             </TableHeader>
@@ -795,10 +977,38 @@ function WhatsAppInbox({
                     <div className="text-sm line-clamp-2">{c.lastMessage ?? "-"}</div>
                     <div className="text-xs text-muted-foreground">{formatDateSafe(c.lastMessageAt)}</div>
                   </TableCell>
+                  <TableCell>
+                    <div className="space-y-1">
+                      {c.latestOrderNumber ? (
+                        <div className="text-xs font-medium">Cmd {c.latestOrderNumber}</div>
+                      ) : c.linkedDemandId ? (
+                        <div className="text-xs font-medium">Demande {c.linkedDemandStatus ?? "-"}</div>
+                      ) : c.linkedLeadId ? (
+                        <div className="text-xs font-medium">Lead {c.linkedLeadStatus ?? "-"}</div>
+                      ) : (
+                        <div className="text-xs text-muted-foreground">Conversation brute</div>
+                      )}
+                      {c.mediaCount ? (
+                        <div className="text-[11px] text-muted-foreground">{c.mediaCount} piece(s) jointe(s)</div>
+                      ) : null}
+                    </div>
+                  </TableCell>
                   <TableCell><StatusBadge status={c.status} /></TableCell>
                   <TableCell>{c.assignedTo ?? "-"}</TableCell>
-                  <TableCell>{c.intentScore ? <Badge variant="outline">{c.intentScore}</Badge> : "-"}</TableCell>
-                  <TableCell>{c.slaDueAt ? formatDateSafe(c.slaDueAt) : "-"}</TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-1">
+                      {c.intentScore ? <Badge variant="outline">{c.intentScore}</Badge> : null}
+                      {c.responseState ? <ResponseBadge state={c.responseState} /> : null}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="space-y-1">
+                      <div>{c.slaDueAt ? formatDateSafe(c.slaDueAt) : "-"}</div>
+                      {c.slaState && c.slaState !== "NO_SLA" ? (
+                        <SlaBadge state={c.slaState} />
+                      ) : null}
+                    </div>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

@@ -5,6 +5,8 @@ export type WhatsAppDashboardStats = {
   messagesToday: number;
   groupsActive: number;
   broadcastsScheduled: number;
+  needsReply: number;
+  unlinkedConversations: number;
   demo?: boolean;
 };
 
@@ -17,13 +19,34 @@ export type WhatsAppConversationItem = {
   linkedLeadId?: string | null;
   linkedLeadStatus?: string | null;
   linkedLeadCount?: number;
+  linkedDemandId?: string | null;
+  linkedDemandStatus?: string | null;
+  linkedDemandUrgency?: string | null;
+  linkedDemandReceivedAt?: string | null;
+  latestOrderId?: string | null;
+  latestOrderNumber?: string | null;
+  latestOrderStatus?: string | null;
+  latestPaymentStatus?: string | null;
+  latestShipmentStatus?: string | null;
   status: string;
   priority?: string | null;
   assignedTo?: string | null;
+  assignedToId?: string | null;
+  ownerName?: string | null;
+  ownerId?: string | null;
   lastMessage?: string | null;
   lastMessageAt?: string | null;
   slaDueAt?: string | null;
   intentScore?: string | null;
+  latestIntentId?: string | null;
+  latestIntentSummary?: string | null;
+  latestIntentStatus?: string | null;
+  responseState?: string | null;
+  slaState?: string | null;
+  mediaCount?: number;
+  copilotSummary?: string | null;
+  copilotNextAction?: string | null;
+  copilotMissingFields?: string[];
   tags?: string[];
 };
 
@@ -34,6 +57,11 @@ export type WhatsAppMessageItem = {
   body?: string | null;
   status?: string | null;
   createdAt?: string | null;
+  media?: Array<{
+    url: string;
+    mimeType?: string | null;
+    caption?: string | null;
+  }>;
 };
 
 export type WhatsAppIntentItem = {
@@ -75,6 +103,7 @@ export type WhatsAppTemplateItem = {
   versions?: number;
   latestVersionId?: string | null;
   latestVersionStatus?: string | null;
+  latestVersionBody?: string | null;
 };
 
 export type WhatsAppAccountItem = {
@@ -95,4 +124,10 @@ export type WhatsAppBotFlowItem = {
   isActive: boolean;
   priority: number;
   createdAt?: string | null;
+};
+
+export type WhatsAppAssignableUserItem = {
+  id: string;
+  name: string;
+  role: string;
 };

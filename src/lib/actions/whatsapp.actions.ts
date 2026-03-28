@@ -10,12 +10,16 @@ import { WhatsappTemplateService } from "@/lib/services/whatsapp-template.servic
 import { WhatsappBroadcastService } from "@/lib/services/whatsapp-broadcast.service";
 import { WhatsappNotificationService } from "@/lib/services/whatsapp-notification.service";
 import { WhatsappBotFlowService } from "@/lib/services/whatsapp-bot-flow.service";
+import { OperationalTaskService } from "@/lib/services/operational-task.service";
+import { CrmTaskOrchestratorService } from "@/lib/services/crm-task-orchestrator.service";
+import { SourcingTicketService } from "@/lib/services/sourcing-ticket.service";
 import { getCrmContactScopeWithDelegation, getModuleScopeWithDelegation } from "@/lib/access-control";
 import { prisma } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { serializeDecimals } from "@/lib/utils";
 import type {
   WhatsAppAccountItem,
+  WhatsAppAssignableUserItem,
   WhatsAppCampaignItem,
   WhatsAppConversationItem,
   WhatsAppDashboardStats,
@@ -27,6 +31,13 @@ import type {
 } from "@/lib/types/whatsapp";
 
 type UserLike = { id: string; tenantId: string; role: any };
+
+async function findCommunityManager(tenantId: string) {
+  return prisma.user.findFirst({
+    where: { tenantId, isActive: true, role: "COMMUNITY_MANAGER" },
+    select: { id: true },
+  });
+}
 
 async function getWhatsappConversationScope(user: UserLike) {
   const scope = await getModuleScopeWithDelegation(user, "whatsapp");
@@ -219,6 +230,39 @@ export async function updateWhatsAppBotFlow(data: {
   }
 }
 
+export async function getWhatsAppAssignableUsers(): Promise<{ data?: WhatsAppAssignableUserItem[]; error?: string }> {
+  try {
+    const user = await getSession();
+    checkPermission(user.role, "whatsapp.view");
+
+    const users = await prisma.user.findMany({
+      where: {
+        tenantId: user.tenantId,
+        isActive: true,
+        role: {
+          in: ["COMMUNITY_MANAGER", "CRM_MANAGER", "COMMERCIAL", "OPS", "DIRECTION", "ADMIN", "CEO"] as any[],
+        },
+      },
+      orderBy: [{ name: "asc" }],
+      select: {
+        id: true,
+        name: true,
+        role: true,
+      },
+    });
+
+    return {
+      data: users.map((entry) => ({
+        id: entry.id,
+        name: entry.name,
+        role: String(entry.role),
+      })),
+    };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Erreur" };
+  }
+}
+
 export async function ensureWarehousePartnerBotFlow() {
   try {
     const user = await getSession();
@@ -258,6 +302,13 @@ export async function getWhatsAppConversationMessages(
         body: m.body ?? null,
         status: m.status ?? null,
         createdAt: m.createdAt?.toISOString?.() ?? null,
+        media: Array.isArray(m.media)
+          ? m.media.map((media: any) => ({
+              url: media.url,
+              mimeType: media.mimeType ?? null,
+              caption: media.caption ?? null,
+            }))
+          : [],
       }))
       .reverse();
 
@@ -418,6 +469,333 @@ export async function addWhatsAppConversationTags(conversationId: string, tags: 
       return { error: "Conversation introuvable" };
     }
     return { error: message };
+  }
+}
+
+async function getManagedConversationContext(user: UserLike, conversationId: string) {
+  const scope = await getWhatsappConversationScope(user);
+  if (!scope) return null;
+
+  return prisma.whatsappConversation.findFirst({
+    where: { id: conversationId, ...scope },
+    include: {
+      contact: {
+        include: {
+          linkedContact: {
+            include: {
+              leads: {
+                take: 1,
+                orderBy: { createdAt: "desc" },
+                select: { id: true, status: true },
+              },
+              orders: {
+                take: 1,
+                orderBy: { createdAt: "desc" },
+                select: { id: true, orderNumber: true, status: true },
+              },
+              demandIntakes: {
+                take: 1,
+                orderBy: { receivedAt: "desc" },
+                select: { id: true, status: true },
+              },
+            },
+          },
+        },
+      },
+      intents: {
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: {
+          id: true,
+          summary: true,
+          score: true,
+          status: true,
+        },
+      },
+      messages: {
+        orderBy: { createdAt: "desc" },
+        take: 8,
+        include: { media: true },
+      },
+    },
+  });
+}
+
+export async function ensureWhatsAppConversationContact(conversationId: string) {
+  try {
+    const user = await getSession();
+    checkPermission(user.role, "whatsapp.manage");
+    checkPermission(user.role, "contact.manage");
+
+    const conversation = await getManagedConversationContext(user, conversationId);
+    if (!conversation) return { error: "Conversation introuvable" };
+
+    if (conversation.contact?.linkedContactId) {
+      return {
+        data: {
+          contactId: conversation.contact.linkedContactId,
+          created: false,
+        },
+      };
+    }
+
+    const phone = conversation.contact?.phone;
+    if (!phone) return { error: "Numero WhatsApp introuvable" };
+
+    let linkedContact = await prisma.contact.findFirst({
+      where: {
+        tenantId: user.tenantId,
+        OR: [{ whatsapp: phone }, { phone }],
+      },
+      select: { id: true },
+    });
+
+    let created = false;
+    if (!linkedContact) {
+      linkedContact = await prisma.contact.create({
+        data: {
+          tenantId: user.tenantId,
+          type: "PROSPECT",
+          name: conversation.contact?.name || phone,
+          phone,
+          whatsapp: phone,
+          ownerId: conversation.assignedToId ?? user.id,
+          onboardedById: user.id,
+          notes: "Contact cree depuis WhatsApp OS",
+        },
+        select: { id: true },
+      });
+      created = true;
+    }
+
+    await prisma.whatsappContact.update({
+      where: { id: conversation.waContactId },
+      data: { linkedContactId: linkedContact.id },
+    });
+
+    revalidatePath("/whatsapp");
+    revalidatePath("/crm");
+    revalidatePath(`/contacts/${linkedContact.id}`);
+
+    return {
+      data: {
+        contactId: linkedContact.id,
+        created,
+      },
+    };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Erreur liaison CRM" };
+  }
+}
+
+export async function createDemandFromWhatsAppConversation(conversationId: string) {
+  try {
+    const user = await getSession();
+    checkPermission(user.role, "whatsapp.manage");
+
+    const conversation = await getManagedConversationContext(user, conversationId);
+    if (!conversation) return { error: "Conversation introuvable" };
+
+    const sourceRef = `conversation:${conversation.id}`;
+    const existing = await prisma.demandIntake.findFirst({
+      where: {
+        tenantId: user.tenantId,
+        source: "WHATSAPP",
+        sourceRef,
+      },
+      select: { id: true, status: true },
+    });
+
+    if (existing) {
+      return { data: { demandId: existing.id, created: false, status: existing.status } };
+    }
+
+    const linkedContactId = conversation.contact?.linkedContactId ?? null;
+    const latestLeadId = conversation.contact?.linkedContact?.leads?.[0]?.id ?? null;
+    const latestIntent = conversation.intents?.[0] ?? null;
+    const inboundMessages = (conversation.messages ?? []).filter((message) => message.direction === "IN");
+    const latestInbound = inboundMessages[0] ?? conversation.messages?.[0] ?? null;
+    const rawDescription =
+      latestIntent?.summary ||
+      latestInbound?.body ||
+      inboundMessages
+        .map((message) => message.body)
+        .filter(Boolean)
+        .slice(0, 3)
+        .join("\n\n") ||
+      "Demande WhatsApp";
+
+    const media = inboundMessages.flatMap((message) =>
+      (message.media ?? []).map((item) => ({
+        name: item.caption || item.mimeType || "piece-jointe-whatsapp",
+        url: item.url,
+        type: item.mimeType || "whatsapp_media",
+      }))
+    );
+
+    const cm = await findCommunityManager(user.tenantId);
+
+    const demand = await prisma.demandIntake.create({
+      data: {
+        tenantId: user.tenantId,
+        source: "WHATSAPP",
+        sourceRef,
+        sourcePayload: {
+          conversationId: conversation.id,
+          waContactId: conversation.waContactId,
+          latestIntentId: latestIntent?.id ?? null,
+          latestIntentScore: latestIntent?.score ?? conversation.intentScore ?? null,
+          latestMessageId: latestInbound?.id ?? null,
+          tags: conversation.tags,
+        } as any,
+        clientName:
+          conversation.contact?.linkedContact?.name ||
+          conversation.contact?.name ||
+          conversation.contact?.phone ||
+          "Client WhatsApp",
+        rawDescription,
+        currency: "XAF",
+        urgency:
+          latestIntent?.score === "URGENT"
+            ? "CRITICAL"
+            : latestIntent?.score === "HIGH"
+              ? "HIGH"
+              : "NORMAL",
+        status: "RAW",
+        contactId: linkedContactId,
+        leadId: latestLeadId,
+        cmId: cm?.id ?? null,
+        assignedToId: conversation.assignedToId ?? cm?.id ?? null,
+        aiScore:
+          latestIntent?.score === "URGENT"
+            ? 95
+            : latestIntent?.score === "HIGH"
+              ? 80
+              : latestIntent?.score === "MEDIUM"
+                ? 65
+                : 50,
+        attachments: media.length
+          ? {
+              create: media,
+            }
+          : undefined,
+      },
+    });
+
+    await SourcingTicketService.ensureFromDemand(demand.id);
+    await CrmTaskOrchestratorService.syncDemandWorkflow(user.tenantId, demand.id);
+
+    revalidatePath("/whatsapp");
+    revalidatePath("/crm");
+    revalidatePath("/sourcing");
+    revalidatePath("/tasks");
+
+    return { data: { demandId: demand.id, created: true, status: demand.status } };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Erreur creation demande WhatsApp" };
+  }
+}
+
+export async function createWhatsAppConversationTask(
+  conversationId: string,
+  taskKind: "followup" | "missing_info" | "quote" | "payment" | "logistics"
+) {
+  try {
+    const user = await getSession();
+    checkPermission(user.role, "task.manage");
+    checkPermission(user.role, "whatsapp.manage");
+
+    const conversation = await getManagedConversationContext(user, conversationId);
+    if (!conversation) return { error: "Conversation introuvable" };
+
+    const latestOrder = conversation.contact?.linkedContact?.orders?.[0] ?? null;
+    const latestIntent = conversation.intents?.[0] ?? null;
+    const subject = latestOrder?.orderNumber || conversation.contact?.name || conversation.contact?.phone || "Conversation WhatsApp";
+
+    const config = {
+      followup: {
+        taskType: "whatsapp_followup",
+        title: `Relancer la conversation - ${subject}`,
+        description: "Repondre au client et confirmer la prochaine etape.",
+        tags: ["whatsapp", "followup"],
+        slaHours: 2,
+        dueInHours: 1,
+      },
+      missing_info: {
+        taskType: "whatsapp_missing_info",
+        title: `Completer les infos manquantes - ${subject}`,
+        description: "Obtenir les informations manquantes pour rendre la conversation exploitable.",
+        tags: ["whatsapp", "qualification"],
+        slaHours: 4,
+        dueInHours: 2,
+      },
+      quote: {
+        taskType: "whatsapp_prepare_quote",
+        title: `Preparer le devis - ${subject}`,
+        description: "Transformer cette conversation en proposition commerciale claire.",
+        tags: ["whatsapp", "quote"],
+        slaHours: 6,
+        dueInHours: 4,
+      },
+      payment: {
+        taskType: "whatsapp_payment_followup",
+        title: `Suivi paiement client - ${subject}`,
+        description: "Verifier la preuve, la validation ou la prochaine action paiement.",
+        tags: ["whatsapp", "payment"],
+        slaHours: 4,
+        dueInHours: 2,
+      },
+      logistics: {
+        taskType: "whatsapp_logistics_followup",
+        title: `Suivi logistique client - ${subject}`,
+        description: "Repondre avec le bon contexte shipment / livraison / incident.",
+        tags: ["whatsapp", "logistics"],
+        slaHours: 6,
+        dueInHours: 3,
+      },
+    }[taskKind];
+
+    const created = await OperationalTaskService.create({
+      tenantId: user.tenantId,
+      entityType: "whatsapp_conversation",
+      entityId: conversation.id,
+      taskType: config.taskType,
+      title: config.title,
+      description: [
+        config.description,
+        "",
+        latestIntent?.summary ? `Signal: ${latestIntent.summary}` : null,
+        latestOrder ? `Commande: ${latestOrder.orderNumber} (${latestOrder.status})` : null,
+      ]
+        .filter(Boolean)
+        .join("\n"),
+      module: "whatsapp",
+      priority:
+        latestIntent?.score === "URGENT"
+          ? "URGENT"
+          : latestIntent?.score === "HIGH"
+            ? "HIGH"
+            : "NORMAL",
+      ownerType: "SYSTEM",
+      riskLevel: latestIntent?.score === "URGENT" ? "HIGH" : "LOW",
+      slaHours: config.slaHours,
+      dueInHours: config.dueInHours,
+      tags: [...config.tags, ...(Array.isArray(conversation.tags) ? conversation.tags : [])],
+      assigneeId: conversation.assignedToId ?? user.id,
+      assigneeRoles: ["COMMUNITY_MANAGER", "COMMERCIAL", "CRM_MANAGER", "OPS"] as any[],
+      fallbackRoles: ["DIRECTION", "ADMIN", "CEO"] as any[],
+      reuseIfOpen: true,
+      completionRequirements: {
+        requiredComment: true,
+      },
+    });
+
+    revalidatePath("/whatsapp");
+    revalidatePath("/tasks");
+
+    return { data: { taskId: created.taskId } };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Erreur creation tache WhatsApp" };
   }
 }
 
