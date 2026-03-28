@@ -105,7 +105,7 @@ export function WhatsAppClient({
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [activeConversation, setActiveConversation] = useState<WhatsAppConversationItem | null>(null);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(() => searchParams.get("conversationId"));
   const [messages, setMessages] = useState<WhatsAppMessageItem[]>([]);
   const [messageDraft, setMessageDraft] = useState("");
   const [tagDraft, setTagDraft] = useState("");
@@ -115,6 +115,10 @@ export function WhatsAppClient({
   const [intentFilter, setIntentFilter] = useState("ALL");
   const [tagFilter, setTagFilter] = useState("");
   const [pending, startTransition] = useTransition();
+  const activeConversation = useMemo(
+    () => conversations.find((conversation) => conversation.id === activeConversationId) ?? null,
+    [activeConversationId, conversations]
+  );
 
   // 30s polling — revalidate server data automatically
   useEffect(() => {
@@ -145,35 +149,24 @@ export function WhatsAppClient({
   }, [conversations, search, statusFilter, intentFilter, tagFilter]);
 
   const openConversation = (conversation: WhatsAppConversationItem) => {
-    setActiveConversation(conversation);
+    setActiveConversationId(conversation.id);
     setTemplateDraft("");
+  };
+
+  useEffect(() => {
+    if (!activeConversation?.id) {
+      setMessages([]);
+      return;
+    }
     startTransition(async () => {
-      const res = await getWhatsAppConversationMessages(conversation.id);
+      const res = await getWhatsAppConversationMessages(activeConversation.id);
       if (res?.error) {
         toast.error(res.error);
       } else {
         setMessages(res.data ?? []);
       }
     });
-  };
-
-  useEffect(() => {
-    const conversationId = searchParams.get("conversationId");
-    if (!conversationId || activeConversation?.id === conversationId) return;
-
-    const target = conversations.find((conversation) => conversation.id === conversationId);
-    if (target) {
-      openConversation(target);
-    }
-  }, [activeConversation?.id, conversations, searchParams]);
-
-  useEffect(() => {
-    if (!activeConversation?.id) return;
-    const refreshed = conversations.find((conversation) => conversation.id === activeConversation.id);
-    if (refreshed) {
-      setActiveConversation(refreshed);
-    }
-  }, [activeConversation?.id, conversations]);
+  }, [activeConversation?.id]);
 
 
   return (
@@ -370,10 +363,11 @@ export function WhatsAppClient({
                           Creer demande
                         </Button>
                       ) : (
-                        <Link href="/crm/demands" className="inline-flex">
-                          <Button size="sm" variant="outline" className="text-xs">
-                            Voir les demandes
-                          </Button>
+                        <Link
+                          href="/crm/demands"
+                          className="inline-flex h-8 items-center justify-center rounded-md border px-3 text-xs font-medium hover:bg-muted"
+                        >
+                          Voir les demandes
                         </Link>
                       )}
                     </div>
@@ -423,7 +417,6 @@ export function WhatsAppClient({
                             const res = await updateWhatsAppConversationStatus(activeConversation.id, value);
                             if (res?.error) toast.error(res.error);
                             else {
-                              setActiveConversation((prev) => (prev ? { ...prev, status: value } : prev));
                               toast.success("Statut mis a jour");
                               router.refresh();
                             }
@@ -451,16 +444,6 @@ export function WhatsAppClient({
                               const res = await assignWhatsAppConversation(activeConversation.id, value);
                               if (res?.error) toast.error(res.error);
                               else {
-                                const selected = assignableUsers.find((entry) => entry.id === value);
-                                setActiveConversation((prev) =>
-                                  prev
-                                    ? {
-                                        ...prev,
-                                        assignedTo: selected?.name ?? prev.assignedTo,
-                                        assignedToId: value,
-                                      }
-                                    : prev
-                                );
                                 toast.success("Conversation assignee");
                                 router.refresh();
                               }
@@ -492,9 +475,6 @@ export function WhatsAppClient({
                               const res = await assignWhatsAppConversation(activeConversation.id, viewerId);
                               if (res?.error) toast.error(res.error);
                               else {
-                                setActiveConversation((prev) =>
-                                  prev ? { ...prev, assignedTo: "Moi", assignedToId: viewerId } : prev
-                                );
                                 toast.success("Conversation assignee");
                                 router.refresh();
                               }
@@ -550,6 +530,33 @@ export function WhatsAppClient({
                         <Badge key={tag} variant="outline" className="text-xs">{tag}</Badge>
                       ))}
                     </div>
+                    <div className="flex flex-wrap gap-2">
+                      {QUICK_QUALIFICATION_TAGS.map((tag) => {
+                        const alreadyTagged = (activeConversation.tags ?? []).includes(tag);
+                        return (
+                          <Button
+                            key={tag}
+                            size="sm"
+                            variant={alreadyTagged ? "secondary" : "outline"}
+                            className="h-7 text-[11px]"
+                            disabled={pending || alreadyTagged}
+                            onClick={() => {
+                              startTransition(async () => {
+                                const res = await addWhatsAppConversationTags(activeConversation.id, [tag]);
+                              if (res?.error) {
+                                toast.error(res.error);
+                                return;
+                              }
+                                toast.success(`Tag ${tag} ajoute`);
+                                router.refresh();
+                              });
+                            }}
+                          >
+                            {tag}
+                          </Button>
+                        );
+                      })}
+                    </div>
                     <div className="flex gap-2">
                       <Input
                         value={tagDraft}
@@ -567,11 +574,6 @@ export function WhatsAppClient({
                             const res = await addWhatsAppConversationTags(activeConversation.id, tags);
                             if (res?.error) toast.error(res.error);
                             else {
-                              setActiveConversation((prev) => {
-                                if (!prev) return prev;
-                                const merged = Array.from(new Set([...(prev.tags ?? []), ...tags]));
-                                return { ...prev, tags: merged };
-                              });
                               toast.success("Tags ajoutes");
                               setTagDraft("");
                               router.refresh();
@@ -585,24 +587,73 @@ export function WhatsAppClient({
                   </div>
 
                   <div className="rounded-lg border bg-slate-50 p-3 text-xs space-y-2">
-                    <div className="font-semibold text-slate-700">Resume IA</div>
+                    <div className="font-semibold text-slate-700">Copilote conversation</div>
                     <div className="text-muted-foreground">
-                      {activeConversation.lastMessage
-                        ? `Dernier signal: ${activeConversation.lastMessage}`
-                        : "Aucun signal recent detecte."}
+                      {activeConversation.copilotSummary || "Aucun signal recent detecte."}
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <Badge variant="outline" className="text-xs">
                         Priorite {activeConversation.intentScore ?? "NORMAL"}
                       </Badge>
-                      <Badge variant="outline" className="text-xs">
-                        SLA {activeConversation.slaDueAt ? formatDateSafe(activeConversation.slaDueAt) : "-"}
-                      </Badge>
+                      {activeConversation.responseState ? <ResponseBadge state={activeConversation.responseState} /> : null}
+                      {activeConversation.slaState && activeConversation.slaState !== "NO_SLA" ? (
+                        <SlaBadge state={activeConversation.slaState} />
+                      ) : null}
                     </div>
                     <div className="text-muted-foreground">
-                      Action suggeree: {activeConversation.intentScore === "HIGH" || activeConversation.intentScore === "URGENT"
-                        ? "contacter immediatement"
-                        : "qualifier le besoin et confirmer quantites"}
+                      Action suggeree: {activeConversation.copilotNextAction || "Qualifier le besoin et confirmer les prochaines etapes."}
+                    </div>
+                    {(activeConversation.copilotMissingFields ?? []).length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {(activeConversation.copilotMissingFields ?? []).map((field) => (
+                          <Badge key={field} variant="outline" className="text-[11px]">
+                            manque: {field}
+                          </Badge>
+                        ))}
+                      </div>
+                    ) : null}
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-[11px]"
+                        disabled={pending}
+                        onClick={() => {
+                          startTransition(async () => {
+                            const res = await createWhatsAppConversationTask(activeConversation.id, "followup");
+                            if (res?.error) {
+                              toast.error(res.error);
+                              return;
+                            }
+                            toast.success("Tache de relance creee");
+                            router.refresh();
+                          });
+                        }}
+                      >
+                        <Clock3 className="mr-1.5 h-3.5 w-3.5" />
+                        Tache relance
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-[11px]"
+                        disabled={pending}
+                        onClick={() => {
+                          startTransition(async () => {
+                            const kind = activeConversation.latestOrderNumber ? "logistics" : "missing_info";
+                            const res = await createWhatsAppConversationTask(activeConversation.id, kind);
+                            if (res?.error) {
+                              toast.error(res.error);
+                              return;
+                            }
+                            toast.success("Tache creee depuis la conversation");
+                            router.refresh();
+                          });
+                        }}
+                      >
+                        <ShieldAlert className="mr-1.5 h-3.5 w-3.5" />
+                        Handoff task
+                      </Button>
                     </div>
                   </div>
 
@@ -623,6 +674,20 @@ export function WhatsAppClient({
                             )}
                           >
                             <div className="whitespace-pre-wrap">{msg.body ?? "-"}</div>
+                            {Array.isArray(msg.media) && msg.media.length > 0 ? (
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                {msg.media.map((media, index) => (
+                                  <Badge key={`${msg.id}-media-${index}`} variant="outline" className="text-[11px]">
+                                    {media.mimeType?.startsWith("image/")
+                                      ? "Image"
+                                      : media.mimeType?.startsWith("video/")
+                                        ? "Video"
+                                        : "Document"}
+                                    {media.caption ? ` · ${media.caption}` : ""}
+                                  </Badge>
+                                ))}
+                              </div>
+                            ) : null}
                             <div className="text-[11px] text-muted-foreground mt-1">
                               {formatDateSafe(msg.createdAt)}
                             </div>
@@ -673,8 +738,9 @@ export function WhatsAppClient({
                             setTemplateDraft("");
                             return;
                           }
+                          const template = templates.find((item) => item.id === value);
                           setTemplateDraft(value);
-                          setMessageDraft((prev) => (prev ? `${prev}\n[template:${value}]` : `[template:${value}]`));
+                          setMessageDraft(template?.latestVersionBody || "");
                         }}
                       >
                         <SelectTrigger className="h-8 w-[220px]">
@@ -683,7 +749,7 @@ export function WhatsAppClient({
                         <SelectContent>
                           <SelectItem value="none">Aucun</SelectItem>
                           {templates.map((t) => (
-                            <SelectItem key={t.id} value={t.name}>{t.name}</SelectItem>
+                            <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -1689,6 +1755,43 @@ function StatusBadge({ status }: { status: string }) {
 
   return (
     <Badge className={cn("text-xs", colorMap[normalized] ?? "bg-gray-100 text-gray-700")}>{normalized}</Badge>
+  );
+}
+
+function ResponseBadge({ state }: { state: string }) {
+  const colorMap: Record<string, string> = {
+    WAITING_ON_US: "bg-amber-100 text-amber-700",
+    WAITING_ON_CLIENT: "bg-blue-100 text-blue-700",
+    CLOSED: "bg-gray-100 text-gray-700",
+  };
+
+  const labels: Record<string, string> = {
+    WAITING_ON_US: "a traiter",
+    WAITING_ON_CLIENT: "attente client",
+    CLOSED: "clos",
+  };
+
+  const normalized = state?.toUpperCase?.() ?? state;
+  return (
+    <Badge className={cn("text-xs", colorMap[normalized] ?? "bg-gray-100 text-gray-700")}>
+      {labels[normalized] ?? normalized}
+    </Badge>
+  );
+}
+
+function SlaBadge({ state }: { state: string }) {
+  const normalized = state?.toUpperCase?.() ?? state;
+  const colorMap: Record<string, string> = {
+    ON_TRACK: "bg-emerald-100 text-emerald-700",
+    WARNING: "bg-amber-100 text-amber-700",
+    BREACHED: "bg-rose-100 text-rose-700",
+    NO_SLA: "bg-gray-100 text-gray-700",
+  };
+
+  return (
+    <Badge className={cn("text-xs", colorMap[normalized] ?? "bg-gray-100 text-gray-700")}>
+      {normalized}
+    </Badge>
   );
 }
 

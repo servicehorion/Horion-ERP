@@ -21,22 +21,29 @@ export class WhatsappConversationService {
       return { ownerId: contactOwnerId, assignedToId: contactOwnerId };
     }
 
-    const fallback = await prisma.user.findFirst({
-      where: {
-        tenantId: params.tenantId,
-        isActive: true,
-        role: { in: ["COMMUNITY_MANAGER", "CRM_MANAGER", "OPS", "DIRECTION", "ADMIN", "CEO"] as any[] },
-      },
-      orderBy: [
-        { role: "asc" },
-        { createdAt: "asc" },
-      ],
-      select: { id: true },
-    });
+    const fallbackRoles = ["COMMUNITY_MANAGER", "CRM_MANAGER", "OPS", "DIRECTION", "ADMIN", "CEO"] as const;
+    for (const role of fallbackRoles) {
+      const candidate = await prisma.user.findFirst({
+        where: {
+          tenantId: params.tenantId,
+          isActive: true,
+          role: role as any,
+        },
+        orderBy: [{ createdAt: "asc" }],
+        select: { id: true },
+      });
+
+      if (candidate?.id) {
+        return {
+          ownerId: candidate.id,
+          assignedToId: candidate.id,
+        };
+      }
+    }
 
     return {
-      ownerId: fallback?.id ?? null,
-      assignedToId: fallback?.id ?? null,
+      ownerId: null,
+      assignedToId: null,
     };
   }
 

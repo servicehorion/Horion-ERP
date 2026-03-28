@@ -10,6 +10,7 @@ import { WhatsappTemplateService } from "@/lib/services/whatsapp-template.servic
 import { WhatsappBroadcastService } from "@/lib/services/whatsapp-broadcast.service";
 import { WhatsappNotificationService } from "@/lib/services/whatsapp-notification.service";
 import { WhatsappBotFlowService } from "@/lib/services/whatsapp-bot-flow.service";
+import { WhatsappAuditService } from "@/lib/services/whatsapp-audit.service";
 import { OperationalTaskService } from "@/lib/services/operational-task.service";
 import { CrmTaskOrchestratorService } from "@/lib/services/crm-task-orchestrator.service";
 import { SourcingTicketService } from "@/lib/services/sourcing-ticket.service";
@@ -573,6 +574,18 @@ export async function ensureWhatsAppConversationContact(conversationId: string) 
       data: { linkedContactId: linkedContact.id },
     });
 
+    await WhatsappAuditService.log({
+      tenantId: user.tenantId,
+      actorId: user.id,
+      action: "whatsapp.contact_linked",
+      entityType: "whatsapp_conversation",
+      entityId: conversation.id,
+      payload: {
+        contactId: linkedContact.id,
+        created,
+      },
+    });
+
     revalidatePath("/whatsapp");
     revalidatePath("/crm");
     revalidatePath(`/contacts/${linkedContact.id}`);
@@ -685,6 +698,18 @@ export async function createDemandFromWhatsAppConversation(conversationId: strin
     await SourcingTicketService.ensureFromDemand(demand.id);
     await CrmTaskOrchestratorService.syncDemandWorkflow(user.tenantId, demand.id);
 
+    await WhatsappAuditService.log({
+      tenantId: user.tenantId,
+      actorId: user.id,
+      action: "whatsapp.demand_created",
+      entityType: "whatsapp_conversation",
+      entityId: conversation.id,
+      payload: {
+        demandId: demand.id,
+        sourceRef,
+      },
+    });
+
     revalidatePath("/whatsapp");
     revalidatePath("/crm");
     revalidatePath("/sourcing");
@@ -780,13 +805,28 @@ export async function createWhatsAppConversationTask(
       riskLevel: latestIntent?.score === "URGENT" ? "HIGH" : "LOW",
       slaHours: config.slaHours,
       dueInHours: config.dueInHours,
-      tags: [...config.tags, ...(Array.isArray(conversation.tags) ? conversation.tags : [])],
+      tags: [
+        ...config.tags,
+        ...(Array.isArray(conversation.tags) ? conversation.tags.map((tag) => String(tag)) : []),
+      ],
       assigneeId: conversation.assignedToId ?? user.id,
       assigneeRoles: ["COMMUNITY_MANAGER", "COMMERCIAL", "CRM_MANAGER", "OPS"] as any[],
       fallbackRoles: ["DIRECTION", "ADMIN", "CEO"] as any[],
       reuseIfOpen: true,
       completionRequirements: {
         requiredComment: true,
+      },
+    });
+
+    await WhatsappAuditService.log({
+      tenantId: user.tenantId,
+      actorId: user.id,
+      action: "whatsapp.task_handoff",
+      entityType: "whatsapp_conversation",
+      entityId: conversation.id,
+      payload: {
+        taskId: created.taskId,
+        taskKind,
       },
     });
 
