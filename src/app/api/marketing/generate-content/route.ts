@@ -39,6 +39,20 @@ Demandez votre devis gratuit aujourd'hui !
 #Logistique #ImportCongo #Horion #Brazzaville #Commerce`;
 }
 
+const ALLOWED_PLATFORMS = new Set(Object.keys(PLATFORM_GUIDANCE));
+const ALLOWED_TONES = new Set(["professionnel", "décontracté", "inspirant", "humoristique", "informatif"]);
+const ALLOWED_LANGUAGES = new Set(["fr", "en", "ln"]);
+
+function sanitizeText(value: unknown, maxLength: number): string {
+  if (typeof value !== "string") return "";
+  // Strip any attempt at injecting newlines + instruction-like patterns
+  return value
+    .replace(/[\r\n]+/g, " ")
+    .replace(/[<>]/g, "")
+    .trim()
+    .slice(0, maxLength);
+}
+
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user) {
@@ -46,7 +60,22 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { platform = "FACEBOOK", theme = "logistique", tone = "professionnel", cta, language = "fr" } = body;
+
+  // Validate platform against strict whitelist
+  const rawPlatform = typeof body.platform === "string" ? body.platform.toUpperCase() : "FACEBOOK";
+  const platform = ALLOWED_PLATFORMS.has(rawPlatform) ? rawPlatform : "FACEBOOK";
+
+  // Validate tone against whitelist
+  const rawTone = typeof body.tone === "string" ? body.tone.toLowerCase() : "professionnel";
+  const tone = ALLOWED_TONES.has(rawTone) ? rawTone : "professionnel";
+
+  // Validate language against whitelist
+  const rawLanguage = typeof body.language === "string" ? body.language.toLowerCase() : "fr";
+  const language = ALLOWED_LANGUAGES.has(rawLanguage) ? rawLanguage : "fr";
+
+  // Sanitize free-text fields: strip newlines and limit length
+  const theme = sanitizeText(body.theme ?? "logistique Chine-Congo", 200);
+  const cta = body.cta ? sanitizeText(body.cta, 150) : null;
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
@@ -58,18 +87,22 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const guidance = PLATFORM_GUIDANCE[platform] ?? "Post générique";
+    const guidance = PLATFORM_GUIDANCE[platform]!;
+    // User-controlled values are passed as data inside XML-like tags,
+    // not as raw interpolation into instructions — prevents prompt injection.
     const prompt = `Tu es un expert en marketing digital pour Horion, une entreprise de logistique et sourcing Chine → Congo (Brazzaville).
 
-Génère un post ${platform} sur le thème : "${theme}".
+Génère un post pour la plateforme <plateforme>${platform}</plateforme>.
 
-Consignes :
-- ${guidance}
-- Ton de voix : ${tone}
-- Call to action : ${cta ?? "Contactez-nous pour votre prochain projet d'importation"}
-- Langue : ${language === "fr" ? "Français" : language}
-- Public cible : importateurs, commerçants et entrepreneurs congolais
-- Mets en avant la fiabilité, la transparence et le suivi Horion
+Voici les paramètres du post :
+<theme>${theme}</theme>
+<cta>${cta ?? "Contactez-nous pour votre prochain projet d'importation"}</cta>
+<langue>${language === "fr" ? "Français" : language === "en" ? "Anglais" : "Lingala"}</langue>
+
+Consignes de format : ${guidance}
+Ton de voix : ${tone}
+Public cible : importateurs, commerçants et entrepreneurs congolais
+Mets en avant la fiabilité, la transparence et le suivi Horion.
 
 Réponds uniquement avec le texte du post (prêt à copier-coller), sans explication.`;
 

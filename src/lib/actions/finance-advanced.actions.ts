@@ -1177,7 +1177,12 @@ export async function createFinanceApprovalRule(formData: FormData) {
     const name = String(formData.get("name") || "").trim();
     const minAmountXAF = toNumber(formData.get("minAmountXAF"), "minAmountXAF");
     const sequence = toNumber(formData.get("sequence"), "sequence");
-    const requiredRole = String(formData.get("requiredRole") || "FINANCE_MANAGER");
+    const APPROVAL_ROLES = new Set([
+      "ADMIN", "DIRECTION", "CEO", "CTO",
+      "FINANCE", "FINANCE_MANAGER", "OPS", "LOGISTICS_MANAGER",
+    ]);
+    const rawRole = String(formData.get("requiredRole") || "FINANCE_MANAGER");
+    const requiredRole = APPROVAL_ROLES.has(rawRole) ? rawRole : "FINANCE_MANAGER";
     const slaHours = toNumber(formData.get("slaHours"), "slaHours");
 
     if (!entityType || !name) throw new Error("entityType et name sont obligatoires");

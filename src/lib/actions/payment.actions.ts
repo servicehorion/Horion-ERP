@@ -175,7 +175,7 @@ export async function autoReconcileOrderPayments(orderId: string) {
         if (!sameAmount) return false;
         if (tx.reference && order.orderNumber && tx.reference.includes(order.orderNumber)) return true;
         if (p.reference && tx.reference && p.reference === tx.reference) return true;
-        return true;
+        return false;
       });
 
       if (match) {

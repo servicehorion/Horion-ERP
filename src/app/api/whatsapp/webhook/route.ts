@@ -17,7 +17,11 @@ export async function GET(req: NextRequest) {
   const token = searchParams.get("hub.verify_token");
   const challenge = searchParams.get("hub.challenge");
 
-  if (mode === "subscribe" && token && token === verifyToken) {
+  const tokenMatch =
+    token !== null &&
+    token.length === verifyToken.length &&
+    timingSafeEqual(Buffer.from(token), Buffer.from(verifyToken));
+  if (mode === "subscribe" && tokenMatch) {
     return new NextResponse(challenge ?? "", { status: 200 });
   }
 

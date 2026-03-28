@@ -13,15 +13,24 @@ import { PaymentService } from "@/lib/services/payment.service";
 
 const WEBHOOK_SECRET = process.env.PAYMENT_WEBHOOK_SECRET ?? "";
 
-function verifySecret(req: NextRequest): boolean {
-  if (!WEBHOOK_SECRET) return true;
+function verifySecret(req: NextRequest): { ok: boolean; status?: number; error?: string } {
+  if (!WEBHOOK_SECRET) {
+    return { ok: false, status: 503, error: "PAYMENT_WEBHOOK_SECRET non configure" };
+  }
   const header = req.headers.get("x-webhook-secret") ?? req.headers.get("x-api-key") ?? "";
-  return header === WEBHOOK_SECRET;
+  // timingSafeEqual prevents timing attacks when comparing secrets
+  const a = Buffer.from(header);
+  const b = Buffer.from(WEBHOOK_SECRET);
+  if (a.length !== b.length) return { ok: false, status: 401, error: "Non autorise" };
+  const { timingSafeEqual } = require("crypto") as typeof import("crypto");
+  if (!timingSafeEqual(a, b)) return { ok: false, status: 401, error: "Non autorise" };
+  return { ok: true };
 }
 
 export async function POST(req: NextRequest) {
-  if (!verifySecret(req)) {
-    return NextResponse.json({ error: "Non autorise" }, { status: 401 });
+  const check = verifySecret(req);
+  if (!check.ok) {
+    return NextResponse.json({ error: check.error }, { status: check.status });
   }
 
   const body = await req.json().catch(() => null);
