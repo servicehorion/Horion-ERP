@@ -25,7 +25,10 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
     redirect("/login");
   }
 
-  const result = await getOrderDetailProjection(id);
+  const [result, teamMembersResult] = await Promise.all([
+    getOrderDetailProjection(id),
+    getTeamMembers("orders"),
+  ]);
 
   if (result.error || !result.data) {
     notFound();
@@ -44,7 +47,6 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
   const canManageLogistics = hasPermission(session.user.role, "logistics.manage");
   const canManageQc = hasPermission(session.user.role, "qc.manage");
 
-  const teamMembersResult = await getTeamMembers("orders");
   const teamMembers = teamMembersResult.data || [];
 
   return (

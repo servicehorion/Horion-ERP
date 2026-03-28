@@ -237,6 +237,112 @@ export class FinanceTransactionService {
     });
   }
 
+  static async syncOrder(tenantId: string, orderId: string) {
+    const [payments, treasuryTransactions] = await Promise.all([
+      prisma.payment.findMany({
+        where: {
+          orderId,
+          order: { tenantId },
+        },
+        select: {
+          id: true,
+          orderId: true,
+          direction: true,
+          type: true,
+          status: true,
+          amount: true,
+          currency: true,
+          amountXAF: true,
+          fxRate: true,
+          methodKey: true,
+          reference: true,
+          notes: true,
+          createdAt: true,
+          confirmedAt: true,
+          paidAt: true,
+        },
+      }),
+      prisma.treasuryTransaction.findMany({
+        where: {
+          orderId,
+          account: { tenantId },
+        },
+        include: {
+          account: {
+            select: { id: true, label: true, currency: true },
+          },
+        },
+      }),
+    ]);
+
+    let projected = 0;
+
+    for (const payment of payments) {
+      const status = mapPaymentStatus(payment);
+      if (status === "CANCELLED" && !["FAILED", "CANCELLED", "EXPIRED", "REFUNDED"].includes(payment.status)) {
+        continue;
+      }
+
+      await this.upsertProjection({
+        tenantId,
+        orderId: payment.orderId,
+        externalRef: `PAYMENT:${payment.id}`,
+        walletCode: mapPaymentWalletCode(payment),
+        sourceType: "PAYMENT",
+        sourceId: payment.id,
+        direction: payment.direction === "INBOUND" ? "IN" : "OUT",
+        category: mapPaymentCategory(payment),
+        amountLocal: toNumber(payment.amount),
+        currency: payment.currency,
+        exchangeRate: payment.fxRate == null ? null : toNumber(payment.fxRate),
+        amountXAF: toNumber(payment.amountXAF),
+        status,
+        reference: payment.reference || null,
+        notes: payment.notes || null,
+        completedAt: payment.confirmedAt || payment.paidAt || null,
+        metadata: {
+          paymentStatus: payment.status,
+          paymentType: payment.type,
+          methodKey: payment.methodKey,
+        } as Prisma.InputJsonValue,
+      });
+      projected++;
+    }
+
+    for (const transaction of treasuryTransactions) {
+      const amountXAF =
+        transaction.account.currency === "XAF"
+          ? toNumber(transaction.amount)
+          : roundMoney(toNumber(transaction.amount) * toNumber(transaction.fxRate));
+
+      await this.upsertProjection({
+        tenantId,
+        orderId: transaction.orderId || null,
+        externalRef: `TREASURY:${transaction.id}`,
+        walletCode: mapTreasuryWalletCode(transaction.account.label, transaction.account.currency),
+        sourceType: "TREASURY",
+        sourceId: transaction.id,
+        direction: transaction.type === "TOP_UP" ? "IN" : "OUT",
+        category: mapTreasuryCategory(transaction.type),
+        amountLocal: toNumber(transaction.amount),
+        currency: transaction.account.currency,
+        exchangeRate: transaction.fxRate == null ? null : toNumber(transaction.fxRate),
+        amountXAF,
+        status: "COMPLETED",
+        reference: transaction.reference || null,
+        completedAt: transaction.createdAt,
+        metadata: {
+          treasuryType: transaction.type,
+          reconciliationStatus: transaction.status,
+          accountId: transaction.accountId,
+        } as Prisma.InputJsonValue,
+      });
+      projected++;
+    }
+
+    return { projected };
+  }
+
   static async syncTenant(tenantId: string) {
     const [payments, treasuryTransactions, bankTransactions] = await Promise.all([
       prisma.payment.findMany({

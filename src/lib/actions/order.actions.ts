@@ -357,8 +357,8 @@ export async function getOrderDetailProjection(orderId: string) {
     const user = await getSession();
     checkPermission(user.role, "order.view");
 
-    const order = await OrderDetailProjectionService.get(orderId);
-    if (!order || order.tenantId !== user.tenantId) {
+    const order = await OrderDetailProjectionService.get(orderId, { tenantId: user.tenantId });
+    if (!order) {
       return { error: "Commande introuvable" };
     }
 

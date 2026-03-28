@@ -60,12 +60,12 @@ export type OrderDetailProjection = {
 
 export class OrderDetailProjectionService {
   static async get(orderId: string, scopeWhere?: Prisma.OrderWhereInput) {
-    const order = await OrderService.getById(orderId, scopeWhere);
+    const order = await OrderService.getDetailById(orderId, scopeWhere);
     if (!order) return null;
 
     const [transitionReadiness] = await Promise.all([
       OrderService.getTransitionReadiness(orderId),
-      FinanceTransactionService.syncTenant(order.tenantId),
+      FinanceTransactionService.syncOrder(order.tenantId, orderId),
     ]);
 
     const financeTransactions = await prisma.financeTransaction.findMany({

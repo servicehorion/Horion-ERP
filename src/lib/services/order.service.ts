@@ -12,6 +12,406 @@ import { InvoiceService } from "@/lib/services/invoice.service";
 import { CatalogMemoryService } from "@/lib/services/catalog-memory.service";
 import { FinanceTransactionService } from "@/lib/services/finance-transaction.service";
 
+const orderDetailSelect = Prisma.validator<Prisma.OrderSelect>()({
+  id: true,
+  tenantId: true,
+  orderNumber: true,
+  status: true,
+  approvalStatus: true,
+  priority: true,
+  riskLevel: true,
+  originCountry: true,
+  destinationCity: true,
+  notes: true,
+  merchandiseTotal: true,
+  logisticsCost: true,
+  commissionRate: true,
+  commissionAmount: true,
+  insuranceAmount: true,
+  totalClient: true,
+  budgetPlannedXAF: true,
+  budgetActualXAF: true,
+  fxImpactXAF: true,
+  fxRatesSnapshot: true,
+  estimatedDelivery: true,
+  actualDelivery: true,
+  archivedAt: true,
+  createdAt: true,
+  updatedAt: true,
+  currentQuote: {
+    select: {
+      id: true,
+      version: true,
+      status: true,
+      approvalStatus: true,
+      paymentStatus: true,
+      paidAt: true,
+      total: true,
+      validUntil: true,
+    },
+  },
+  contact: {
+    select: {
+      name: true,
+      email: true,
+      phone: true,
+    },
+  },
+  items: {
+    select: {
+      id: true,
+      description: true,
+      quantity: true,
+      unitPrice: true,
+      currency: true,
+      totalXAF: true,
+    },
+  },
+  owner: {
+    select: {
+      id: true,
+      name: true,
+      email: true,
+    },
+  },
+  onboardedBy: {
+    select: {
+      id: true,
+      name: true,
+      email: true,
+    },
+  },
+  collaborators: {
+    select: {
+      userId: true,
+      user: {
+        select: {
+          name: true,
+          email: true,
+        },
+      },
+    },
+  },
+  attachments: {
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      name: true,
+      url: true,
+      type: true,
+      createdAt: true,
+      user: {
+        select: {
+          name: true,
+        },
+      },
+    },
+  },
+  quotes: {
+    orderBy: { version: "desc" },
+    select: {
+      id: true,
+      version: true,
+      isActive: true,
+      status: true,
+      approvalStatus: true,
+      approvedAt: true,
+      merchandiseTotal: true,
+      logisticsCost: true,
+      commission: true,
+      insuranceCost: true,
+      total: true,
+      currency: true,
+      validUntil: true,
+      createdAt: true,
+      sentAt: true,
+      sentByEmailAt: true,
+      sentByEmailTo: true,
+      acceptedAt: true,
+      signatureToken: true,
+      signedAt: true,
+      signedByName: true,
+      signedByEmail: true,
+      pricingSnapshot: true,
+      paymentToken: true,
+      paymentStatus: true,
+      paymentExpiry: true,
+    },
+  },
+  approvals: {
+    orderBy: { createdAt: "asc" },
+    select: {
+      id: true,
+      status: true,
+      note: true,
+      decidedAt: true,
+      rule: {
+        select: {
+          name: true,
+          requiredRole: true,
+          minAmountXAF: true,
+        },
+      },
+      decidedBy: {
+        select: {
+          name: true,
+          email: true,
+        },
+      },
+    },
+  },
+  revisions: {
+    orderBy: { createdAt: "desc" },
+    take: 10,
+    select: {
+      id: true,
+      revisionNumber: true,
+      reason: true,
+      createdAt: true,
+    },
+  },
+  ediTransmissions: {
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      provider: true,
+      status: true,
+      sentAt: true,
+    },
+  },
+  timeline: {
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      event: true,
+      fromValue: true,
+      toValue: true,
+      note: true,
+      userId: true,
+      createdAt: true,
+    },
+  },
+  tasks: {
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      title: true,
+      status: true,
+      slaDeadline: true,
+      slaBreach: true,
+      assignments: {
+        select: {
+          user: {
+            select: {
+              name: true,
+            },
+          },
+        },
+      },
+    },
+  },
+  shipments: {
+    orderBy: { createdAt: "asc" },
+    select: {
+      id: true,
+      mode: true,
+      status: true,
+      origin: true,
+      destination: true,
+      trackingProvider: true,
+      trackingNumber: true,
+      trackingStatus: true,
+      trackingUrl: true,
+      lastTrackingSyncAt: true,
+      containerNumber: true,
+      blNumber: true,
+      weight: true,
+      volume: true,
+      estimatedDeparture: true,
+      estimatedArrival: true,
+      actualDeparture: true,
+      actualArrival: true,
+      cost: true,
+      currency: true,
+      trackingEvents: {
+        orderBy: { occurredAt: "asc" },
+        select: {
+          id: true,
+          event: true,
+          location: true,
+          description: true,
+          occurredAt: true,
+        },
+      },
+      customsClearance: {
+        select: {
+          id: true,
+          shipmentId: true,
+          status: true,
+          declarationNum: true,
+          dutyAmount: true,
+          dutyCurrency: true,
+          brokerName: true,
+          submittedAt: true,
+          clearedAt: true,
+        },
+      },
+      aiInsight: {
+        select: {
+          predictedArrival: true,
+          predictedDelayDays: true,
+          riskLevel: true,
+        },
+      },
+    },
+  },
+  payments: {
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      direction: true,
+      type: true,
+      status: true,
+      amount: true,
+      amountXAF: true,
+      currency: true,
+      method: true,
+      reference: true,
+      dueAt: true,
+      createdAt: true,
+    },
+  },
+  disputes: {
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      type: true,
+      status: true,
+      description: true,
+      resolution: true,
+      amount: true,
+      currency: true,
+      createdAt: true,
+      resolvedAt: true,
+    },
+  },
+  returns: {
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      status: true,
+      reason: true,
+      notes: true,
+      trackingNumber: true,
+      warehouseSite: true,
+      approvedAt: true,
+      receivedAt: true,
+      createdAt: true,
+      lines: {
+        select: {
+          id: true,
+          description: true,
+          quantity: true,
+          condition: true,
+          notes: true,
+        },
+      },
+    },
+  },
+  qcRequests: {
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      type: true,
+      status: true,
+      inspector: true,
+      scheduledAt: true,
+      completedAt: true,
+      cost: true,
+      currency: true,
+      reports: {
+        select: {
+          id: true,
+          overallResult: true,
+          defectRate: true,
+          recommendation: true,
+          createdAt: true,
+          nonConformities: {
+            select: {
+              id: true,
+              category: true,
+              severity: true,
+              description: true,
+              photoUrl: true,
+              resolution: true,
+            },
+          },
+        },
+      },
+    },
+  },
+  qcInspections: {
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      status: true,
+      overall: true,
+      completedAt: true,
+      createdAt: true,
+    },
+  },
+  sourcingCases: {
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      status: true,
+      requirement: true,
+      budget: true,
+      currency: true,
+      createdAt: true,
+      supplier: {
+        select: {
+          id: true,
+          name: true,
+          country: true,
+        },
+      },
+      offers: {
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          unitPrice: true,
+          currency: true,
+          isSelected: true,
+          moq: true,
+          leadTimeDays: true,
+        },
+      },
+    },
+  },
+  marginReport: {
+    select: {
+      revenue: true,
+      cogs: true,
+      commission: true,
+      grossMargin: true,
+      marginPercent: true,
+      netMargin: true,
+      netMarginPct: true,
+      currency: true,
+      calculatedAt: true,
+    },
+  },
+  warehouseReceipts: {
+    orderBy: { receivedAt: "desc" },
+    select: {
+      id: true,
+      receivedAt: true,
+      readyToShip: true,
+    },
+  },
+});
+
 export class OrderService {
   private static hasArchivedAtField() {
     const models = (prisma as any)?._dmmf?.datamodel?.models;
@@ -326,7 +726,7 @@ export class OrderService {
     });
     if (!order) throw new Error("Commande introuvable");
 
-    await FinanceTransactionService.syncTenant(order.tenantId);
+    await FinanceTransactionService.syncOrder(order.tenantId, orderId);
 
     const transactions = await prisma.financeTransaction.findMany({
       where: {
@@ -666,6 +1066,13 @@ export class OrderService {
         customsClearance: true,
         warehouseReceipts: { orderBy: { receivedAt: "desc" } },
       },
+    });
+  }
+
+  static async getDetailById(orderId: string, scopeWhere?: Prisma.OrderWhereInput) {
+    return prisma.order.findFirst({
+      where: { id: orderId, ...(scopeWhere || {}) },
+      select: orderDetailSelect,
     });
   }
 
