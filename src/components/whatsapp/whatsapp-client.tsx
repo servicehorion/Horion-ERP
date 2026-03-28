@@ -154,10 +154,7 @@ export function WhatsAppClient({
   };
 
   useEffect(() => {
-    if (!activeConversation?.id) {
-      setMessages([]);
-      return;
-    }
+    if (!activeConversation?.id) return;
     startTransition(async () => {
       const res = await getWhatsAppConversationMessages(activeConversation.id);
       if (res?.error) {
