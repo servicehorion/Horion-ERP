@@ -34,6 +34,12 @@ const ROUTE_GUARDS: [string, string][] = [
   ["/tasks",      "task.view"],
   // Orders
   ["/orders",     "order.view"],
+  // Catalogue
+  ["/catalog",    "catalog.view"],
+  // Devis — quote.approve est la permission minimale commune à tous les rôles liés aux devis
+  ["/quotes",     "quote.approve"],
+  // Pilotage stratégique — CEO / DIRECTION / ADMIN uniquement
+  ["/pilotage",   "pilotage.view"],
   // Dashboard intentionally not protected by middleware
 ];
 

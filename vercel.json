@@ -7,6 +7,11 @@
     { "path": "/api/cron/nurturing-step", "schedule": "*/30 * * * *" },
     { "path": "/api/cron/lead-scoring", "schedule": "0 * * * *" },
     { "path": "/api/cron/fx-rates", "schedule": "0 */6 * * *" },
-    { "path": "/api/cron/finance-approval-escalation", "schedule": "*/30 * * * *" }
+    { "path": "/api/cron/finance-approval-escalation", "schedule": "*/30 * * * *" },
+    { "path": "/api/cron/expire-payments", "schedule": "0 * * * *" },
+    { "path": "/api/cron/sourcing-sla-check", "schedule": "*/30 * * * *" },
+    { "path": "/api/cron/treasury-balance-alerts", "schedule": "0 */4 * * *" },
+    { "path": "/api/cron/assistant-knowledge-sync", "schedule": "0 3 * * *" },
+    { "path": "/api/cron/recurring-tasks", "schedule": "0 * * * *" }
   ]
 }
