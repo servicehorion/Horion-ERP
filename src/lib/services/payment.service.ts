@@ -63,17 +63,19 @@ export class PaymentService {
       tenantId?: string;
       orderId?: string;
       direction?: PaymentDirection;
+      type?: PaymentType;
       status?: PaymentStatus;
       page?: number;
       limit?: number;
     } = {}
   ) {
-    const { tenantId, orderId, direction, status, page = 1, limit = 20 } = options;
+    const { tenantId, orderId, direction, type, status, page = 1, limit = 20 } = options;
 
     const where: Prisma.PaymentWhereInput = {
       ...(tenantId && { order: { tenantId } }),
       ...(orderId && { orderId }),
       ...(direction && { direction }),
+      ...(type && { type }),
       ...(status && { status }),
     };
 

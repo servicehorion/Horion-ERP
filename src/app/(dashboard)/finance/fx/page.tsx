@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/table";
 import { getLatestFXRates, getFXHistory } from "@/lib/actions/finance.actions";
 import { AddFXRateForm } from "@/components/finance/add-fx-rate-form";
+import { FXCalculator } from "@/components/finance/fx-calculator";
 
 export const metadata = { title: "Taux de change | Horion ERP" };
 
@@ -18,16 +19,34 @@ const DEFAULT_RATES: Record<string, number> = {
   "USD/RMB": 7.25,
 };
 
+const PAIR_DECIMALS: Record<string, number> = {
+  "USD/XAF": 2,
+  "RMB/XAF": 2,
+  "EUR/XAF": 3,
+  "USD/RMB": 4,
+};
+
 export default async function FXPage() {
-  const [ratesRes, usdHistRes, rmbHistRes] = await Promise.all([
+  const [ratesRes, usdHistRes, rmbHistRes, eurHistRes, usdRmbHistRes] = await Promise.all([
     getLatestFXRates(),
     getFXHistory("USD", "XAF"),
     getFXHistory("RMB", "XAF"),
+    getFXHistory("EUR", "XAF"),
+    getFXHistory("USD", "RMB"),
   ]);
 
   const rates = ratesRes.data || [];
   const usdHistory = usdHistRes.data || [];
   const rmbHistory = rmbHistRes.data || [];
+  const eurHistory = eurHistRes.data || [];
+  const usdRmbHistory = usdRmbHistRes.data || [];
+
+  const historyPairs = [
+    { label: "USD / XAF", history: usdHistory, decimals: 2 },
+    { label: "RMB / XAF", history: rmbHistory, decimals: 2 },
+    { label: "EUR / XAF", history: eurHistory, decimals: 3 },
+    { label: "USD / RMB", history: usdRmbHistory, decimals: 4 },
+  ];
 
   return (
     <div className="space-y-6">
@@ -54,6 +73,7 @@ export default async function FXPage() {
           const rate = r.rate ? Number(r.rate) : DEFAULT_RATES[r.pair];
           const [from, to] = r.pair.split("/");
           const isLive = !!r.rate;
+          const decimals = PAIR_DECIMALS[r.pair] ?? 4;
 
           return (
             <Card key={r.pair}>
@@ -73,7 +93,7 @@ export default async function FXPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold font-mono">
-                  {rate ? rate.toFixed(to === "XAF" ? 2 : 4) : "N/A"}
+                  {rate ? rate.toFixed(decimals) : "N/A"}
                 </div>
                 {isLive && r.effectiveAt && (
                   <p className="text-xs text-muted-foreground mt-1">
@@ -86,87 +106,94 @@ export default async function FXPage() {
         })}
       </div>
 
-      {/* History Tables */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Historique USD/XAF</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {usdHistory.length === 0 ? (
-              <p className="text-center text-sm text-muted-foreground py-4">
-                Aucun historique — enregistrez un taux pour commencer
+      {/* Calculatrice + intro */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-1">
+          <FXCalculator />
+        </div>
+        <div className="lg:col-span-2">
+          <Card className="h-full">
+            <CardHeader>
+              <CardTitle className="text-base">Taux de référence Horion</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm text-muted-foreground">
+              <p>
+                Les taux affichés en <Badge className="bg-green-100 text-green-800 text-[10px]">Live</Badge> sont
+                les derniers taux saisis manuellement dans le système.
               </p>
-            ) : (
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Taux</TableHead>
-                      <TableHead>Source</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {usdHistory.map((h) => (
-                      <TableRow key={h.id}>
-                        <TableCell className="text-sm">
-                          {new Date(h.effectiveAt).toLocaleDateString("fr-FR")}
-                        </TableCell>
-                        <TableCell className="font-mono font-medium">
-                          {Number(h.rate).toFixed(2)}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {h.source}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              <p>
+                Les taux affichés en <Badge variant="secondary" className="text-[10px]">Défaut</Badge> sont
+                les taux de référence Horion (USD=605, RMB=83, EUR=655.957 FCFA) utilisés
+                en fallback pour toutes les conversions automatiques.
+              </p>
+              <p className="text-xs">
+                La calculatrice utilise en priorité les taux Live de la base de données,
+                puis les taux Défaut si aucun taux Live n'est disponible.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Historique RMB/XAF</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {rmbHistory.length === 0 ? (
-              <p className="text-center text-sm text-muted-foreground py-4">
-                Aucun historique — enregistrez un taux pour commencer
-              </p>
-            ) : (
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Taux</TableHead>
-                      <TableHead>Source</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {rmbHistory.map((h) => (
-                      <TableRow key={h.id}>
-                        <TableCell className="text-sm">
-                          {new Date(h.effectiveAt).toLocaleDateString("fr-FR")}
-                        </TableCell>
-                        <TableCell className="font-mono font-medium">
-                          {Number(h.rate).toFixed(2)}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {h.source}
-                        </TableCell>
+      {/* History Tables — 4 paires */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {historyPairs.map(({ label, history, decimals }) => (
+          <Card key={label}>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center justify-between">
+                Historique {label}
+                <Badge variant="outline" className="text-[10px]">
+                  {history.length} entrée{history.length !== 1 ? "s" : ""}
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {history.length === 0 ? (
+                <p className="text-center text-sm text-muted-foreground py-4">
+                  Aucun historique — enregistrez un taux pour commencer
+                </p>
+              ) : (
+                <div className="rounded-md border max-h-[280px] overflow-y-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead className="text-right">Taux</TableHead>
+                        <TableHead>Source</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                    </TableHeader>
+                    <TableBody>
+                      {history.map((h, idx) => {
+                        const prev = history[idx + 1];
+                        const diff = prev ? Number(h.rate) - Number(prev.rate) : 0;
+                        return (
+                          <TableRow key={h.id}>
+                            <TableCell className="text-sm">
+                              {new Date(h.effectiveAt).toLocaleDateString("fr-FR")}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <span className="font-mono font-medium">
+                                {Number(h.rate).toFixed(decimals)}
+                              </span>
+                              {diff !== 0 && (
+                                <span className={`ml-1 text-[10px] ${diff > 0 ? "text-green-600" : "text-red-600"}`}>
+                                  {diff > 0 ? "▲" : "▼"}{Math.abs(diff).toFixed(decimals)}
+                                </span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {h.source}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        ))}
       </div>
     </div>
   );
