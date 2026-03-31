@@ -1,4 +1,6 @@
 import { NextRequest } from "next/server";
+import { getToken } from "next-auth/jwt";
+import { aiRateLimit } from "@/lib/rate-limit";
 
 type NbaPayload = {
   status: string;
@@ -131,6 +133,21 @@ function parseResponse(text: string): NbaResult {
 }
 
 export async function POST(req: NextRequest) {
+  // Auth check — must be a logged-in user
+  const token = await getToken({
+    req,
+    secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
+  });
+  if (!token?.sub) {
+    return Response.json({ error: "Non authentifié" }, { status: 401 });
+  }
+
+  // Rate limit per user (not just IP) — 20 AI calls / min
+  const rl = await aiRateLimit(req, `nba:${token.sub}`);
+  if (!rl.success) {
+    return Response.json({ error: "Trop de requêtes" }, { status: 429 });
+  }
+
   try {
     const body: NbaPayload = await req.json();
 

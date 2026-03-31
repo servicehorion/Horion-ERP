@@ -120,14 +120,15 @@ export class EmailNotificationChannel {
 
       try {
         const { renderEmailHtml } = await import("@/lib/email-templates");
-        let ResendCtor: any = null;
+        let ResendCtor: (new (key: string) => { emails: { send: (opts: Record<string, unknown>) => Promise<unknown> } }) | null = null;
         try {
           const mod = await import("resend");
-          ResendCtor = mod.Resend;
+          ResendCtor = mod.Resend as typeof ResendCtor;
         } catch (err) {
           console.error("[EmailChannel] Resend SDK not installed.", err);
           return;
         }
+        if (!ResendCtor) return;
 
         const resend = new ResendCtor(apiKey);
         await resend.emails.send({

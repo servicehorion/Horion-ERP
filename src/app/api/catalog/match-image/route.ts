@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 
 import { CatalogProductService } from "@/lib/services/catalog-product.service";
+import { aiRateLimit } from "@/lib/rate-limit";
 
 function stripExtension(filename?: string | null) {
   if (!filename) return "";
@@ -33,6 +34,12 @@ export async function POST(req: NextRequest) {
 
   if (!token?.tenantId) {
     return NextResponse.json({ error: "Non authentifie" }, { status: 401 });
+  }
+
+  // Rate limit per user: 20 AI image analysis calls/min
+  const rl = await aiRateLimit(req, `img:${String(token.sub)}`);
+  if (!rl.success) {
+    return NextResponse.json({ error: "Trop de requêtes" }, { status: 429 });
   }
 
   const body = await req.json().catch(() => ({}));

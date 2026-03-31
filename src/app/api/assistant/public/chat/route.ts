@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { ZeliaPayService } from "@/lib/services/zelia-pay.service";
+import { aiRateLimit } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
+  // Rate limit: public endpoint — 20 AI calls/min per IP
+  const rl = await aiRateLimit(req);
+  if (!rl.success) {
+    return NextResponse.json({ error: "Trop de requêtes" }, { status: 429 });
+  }
   try {
     const body = await req.json().catch(() => ({}));
     const message = String(body.message || "").trim();

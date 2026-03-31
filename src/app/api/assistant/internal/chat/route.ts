@@ -2,8 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { getSession } from "@/lib/session";
 import { ZeliaInternalService } from "@/lib/services/zelia-internal.service";
+import { aiRateLimit } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
+  // Rate limit per IP: 20 AI calls/min — protects Anthropic API costs
+  const rl = await aiRateLimit(req);
+  if (!rl.success) {
+    return NextResponse.json({ error: "Trop de requêtes" }, { status: 429 });
+  }
+
   try {
     const user = await getSession();
     const body = await req.json().catch(() => ({}));

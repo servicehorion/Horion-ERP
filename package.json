@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "next dev --webpack",
+    "clean:next": "node scripts/clean-next-cache.mjs",
+    "dev:reset": "npm run clean:next && next dev --webpack",
     "dev:webpack": "next dev --webpack",
     "dev:turbopack": "next dev --turbopack",
     "typecheck": "tsc -p tsconfig.build.json --noEmit",

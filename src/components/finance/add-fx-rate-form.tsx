@@ -34,10 +34,16 @@ export function AddFXRateForm() {
     setError("");
 
     const fd = new FormData(e.currentTarget);
+    const rateRaw = parseFloat(fd.get("rate") as string);
+    if (!Number.isFinite(rateRaw) || rateRaw <= 0) {
+      setError("Le taux doit être un nombre positif.");
+      setLoading(false);
+      return;
+    }
     const result = await createFXRate({
       fromCurrency: fd.get("fromCurrency") as string,
       toCurrency: fd.get("toCurrency") as string,
-      rate: parseFloat(fd.get("rate") as string),
+      rate: rateRaw,
       source: (fd.get("source") as string) || "manual",
       effectiveAt: (fd.get("effectiveAt") as string) || undefined,
     });

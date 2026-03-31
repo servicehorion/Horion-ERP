@@ -17,6 +17,7 @@ type MemoryBucket = {
 
 let ratelimitInstance: Ratelimit | null = null;
 let authRatelimitInstance: Ratelimit | null = null;
+let aiRatelimitInstance: Ratelimit | null = null;
 
 const memoryPublicBucket: MemoryBucket = {
   limit: 100,
@@ -27,6 +28,13 @@ const memoryPublicBucket: MemoryBucket = {
 const memoryAuthBucket: MemoryBucket = {
   limit: 10,
   windowMs: 15 * 60_000,
+  entries: new Map(),
+};
+
+// AI endpoints: 20 req/min per IP — stricter than general to protect Anthropic API costs
+const memoryAiBucket: MemoryBucket = {
+  limit: 20,
+  windowMs: 60_000,
   entries: new Map(),
 };
 
@@ -71,6 +79,19 @@ function getAuthRatelimit() {
     prefix: "horion-auth",
   });
   return authRatelimitInstance;
+}
+
+function getAiRatelimit() {
+  if (aiRatelimitInstance) return aiRatelimitInstance;
+  const redis = getRedis();
+  if (!redis) return null;
+  aiRatelimitInstance = new Ratelimit({
+    redis,
+    limiter: Ratelimit.slidingWindow(memoryAiBucket.limit, "1 m"),
+    analytics: true,
+    prefix: "horion-ai",
+  });
+  return aiRatelimitInstance;
 }
 
 function getRequestIp(req: NextRequest) {
@@ -133,5 +154,19 @@ export async function authRateLimit(req: NextRequest): Promise<LimitResult> {
     return await limiter.limit(ip);
   } catch {
     return applyMemoryLimit(memoryAuthBucket, ip);
+  }
+}
+
+export async function aiRateLimit(req: NextRequest, identifier?: string): Promise<LimitResult> {
+  const key = identifier ?? getRequestIp(req);
+  const limiter = getAiRatelimit();
+  if (!limiter) {
+    return applyMemoryLimit(memoryAiBucket, key);
+  }
+
+  try {
+    return await limiter.limit(key);
+  } catch {
+    return applyMemoryLimit(memoryAiBucket, key);
   }
 }
