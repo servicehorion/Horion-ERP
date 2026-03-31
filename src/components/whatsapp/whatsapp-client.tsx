@@ -47,6 +47,7 @@ import {
   createLeadFromWhatsAppConversation,
   ensureWhatsAppConversationContact,
   getWhatsAppConversationMessages,
+  linkWhatsAppConversationToContact,
   sendWhatsAppMessage,
   updateWhatsAppBotFlow,
   updateWhatsAppConversationStatus,
@@ -61,10 +62,12 @@ import type {
   WhatsAppDashboardStats,
   WhatsAppGroupItem,
   WhatsAppIntentItem,
+  WhatsAppLinkableContactItem,
   WhatsAppMessageItem,
   WhatsAppTemplateItem,
   WhatsAppBotFlowItem,
 } from "@/lib/types/whatsapp";
+import { getWhatsAppQuickReplies } from "@/lib/whatsapp/quick-replies";
 
 interface Props {
   stats: WhatsAppDashboardStats;
@@ -76,6 +79,7 @@ interface Props {
   accounts: WhatsAppAccountItem[];
   botFlows: WhatsAppBotFlowItem[];
   assignableUsers: WhatsAppAssignableUserItem[];
+  linkableContacts: WhatsAppLinkableContactItem[];
   viewerId?: string;
 }
 
@@ -101,6 +105,7 @@ export function WhatsAppClient({
   accounts,
   botFlows,
   assignableUsers,
+  linkableContacts,
   viewerId,
 }: Props) {
   const router = useRouter();
@@ -110,6 +115,8 @@ export function WhatsAppClient({
   const [messageDraft, setMessageDraft] = useState("");
   const [tagDraft, setTagDraft] = useState("");
   const [templateDraft, setTemplateDraft] = useState("");
+  const [contactLinkQuery, setContactLinkQuery] = useState("");
+  const [selectedContactId, setSelectedContactId] = useState("none");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [intentFilter, setIntentFilter] = useState("ALL");
@@ -119,6 +126,20 @@ export function WhatsAppClient({
     () => conversations.find((conversation) => conversation.id === activeConversationId) ?? null,
     [activeConversationId, conversations]
   );
+  const quickReplies = useMemo(
+    () => (activeConversation ? getWhatsAppQuickReplies(activeConversation) : []),
+    [activeConversation]
+  );
+  const filteredLinkableContacts = useMemo(() => {
+    const term = contactLinkQuery.trim().toLowerCase();
+    return linkableContacts.filter((contact) => {
+      if (!term) return true;
+      return [contact.name, contact.phone ?? "", contact.whatsapp ?? "", contact.type]
+        .join(" ")
+        .toLowerCase()
+        .includes(term);
+    });
+  }, [contactLinkQuery, linkableContacts]);
 
   // 30s polling — revalidate server data automatically
   useEffect(() => {
@@ -151,6 +172,8 @@ export function WhatsAppClient({
   const openConversation = (conversation: WhatsAppConversationItem) => {
     setActiveConversationId(conversation.id);
     setTemplateDraft("");
+    setContactLinkQuery("");
+    setSelectedContactId("none");
   };
 
   useEffect(() => {
@@ -368,6 +391,57 @@ export function WhatsAppClient({
                         </Link>
                       )}
                     </div>
+
+                    {!activeConversation.linkedContactId ? (
+                      <div className="rounded-md border bg-white/70 p-3 space-y-2">
+                        <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                          Lier a un contact CRM existant
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-2">
+                          <Input
+                            value={contactLinkQuery}
+                            onChange={(event) => setContactLinkQuery(event.target.value)}
+                            placeholder="Rechercher nom / telephone / WhatsApp"
+                            className="h-8"
+                          />
+                          <Select value={selectedContactId} onValueChange={setSelectedContactId}>
+                            <SelectTrigger className="h-8">
+                              <SelectValue placeholder="Choisir un contact" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">Choisir un contact</SelectItem>
+                              {filteredLinkableContacts.slice(0, 50).map((contact) => (
+                                <SelectItem key={contact.id} value={contact.id}>
+                                  {contact.name} · {contact.type}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8"
+                            disabled={pending || selectedContactId === "none"}
+                            onClick={() => {
+                              if (selectedContactId === "none") return;
+                              startTransition(async () => {
+                                const res = await linkWhatsAppConversationToContact(activeConversation.id, selectedContactId);
+                                if (res?.error) {
+                                  toast.error(res.error);
+                                  return;
+                                }
+                                toast.success(`Conversation liee a ${res.data?.contactName ?? "un contact CRM"}`);
+                                setSelectedContactId("none");
+                                setContactLinkQuery("");
+                                router.refresh();
+                              });
+                            }}
+                          >
+                            Lier
+                          </Button>
+                        </div>
+                      </div>
+                    ) : null}
 
                     {(activeConversation.latestOrderNumber || activeConversation.linkedDemandId) && (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
@@ -728,6 +802,17 @@ export function WhatsAppClient({
                       </Button>
                     </div>
                     <div className="flex flex-wrap gap-2">
+                      {quickReplies.map((reply) => (
+                        <Button
+                          key={reply.id}
+                          size="sm"
+                          variant="outline"
+                          className="h-8 text-[11px]"
+                          onClick={() => setMessageDraft(reply.message)}
+                        >
+                          {reply.label}
+                        </Button>
+                      ))}
                       <Select
                         value={templateDraft}
                         onValueChange={(value) => {

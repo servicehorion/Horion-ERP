@@ -4,6 +4,7 @@ import { notifyShipmentSlaIfNeeded } from "@/lib/services/logistics-sla.service"
 import { LogisticsTaskOrchestratorService } from "@/lib/services/logistics-task-orchestrator.service";
 import { LeadSlaService } from "@/lib/services/lead-sla.service";
 import { TaskWorkflowService } from "@/lib/services/task-workflow.service";
+import { WhatsappSlaService } from "@/lib/services/whatsapp-sla.service";
 import { requireSecretHeader } from "@/lib/api/secret-auth";
 
 async function getOrderTeamUserIds(orderId: string): Promise<string[]> {
@@ -62,6 +63,8 @@ export async function POST(req: Request) {
       await LeadSlaService.updateSla(lead.id, lead.status);
     }
 
+    const whatsappBreaches = await WhatsappSlaService.checkBreaches(tenantId);
+
     let tasksEscalated = 0;
     const tenantIds = tenantId
       ? [tenantId]
@@ -86,6 +89,7 @@ export async function POST(req: Request) {
         shipmentsChecked: shipments.length,
         shipmentsNotified: notified,
         leadsChecked: leads.length,
+        whatsappBreaches,
         tasksEscalated,
         criticalTasksEscalated: tasksEscalated,
       },

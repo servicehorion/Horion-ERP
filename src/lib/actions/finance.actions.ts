@@ -406,6 +406,59 @@ export async function exportFinanceCSV() {
   }
 }
 
+export async function exportMarginsCSV() {
+  try {
+    const user = await getSession();
+    checkPermission(user.role, "finance.view");
+
+    const reports = await FinanceTransactionService.getMarginByOrder(user.tenantId);
+    const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
+
+    const headers = [
+      "Commande",
+      "Client",
+      "Statut",
+      "Revenue",
+      "China Purchase",
+      "Shipping Fee",
+      "Platform Fee",
+      "Insurance Fee",
+      "Refund",
+      "Marge nette",
+      "Marge %",
+    ];
+
+    const rows = reports.map((report) => [
+      esc(report.orderNumber),
+      esc(report.clientName),
+      esc(String(report.status)),
+      Number(report.revenue).toFixed(0),
+      Number(report.chinaPurchase).toFixed(0),
+      Number(report.shippingFee).toFixed(0),
+      Number(report.platformFee).toFixed(0),
+      Number(report.insuranceFee).toFixed(0),
+      Number(report.refund).toFixed(0),
+      Number(report.netMargin).toFixed(0),
+      Number(report.netMarginPercent).toFixed(2),
+    ]);
+
+    const csv = [headers.join(","), ...rows.map((row) => row.join(","))].join("\n");
+
+    await AuditService.log({
+      tenantId: user.tenantId,
+      userId: user.id,
+      action: "finance.export.margins_csv",
+      entityType: "finance_margin",
+      entityId: "bulk",
+      newValue: { rows: reports.length },
+    });
+
+    return { data: csv };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Erreur export marges" };
+  }
+}
+
 export async function runFxRevaluation() {
   try {
     const user = await getSession();

@@ -3,11 +3,18 @@ import type { PaymentMethod } from "@prisma/client";
 export type PaymentInitiationParams = {
   orderId: string;
   paymentId: string;
-  amountXAF: number;
+  amount: number;
   currency: string;
   method: PaymentMethod;
   customerPhone?: string | null;
+  customerName?: string | null;
   customerEmail?: string | null;
+  countryCode?: string | null;
+  providerCode?: string | null;
+  clientReferenceId?: string | null;
+  customerMessage?: string | null;
+  successfulUrl?: string | null;
+  failedUrl?: string | null;
   returnUrl?: string | null;
   metadata?: Record<string, unknown>;
 };
@@ -30,6 +37,7 @@ export type TransactionStatus = {
 export type WebhookResult = {
   accepted: boolean;
   eventType: string;
+  operationType?: "DEPOSIT" | "PAYMENT" | "REFUND" | null;
   providerReference?: string | null;
   transactionStatus?: TransactionStatus["status"] | null;
   raw?: Record<string, unknown>;

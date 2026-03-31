@@ -11,6 +11,7 @@ import {
   getWhatsAppDashboard,
   getWhatsAppGroups,
   getWhatsAppIntents,
+  getWhatsAppLinkableContacts,
   getWhatsAppTemplates,
   getWhatsAppBotFlows,
 } from "@/lib/actions/whatsapp.actions";
@@ -29,6 +30,7 @@ export default async function WhatsAppPage() {
     accountsResult,
     botFlowsResult,
     assignableUsersResult,
+    linkableContactsResult,
   ] = await Promise.all([
     getWhatsAppDashboard(),
     getWhatsAppConversations(),
@@ -39,6 +41,7 @@ export default async function WhatsAppPage() {
     getWhatsAppAccounts(),
     getWhatsAppBotFlows(),
     getWhatsAppAssignableUsers(),
+    getWhatsAppLinkableContacts(),
   ]);
 
   const stats = statsResult.data ?? {
@@ -74,6 +77,7 @@ export default async function WhatsAppPage() {
         accounts={accountsResult.data ?? []}
         botFlows={botFlowsResult.data ?? []}
         assignableUsers={assignableUsersResult.data ?? []}
+        linkableContacts={linkableContactsResult.data ?? []}
         viewerId={user.id}
       />
     </div>

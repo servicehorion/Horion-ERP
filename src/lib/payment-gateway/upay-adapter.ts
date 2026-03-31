@@ -6,7 +6,7 @@ function buildCheckoutUrl(baseUrl: string, params: PaymentInitiationParams, prov
     const url = new URL(baseUrl);
     url.searchParams.set("payment_id", params.paymentId);
     url.searchParams.set("order_id", params.orderId);
-    url.searchParams.set("amount_xaf", String(params.amountXAF));
+    url.searchParams.set("amount", String(params.amount));
     url.searchParams.set("currency", params.currency);
     url.searchParams.set("method", params.method);
     url.searchParams.set("provider_ref", providerReference);

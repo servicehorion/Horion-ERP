@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma, type PaymentMethod } from "@prisma/client";
 
+import { convertCurrency } from "@/config/currencies";
 import { prisma } from "@/lib/db";
 import { emitEvent } from "@/lib/events";
 import { getInsuranceUpsellCost, INSURANCE_UPSELL_RATE } from "@/lib/insurance-upsell";
+import { PaymentGatewayFactory } from "@/lib/payment-gateway/factory";
 import { getDeferredPaymentExpiryHours } from "@/lib/payments/deferred-payment";
+import {
+  estimatePawaPayCollectionFee,
+  findPawaPayProviderConfig,
+  getPawaPayEnabledProvidersForCountry,
+  normalizePawaPayCountryCode,
+} from "@/lib/payments/pawapay-market-config";
 import {
   generateDepositCode,
   isManualPaymentMethod,
@@ -19,6 +27,11 @@ const MOBILE_MONEY_FEE_PCT = 0.035;
 
 function normalizePhone(value?: string | null) {
   return (value || "").replace(/[^\d+]/g, "").trim();
+}
+
+function toAmountXaf(amount: number, currency: string) {
+  if (currency === "XAF") return amount;
+  return convertCurrency(amount, currency, "XAF");
 }
 
 function buildQuotePayload(quote: {
@@ -104,7 +117,7 @@ export async function GET(
     select: {
       orderNumber: true,
       notes: true,
-      contact: { select: { name: true, company: true, email: true } },
+      contact: { select: { name: true, company: true, email: true, phone: true, country: true } },
     },
   });
 
@@ -120,6 +133,8 @@ export async function GET(
                 name: order.contact.name,
                 company: order.contact.company,
                 email: order.contact.email,
+                phone: order.contact.phone,
+                country: order.contact.country,
               }
             : null,
         }
@@ -134,10 +149,23 @@ export async function POST(
   const { token } = await params;
 
   const body = await req.json().catch(() => ({}));
-  const { paymentMethod, paymentReference, payerPhone, selectedTransportKey, adjustedTotal, qcOption, withInsurance, cgvAcceptedAt } = body as {
+  const {
+    paymentMethod,
+    paymentReference,
+    payerPhone,
+    paymentCountry,
+    paymentProvider,
+    selectedTransportKey,
+    adjustedTotal,
+    qcOption,
+    withInsurance,
+    cgvAcceptedAt,
+  } = body as {
     paymentMethod?: string;
     paymentReference?: string;
     payerPhone?: string;
+    paymentCountry?: string;
+    paymentProvider?: string;
     selectedTransportKey?: string;
     adjustedTotal?: number;
     qcOption?: string;
@@ -154,8 +182,11 @@ export async function POST(
     return NextResponse.json({ error: "Methode de paiement requise" }, { status: 400 });
   }
 
+  const preferredGatewayProvider = PaymentGatewayFactory.getPreferredProvider();
   const methodKey: PaymentMethod = normalizedMethod;
-  const isMobileMoney = isMobileMoneyMethod(methodKey);
+  const isPawaPayGateway = preferredGatewayProvider === "PAWAPAY";
+  const isPawaPayCollection = isPawaPayGateway && methodKey === "AGGREGATOR";
+  const isMobileMoney = isMobileMoneyMethod(methodKey) || isPawaPayCollection;
   const isManualPayment = isManualPaymentMethod(methodKey);
   const normalizedReference = paymentReference?.trim() || "";
   const normalizedPhone = normalizePhone(payerPhone);
@@ -164,7 +195,11 @@ export async function POST(
     if (normalizedPhone.length < 9 || normalizedPhone.length > 16) {
       return NextResponse.json({ error: "Numero Mobile Money invalide" }, { status: 400 });
     }
-  } else if (!isManualPayment && normalizedReference.length > 0 && (normalizedReference.length < 4 || normalizedReference.length > 120)) {
+  } else if (
+    !isManualPayment &&
+    normalizedReference.length > 0 &&
+    (normalizedReference.length < 4 || normalizedReference.length > 120)
+  ) {
     return NextResponse.json({ error: "Reference de paiement invalide" }, { status: 400 });
   }
 
@@ -214,12 +249,47 @@ export async function POST(
       id: true,
       orderNumber: true,
       tenantId: true,
-      contact: { select: { email: true } },
+      contact: { select: { name: true, email: true, phone: true, country: true } },
     },
   });
 
   if (!order) {
     return NextResponse.json({ error: "Commande introuvable" }, { status: 404 });
+  }
+
+  if (isPawaPayGateway && !isManualPayment && !isPawaPayCollection) {
+    return NextResponse.json(
+      { error: "Le mode pawaPay attend Mobile Money ou paiement manuel." },
+      { status: 400 }
+    );
+  }
+
+  const defaultCountryCode = normalizePawaPayCountryCode(paymentCountry ?? order.contact?.country ?? null);
+  const defaultProvider =
+    paymentProvider?.trim().toUpperCase() ||
+    getPawaPayEnabledProvidersForCountry(defaultCountryCode)[0]?.provider ||
+    null;
+  const pawapayProvider = isPawaPayCollection
+    ? findPawaPayProviderConfig({
+        countryCode: defaultCountryCode,
+        provider: defaultProvider,
+      })
+    : null;
+
+  if (isPawaPayCollection && !pawapayProvider) {
+    return NextResponse.json(
+      { error: "Selection Mobile Money invalide ou indisponible pour ce pays." },
+      { status: 400 }
+    );
+  }
+
+  if (pawapayProvider && pawapayProvider.currency !== quote.currency) {
+    return NextResponse.json(
+      {
+        error: `Cette combinaison Mobile Money attend ${pawapayProvider.currency}, mais le devis est en ${quote.currency}.`,
+      },
+      { status: 400 }
+    );
   }
 
   const snapshot = (quote.pricingSnapshot ?? {}) as Record<string, unknown>;
@@ -241,7 +311,11 @@ export async function POST(
   const subtotalBeforeInsurance = finalMerchandise + finalLogistics + finalCommission + finalQcCost;
   const finalInsurance = wantsInsurance ? getInsuranceUpsellCost(subtotalBeforeInsurance) : 0;
   const finalTotal = subtotalBeforeInsurance + finalInsurance;
-  const finalBudgetPlannedXaf = finalMerchandise + finalLogistics + finalInsurance + finalQcCost;
+  const finalBudgetPlannedXaf = toAmountXaf(
+    finalMerchandise + finalLogistics + finalInsurance + finalQcCost,
+    quote.currency
+  );
+  const paymentAmountXaf = toAmountXaf(finalTotal, quote.currency);
   const snapshotBase = JSON.parse(
     JSON.stringify(
       repricedIndicatif?.snapshot ?? {
@@ -267,7 +341,11 @@ export async function POST(
     return NextResponse.json({ error: "Le montant recalcule ne correspond pas au devis." }, { status: 400 });
   }
 
-  const mobileMoneyFeeEstimate = isMobileMoney ? Math.round(finalTotal * MOBILE_MONEY_FEE_PCT) : 0;
+  const mobileMoneyFeeEstimate = pawapayProvider
+    ? estimatePawaPayCollectionFee(finalTotal, pawapayProvider)
+    : isMobileMoney
+      ? Math.round(finalTotal * MOBILE_MONEY_FEE_PCT)
+      : 0;
   const manualExpiryHours = isManualPayment ? await getDeferredPaymentExpiryHours(order.tenantId, methodKey) : null;
   const expiresAt = manualExpiryHours
     ? new Date(Date.now() + manualExpiryHours * 3_600_000)
@@ -275,7 +353,9 @@ export async function POST(
   const depositCode = methodKey === "CASH_DEPOSIT" ? generateDepositCode(order.orderNumber) : null;
   const requiresGateway = !isManualPayment;
   const paymentEvidence = isMobileMoney
-    ? `Numero a debiter: ${normalizedPhone}`
+    ? pawapayProvider
+      ? `Mobile Money ${pawapayProvider.label} (${pawapayProvider.countryName}) - numero a debiter: ${normalizedPhone}`
+      : `Numero a debiter: ${normalizedPhone}`
     : isManualPayment
       ? methodKey === "CASH_DEPOSIT"
         ? `Code de depot: ${depositCode}`
@@ -335,9 +415,9 @@ export async function POST(
         status: isManualPayment ? "PENDING_PROOF" : "PENDING",
         amount: finalTotal,
         currency: quote.currency,
-        amountXAF: finalTotal,
+        amountXAF: paymentAmountXaf,
         methodKey,
-        method: methodKey,
+        method: pawapayProvider ? `PAWAPAY:${pawapayProvider.provider}` : methodKey,
         reference: !isMobileMoney && normalizedReference ? normalizedReference : null,
         depositCode,
         expiresAt: expiresAt ?? undefined,
@@ -376,6 +456,7 @@ export async function POST(
         raw?: Record<string, unknown>;
       }
     | null = null;
+  const appOrigin = new URL(req.url).origin;
 
   if (requiresGateway) {
     try {
@@ -383,16 +464,28 @@ export async function POST(
       gatewayIntent = await gateway.initiatePayment({
         orderId: order.id,
         paymentId: createdPayment.id,
-        amountXAF: finalTotal,
+        amount: finalTotal,
         currency: quote.currency,
         method: methodKey,
         customerPhone: isMobileMoney ? normalizedPhone : null,
+        customerName: order.contact?.name ?? null,
         customerEmail: order.contact?.email ?? null,
+        countryCode: pawapayProvider?.countryAlpha3 ?? null,
+        providerCode: pawapayProvider?.provider ?? null,
+        clientReferenceId: order.orderNumber,
+        customerMessage: pawapayProvider
+          ? `Horion ${order.orderNumber}`
+          : null,
+        successfulUrl: pawapayProvider ? `${appOrigin}/pay/${token}/submitted` : null,
+        failedUrl: pawapayProvider ? `${appOrigin}/pay/${token}/failed` : null,
         returnUrl: null,
         metadata: {
           quoteId: quote.id,
           quoteVersion: quote.version,
           orderNumber: order.orderNumber,
+          paymentId: createdPayment.id,
+          paymentCountry: pawapayProvider?.countryCode ?? null,
+          paymentProvider: pawapayProvider?.provider ?? null,
         },
       });
 
@@ -404,6 +497,7 @@ export async function POST(
           notes: [
             createdPayment.notes,
             `Passerelle: ${gatewayIntent.provider}.`,
+            pawapayProvider ? `Provider selectionne: ${pawapayProvider.label}.` : "",
             gatewayIntent.raw?.message ? String(gatewayIntent.raw.message) : "",
           ]
             .filter(Boolean)
@@ -411,18 +505,42 @@ export async function POST(
         },
       });
     } catch (error) {
-      await prisma.payment.update({
-        where: { id: createdPayment.id },
-        data: {
-          notes: [
-            createdPayment.notes,
-            "Echec d'initialisation passerelle. Revue interne requise.",
-            error instanceof Error ? error.message : "",
-          ]
-            .filter(Boolean)
-            .join(" "),
+      await prisma.$transaction([
+        prisma.payment.update({
+          where: { id: createdPayment.id },
+          data: {
+            status: "FAILED",
+            notes: [
+              createdPayment.notes,
+              "Echec d'initialisation passerelle.",
+              error instanceof Error ? error.message : "",
+            ]
+              .filter(Boolean)
+              .join(" "),
+          },
+        }),
+        prisma.quote.update({
+          where: { id: quote.id },
+          data: {
+            paymentStatus: "PENDING",
+            paymentMethod: null,
+          },
+        }),
+        prisma.order.updateMany({
+          where: { id: order.id, status: "PAIEMENT_EN_COURS" },
+          data: { status: "DEVIS" },
+        }),
+      ]);
+
+      return NextResponse.json(
+        {
+          error:
+            error instanceof Error
+              ? error.message
+              : "Impossible d'initialiser le paiement mobile money pour le moment.",
         },
-      });
+        { status: 502 }
+      );
     }
   }
 
@@ -446,6 +564,8 @@ export async function POST(
       requiresProofUpload: isManualPayment,
       providerReference: gatewayIntent?.providerReference ?? null,
       checkoutUrl: gatewayIntent?.checkoutUrl ?? null,
+      paymentCountry: pawapayProvider?.countryCode ?? null,
+      paymentProvider: pawapayProvider?.provider ?? null,
     },
   });
 }

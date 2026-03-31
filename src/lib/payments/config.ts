@@ -7,7 +7,7 @@ export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   CARD_MASTERCARD: "Carte Mastercard",
   WIRE_TRANSFER: "Virement bancaire",
   CASH_DEPOSIT: "Depot en especes a la banque",
-  AGGREGATOR: "Paiement agregateur",
+  AGGREGATOR: "Mobile Money",
 };
 
 export const MANUAL_PAYMENT_METHODS = new Set<PaymentMethod>(["WIRE_TRANSFER", "CASH_DEPOSIT"]);

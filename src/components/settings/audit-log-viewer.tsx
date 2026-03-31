@@ -78,21 +78,21 @@ export function AuditLogViewer({ initialLogs, initialTotal, entityTypes }: Props
   const [page, setPage] = useState(1);
   const [isPending, startTransition] = useTransition();
   const [filters, setFilters] = useState({
-    entityType: "",
+    module: "",
     action: "",
   });
 
   function fetchLogs(p: number, f: typeof filters) {
     startTransition(async () => {
       const res = await getAuditLogs({
-        entityType: f.entityType || undefined,
+        module: f.module || undefined,
         action: f.action || undefined,
         page: p,
         pageSize: PAGE_SIZE,
       });
-      if (res.data) {
-        setLogs(res.data.logs as AuditLog[]);
-        setTotal(res.data.total);
+      if (res.data && Array.isArray(res.data)) {
+        setLogs(res.data as AuditLog[]);
+        setTotal(res.total ?? 0);
         setPage(p);
       }
     });
@@ -155,7 +155,7 @@ export function AuditLogViewer({ initialLogs, initialTotal, entityTypes }: Props
       <KpiGrid cols={3}>
         <KpiCard label="Événements affichés" value={logs.length} />
         <KpiCard label="Total filtrés" value={total} />
-        <KpiCard label="Aujourd'hui" value={todayCount} variant="info" />
+        <KpiCard label="Aujourd'hui" value={todayCount} variant="default" />
       </KpiGrid>
 
       {/* Filters */}
@@ -170,9 +170,9 @@ export function AuditLogViewer({ initialLogs, initialTotal, entityTypes }: Props
           />
         </div>
         <Select
-          value={filters.entityType || "all"}
+          value={filters.module || "all"}
           onValueChange={(v) =>
-            handleFilterChange("entityType", v === "all" ? "" : v)
+            handleFilterChange("module", v === "all" ? "" : v)
           }
         >
           <SelectTrigger className="w-[180px]">

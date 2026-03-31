@@ -131,3 +131,11 @@ export type WhatsAppAssignableUserItem = {
   name: string;
   role: string;
 };
+
+export type WhatsAppLinkableContactItem = {
+  id: string;
+  name: string;
+  type: string;
+  phone?: string | null;
+  whatsapp?: string | null;
+};

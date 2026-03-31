@@ -64,7 +64,7 @@ export default async function PaymentPage({
     select: {
       orderNumber: true,
       notes: true,
-      contact: { select: { name: true, company: true, email: true } },
+      contact: { select: { name: true, company: true, email: true, phone: true, country: true } },
     },
   });
 
@@ -269,6 +269,9 @@ export default async function PaymentPage({
             token={token}
             total={Number(quote.total)}
             currency={quote.currency}
+            preferredGatewayProvider={String(process.env.PAYMENT_GATEWAY_PROVIDER ?? "AGGREGATOR")}
+            defaultCustomerCountry={order?.contact?.country ?? null}
+            defaultCustomerPhone={order?.contact?.phone ?? null}
             transportOptions={aggregatedTransportOptions ?? undefined}
             currentTransportKey={currentTransportKey ?? undefined}
             baseAmount={baseAmount}

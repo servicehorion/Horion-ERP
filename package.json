@@ -6,7 +6,7 @@
     "dev": "next dev --turbopack",
     "dev:webpack": "next dev --webpack",
     "dev:turbopack": "next dev --turbopack",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc -p tsconfig.build.json --noEmit",
     "build": "npm run typecheck && next build",
     "start": "next start",
     "lint": "eslint",

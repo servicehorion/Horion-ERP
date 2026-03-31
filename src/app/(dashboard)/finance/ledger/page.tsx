@@ -1,4 +1,5 @@
 import { BookOpen, TrendingUp, TrendingDown, Minus, CheckCircle2 } from "lucide-react";
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";

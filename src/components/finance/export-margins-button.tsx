@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Download, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { exportMarginsCSV } from "@/lib/actions/payment.actions";
+import { exportMarginsCSV } from "@/lib/actions/finance.actions";
 
 export function ExportMarginsButton() {
   const [loading, setLoading] = useState(false);

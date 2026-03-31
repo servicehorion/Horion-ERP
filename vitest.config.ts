@@ -6,6 +6,7 @@ export default defineConfig({
     globals: true,
     environment: "node",
     setupFiles: [],
+    exclude: ["Horion-ERP/**", ".next/**", "node_modules/**"],
     coverage: {
       provider: "v8",
       reporter: ["text", "html"],

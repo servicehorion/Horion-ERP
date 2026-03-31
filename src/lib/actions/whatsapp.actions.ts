@@ -26,6 +26,7 @@ import type {
   WhatsAppDashboardStats,
   WhatsAppGroupItem,
   WhatsAppIntentItem,
+  WhatsAppLinkableContactItem,
   WhatsAppMessageItem,
   WhatsAppTemplateItem,
   WhatsAppBotFlowItem,
@@ -257,6 +258,43 @@ export async function getWhatsAppAssignableUsers(): Promise<{ data?: WhatsAppAss
         id: entry.id,
         name: entry.name,
         role: String(entry.role),
+      })),
+    };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Erreur" };
+  }
+}
+
+export async function getWhatsAppLinkableContacts(): Promise<{ data?: WhatsAppLinkableContactItem[]; error?: string }> {
+  try {
+    const user = await getSession();
+    checkPermission(user.role, "contact.view");
+    checkPermission(user.role, "whatsapp.view");
+
+    const scope = await getCrmContactScopeWithDelegation(user);
+    if (!scope) return { data: [] };
+
+    const contacts = await prisma.contact.findMany({
+      where: scope,
+      select: {
+        id: true,
+        name: true,
+        type: true,
+        phone: true,
+        whatsapp: true,
+        updatedAt: true,
+      },
+      orderBy: [{ updatedAt: "desc" }],
+      take: 200,
+    });
+
+    return {
+      data: contacts.map((contact) => ({
+        id: contact.id,
+        name: contact.name,
+        type: String(contact.type),
+        phone: contact.phone ?? null,
+        whatsapp: contact.whatsapp ?? null,
       })),
     };
   } catch (error) {
@@ -598,6 +636,73 @@ export async function ensureWhatsAppConversationContact(conversationId: string) 
     };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur liaison CRM" };
+  }
+}
+
+export async function linkWhatsAppConversationToContact(conversationId: string, contactId: string) {
+  try {
+    const user = await getSession();
+    checkPermission(user.role, "whatsapp.manage");
+    checkPermission(user.role, "contact.manage");
+
+    const conversation = await getManagedConversationContext(user, conversationId);
+    if (!conversation) return { error: "Conversation introuvable" };
+
+    const contactScope = await getCrmContactScopeWithDelegation(user);
+    if (!contactScope) return { error: "Acces refuse" };
+
+    const contact = await prisma.contact.findFirst({
+      where: {
+        id: contactId,
+        ...(contactScope ?? {}),
+      },
+      select: {
+        id: true,
+        name: true,
+        ownerId: true,
+      },
+    });
+
+    if (!contact) return { error: "Contact introuvable" };
+
+    await prisma.whatsappContact.update({
+      where: { id: conversation.waContactId },
+      data: { linkedContactId: contact.id },
+    });
+
+    if (!conversation.assignedToId && contact.ownerId) {
+      await prisma.whatsappConversation.update({
+        where: { id: conversation.id },
+        data: {
+          ownerId: conversation.ownerId ?? contact.ownerId,
+          assignedToId: contact.ownerId,
+        },
+      });
+    }
+
+    await WhatsappAuditService.log({
+      tenantId: user.tenantId,
+      actorId: user.id,
+      action: "whatsapp.contact_manually_linked",
+      entityType: "whatsapp_conversation",
+      entityId: conversation.id,
+      payload: {
+        contactId: contact.id,
+      },
+    });
+
+    revalidatePath("/whatsapp");
+    revalidatePath(`/contacts/${contact.id}`);
+
+    return {
+      data: {
+        success: true,
+        contactId: contact.id,
+        contactName: contact.name,
+      },
+    };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Erreur liaison manuelle CRM" };
   }
 }
 
@@ -1141,3 +1246,6 @@ export async function startWhatsAppConversation(contactId: string) {
     return { error: error instanceof Error ? error.message : "Erreur démarrage conversation WA" };
   }
 }
+
+
+

@@ -57,7 +57,20 @@ export function BrandingClient({ tenant }: { tenant: Tenant }) {
 
   function handleSave() {
     startTransition(async () => {
-      const res = (await updateTenantSettings(form)) as { error?: string };
+      const formData = new FormData();
+      formData.set("currency", form.currency);
+      formData.set("timezone", form.timezone);
+      formData.set("primaryColor", form.primaryColor);
+      formData.set("companyName", form.companyName);
+      formData.set("address", form.address);
+      formData.set("nif", form.nif);
+      formData.set("phone", form.phone);
+      formData.set("email", form.email);
+      if (form.logoUrl) {
+        formData.set("logoUrl", form.logoUrl);
+      }
+
+      const res = (await updateTenantSettings(formData)) as { error?: string };
       if (res.error) {
         toast.error(res.error);
       } else {

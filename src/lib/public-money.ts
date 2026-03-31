@@ -10,7 +10,7 @@ export function formatPublicMoney(
   currency: string = "XAF"
 ): string {
   const amount = Number(value ?? 0);
-  if (currency === "XAF") {
+  if (currency === "XAF" || currency === "XOF") {
     return `${formatPublicNumber(amount)} FCFA`;
   }
 

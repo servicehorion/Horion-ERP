@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Building2,
@@ -16,6 +16,13 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getInsuranceUpsellCost, INSURANCE_UPSELL_RATE } from "@/lib/insurance-upsell";
+import {
+  estimatePawaPayCollectionFee,
+  findPawaPayProviderConfig,
+  getPawaPayCountryOptions,
+  getPawaPayEnabledProvidersForCountry,
+  normalizePawaPayCountryCode,
+} from "@/lib/payments/pawapay-market-config";
 import { formatPublicMoney } from "@/lib/public-money";
 import { QC_UPSELL_PRICING, type QcUpsellOption } from "@/lib/qc-upsell";
 
@@ -28,7 +35,7 @@ type PaymentMethodDef = {
   ring: string;
 };
 
-const PAYMENT_METHODS: PaymentMethodDef[] = [
+const DEFAULT_PAYMENT_METHODS: PaymentMethodDef[] = [
   {
     value: "MOBILE_MONEY_MTN",
     label: "MTN Mobile Money",
@@ -84,6 +91,24 @@ const CARD_PAYMENT_METHODS = new Set(["CARD_VISA", "CARD_MASTERCARD"]);
 const MANUAL_PAYMENT_METHODS = new Set(["WIRE_TRANSFER", "CASH_DEPOSIT"]);
 const MOBILE_MONEY_FEE_PCT = 0.035;
 
+function getPaymentMethods(preferredGatewayProvider?: string | null): PaymentMethodDef[] {
+  if (String(preferredGatewayProvider ?? "").trim().toUpperCase() === "PAWAPAY") {
+    return [
+      {
+        value: "AGGREGATOR",
+        label: "Mobile Money",
+        description: "Choisissez votre pays et votre opérateur mobile money",
+        icon: <Smartphone className="h-5 w-5" />,
+        color: "border-emerald-200 bg-emerald-50",
+        ring: "ring-emerald-300 border-emerald-400",
+      },
+      ...DEFAULT_PAYMENT_METHODS.filter((method) => MANUAL_PAYMENT_METHODS.has(method.value)),
+    ];
+  }
+
+  return [...DEFAULT_PAYMENT_METHODS];
+}
+
 type TransportOption = {
   key: string;
   label: string;
@@ -100,6 +125,9 @@ export function PaymentForm({
   token,
   total,
   currency,
+  preferredGatewayProvider,
+  defaultCustomerCountry,
+  defaultCustomerPhone,
   transportOptions,
   currentTransportKey,
   baseAmount,
@@ -111,6 +139,9 @@ export function PaymentForm({
   token: string;
   total: number;
   currency: string;
+  preferredGatewayProvider?: string | null;
+  defaultCustomerCountry?: string | null;
+  defaultCustomerPhone?: string | null;
   transportOptions?: TransportOption[];
   currentTransportKey?: string;
   baseAmount?: number;
@@ -120,9 +151,26 @@ export function PaymentForm({
   currentQcCost?: number;
 }) {
   const router = useRouter();
+  const paymentMethods = useMemo(
+    () => getPaymentMethods(preferredGatewayProvider),
+    [preferredGatewayProvider]
+  );
+  const isPawaPayGateway =
+    String(preferredGatewayProvider ?? "").trim().toUpperCase() === "PAWAPAY";
+  const countryOptions = useMemo(
+    () => getPawaPayCountryOptions().filter((country) => country.currency === currency),
+    [currency]
+  );
+  const normalizedDefaultCountry = normalizePawaPayCountryCode(defaultCustomerCountry);
+  const initialCountry = countryOptions.some((option) => option.code === normalizedDefaultCountry)
+    ? (normalizedDefaultCountry ?? "")
+    : countryOptions[0]?.code ?? "";
+
   const [method, setMethod] = useState("");
   const [reference, setReference] = useState("");
-  const [payerPhone, setPayerPhone] = useState("");
+  const [payerPhone, setPayerPhone] = useState(defaultCustomerPhone ?? "");
+  const [paymentCountry, setPaymentCountry] = useState(initialCountry);
+  const [paymentProvider, setPaymentProvider] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [selectedTransportKey, setSelectedTransportKey] = useState(currentTransportKey ?? "");
   const [selectedQcOption, setSelectedQcOption] = useState<QcUpsellOption>(currentQcOption);
@@ -130,13 +178,46 @@ export function PaymentForm({
   const [cgvAccepted, setCgvAccepted] = useState(false);
 
   const hasTransportChoice = Boolean(transportOptions && transportOptions.length > 1);
-  const isMobileMoney = MOBILE_MONEY_METHODS.has(method);
+  const isPawaPayCollection = isPawaPayGateway && method === "AGGREGATOR";
+  const isMobileMoney = MOBILE_MONEY_METHODS.has(method) || isPawaPayCollection;
   const isCardPayment = CARD_PAYMENT_METHODS.has(method);
   const isManualPayment = MANUAL_PAYMENT_METHODS.has(method);
-  const instantPaymentMethods = PAYMENT_METHODS.filter((pm) => !MANUAL_PAYMENT_METHODS.has(pm.value));
-  const deferredPaymentMethods = PAYMENT_METHODS.filter((pm) => MANUAL_PAYMENT_METHODS.has(pm.value));
+  const instantPaymentMethods = paymentMethods.filter((pm) => !MANUAL_PAYMENT_METHODS.has(pm.value));
+  const deferredPaymentMethods = paymentMethods.filter((pm) => MANUAL_PAYMENT_METHODS.has(pm.value));
+  const providerOptions = useMemo(
+    () => (isPawaPayGateway ? getPawaPayEnabledProvidersForCountry(paymentCountry) : []),
+    [isPawaPayGateway, paymentCountry]
+  );
+  const selectedPawaPayProvider = useMemo(
+    () =>
+      isPawaPayCollection
+        ? findPawaPayProviderConfig({
+            countryCode: paymentCountry,
+            provider: paymentProvider,
+          })
+        : null,
+    [isPawaPayCollection, paymentCountry, paymentProvider]
+  );
   const normalizedPhone = normalizePhone(payerPhone);
-  const canSubmit = method && cgvAccepted && (isMobileMoney ? normalizedPhone.length >= 9 : true);
+  const canSubmit =
+    Boolean(method) &&
+    cgvAccepted &&
+    (!isMobileMoney || normalizedPhone.length >= 9) &&
+    (!isPawaPayCollection || Boolean(selectedPawaPayProvider));
+
+  useEffect(() => {
+    if (!isPawaPayGateway) return;
+    if ((!paymentCountry || !countryOptions.some((country) => country.code === paymentCountry)) && countryOptions[0]?.code) {
+      setPaymentCountry(countryOptions[0].code);
+    }
+  }, [countryOptions, isPawaPayGateway, paymentCountry]);
+
+  useEffect(() => {
+    if (!isPawaPayGateway) return;
+    if (!providerOptions.some((option) => option.provider === paymentProvider)) {
+      setPaymentProvider(providerOptions[0]?.provider ?? "");
+    }
+  }, [isPawaPayGateway, paymentProvider, providerOptions]);
 
   const selectedTransportCost = useMemo(() => {
     if (!hasTransportChoice) return currentLogisticsCost ?? 0;
@@ -152,7 +233,11 @@ export function PaymentForm({
 
   const insuranceCost = withInsurance ? getInsuranceUpsellCost(subtotalBeforeInsurance) : 0;
   const displayedTotal = subtotalBeforeInsurance + insuranceCost;
-  const mobileMoneyFee = isMobileMoney ? Math.round(displayedTotal * MOBILE_MONEY_FEE_PCT) : 0;
+  const mobileMoneyFee = selectedPawaPayProvider
+    ? estimatePawaPayCollectionFee(displayedTotal, selectedPawaPayProvider)
+    : isMobileMoney
+      ? Math.round(displayedTotal * MOBILE_MONEY_FEE_PCT)
+      : 0;
   const estimatedDebitTotal = displayedTotal + mobileMoneyFee;
 
   async function handleSubmit(e: React.FormEvent) {
@@ -168,6 +253,10 @@ export function PaymentForm({
       };
       if (isMobileMoney) {
         body.payerPhone = normalizedPhone;
+        if (isPawaPayCollection) {
+          body.paymentCountry = paymentCountry;
+          body.paymentProvider = paymentProvider;
+        }
       } else if (reference.trim()) {
         body.paymentReference = reference.trim();
       }
@@ -418,20 +507,68 @@ export function PaymentForm({
               <div className="space-y-3">
                 <div className="flex items-center gap-2 text-slate-900">
                   <Smartphone className="h-4 w-4 text-slate-400" />
-                  <p className="font-medium">Numéro à débiter</p>
+                  <p className="font-medium">
+                    {isPawaPayCollection ? "Paiement mobile money" : "Numéro à débiter"}
+                  </p>
                 </div>
                 <p className="text-xs text-slate-500">
-                  Des frais opérateur estimés à 3,5% peuvent s'appliquer.
+                  {selectedPawaPayProvider
+                    ? `Frais estimés ${selectedPawaPayProvider.label}: ${Math.round(
+                        selectedPawaPayProvider.collectionFeePct * 10000
+                      ) / 100}%.`
+                    : "Des frais opérateur estimés peuvent s'appliquer."}
                 </p>
+                {isPawaPayCollection && (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label className="space-y-1.5">
+                      <span className="text-xs font-medium uppercase tracking-[0.14em] text-slate-400">
+                        Pays
+                      </span>
+                      <select
+                        value={paymentCountry}
+                        onChange={(e) => setPaymentCountry(e.target.value)}
+                        className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none ring-0 focus:border-emerald-300"
+                      >
+                        {countryOptions.map((country) => (
+                          <option key={country.code} value={country.code}>
+                            {country.label} ({country.currency})
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="space-y-1.5">
+                      <span className="text-xs font-medium uppercase tracking-[0.14em] text-slate-400">
+                        Operateur
+                      </span>
+                      <select
+                        value={paymentProvider}
+                        onChange={(e) => setPaymentProvider(e.target.value)}
+                        className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none ring-0 focus:border-emerald-300"
+                      >
+                        {providerOptions.map((provider) => (
+                          <option key={provider.provider} value={provider.provider}>
+                            {provider.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                )}
                 <Input
                   id="payer-phone"
                   value={payerPhone}
                   onChange={(e) => setPayerPhone(e.target.value)}
-                  placeholder="Ex : 06 460 08 31"
+                  placeholder={isPawaPayCollection ? "Ex : 221771234567" : "Ex : 06 460 08 31"}
                   inputMode="tel"
                   className="h-11 rounded-xl"
                   required={isMobileMoney}
                 />
+                {isPawaPayCollection && selectedPawaPayProvider ? (
+                  <p className="text-xs text-slate-500">
+                    Le client voit une demande de debit sur {selectedPawaPayProvider.label}. La commande
+                    ne sera confirmee qu'apres callback ou verification finale pawaPay.
+                  </p>
+                ) : null}
               </div>
             ) : isCardPayment ? (
               <div className="space-y-3">
@@ -498,7 +635,11 @@ export function PaymentForm({
           )}
           {isMobileMoney && (
             <div className="mt-2 flex items-center justify-between text-sm text-white/50">
-              <span>Frais opérateur (3,5%)</span>
+              <span>
+                {selectedPawaPayProvider
+                  ? `Frais Mobile Money (${Math.round(selectedPawaPayProvider.collectionFeePct * 10000) / 100}%)`
+                  : "Frais opérateur (3,5%)"}
+              </span>
               <span className="font-medium text-white">{formatPublicMoney(mobileMoneyFee, currency)}</span>
             </div>
           )}
@@ -551,7 +692,9 @@ export function PaymentForm({
         >
           {submitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Lock className="mr-2 h-4 w-4" />}
           {isMobileMoney
-            ? "Confirmer la demande Mobile Money"
+            ? isPawaPayCollection
+              ? "Confirmer la demande pawaPay"
+              : "Confirmer la demande Mobile Money"
             : isCardPayment
               ? "Continuer vers le paiement securise"
               : "Enregistrer le paiement"}
