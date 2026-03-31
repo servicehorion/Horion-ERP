@@ -22,11 +22,6 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
-  // `next build` typecheck can fail with `spawn EPERM` on some Windows setups.
-  // We run `tsc --noEmit` separately in CI/local before build.
-  typescript: {
-    ignoreBuildErrors: true,
-  },
   turbopack: {
     root: process.cwd(),
   },
