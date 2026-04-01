@@ -18,6 +18,7 @@ import { getCrmContactScopeWithDelegation, getModuleScopeWithDelegation } from "
 import { prisma } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { serializeDecimals } from "@/lib/utils";
+import type { OrderStatus } from "@prisma/client";
 import type {
   WhatsAppAccountItem,
   WhatsAppAssignableUserItem,
@@ -1247,5 +1248,71 @@ export async function startWhatsAppConversation(contactId: string) {
   }
 }
 
+// ── Customer 360: active orders for a contact ──────────────────────────────
 
+export type ContactActiveOrder = {
+  id: string;
+  orderNumber: string;
+  status: string;
+  totalClientXAF: number;
+  currency: string;
+  pendingPaymentXAF: number;
+  createdAt: string;
+  estimatedDelivery?: string | null;
+};
+
+export async function getContactActiveOrders(
+  contactId: string
+): Promise<{ data?: ContactActiveOrder[]; error?: string }> {
+  try {
+    const user = await getSession();
+    checkPermission(user.role, "order.view");
+
+    const TERMINAL: OrderStatus[] = ["LIVRE", "CLOTURE", "ANNULE"];
+
+    const orders = await prisma.order.findMany({
+      where: {
+        tenantId: user.tenantId,
+        contactId,
+        status: { notIn: TERMINAL },
+      },
+      select: {
+        id: true,
+        orderNumber: true,
+        status: true,
+        totalClient: true,
+        currency: true,
+        createdAt: true,
+        estimatedDelivery: true,
+        payments: {
+          where: { status: { in: ["PENDING", "PROOF_UPLOADED", "PROCESSING"] } },
+          select: { amountXAF: true },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+    });
+
+    const data: ContactActiveOrder[] = orders.map((o) => {
+      const pendingPaymentXAF = o.payments.reduce(
+        (sum: number, p: { amountXAF: unknown }) => sum + Number(p.amountXAF ?? 0),
+        0
+      );
+      return {
+        id: o.id,
+        orderNumber: o.orderNumber,
+        status: o.status,
+        totalClientXAF: Number(o.totalClient ?? 0),
+        currency: o.currency ?? "XAF",
+        pendingPaymentXAF,
+        createdAt: o.createdAt.toISOString(),
+        estimatedDelivery: o.estimatedDelivery?.toISOString() ?? null,
+      };
+    });
+
+    return { data };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Erreur chargement commandes" };
+  }
+}
 

@@ -885,7 +885,7 @@ export async function getContactTimeline(contactId: string, limit = 100) {
       take: 50,
     });
 
-    const [orderTimeline, payments, disputes, auditLogs, conversations, emailLogs] = await Promise.all([
+    const [orderTimeline, payments, disputes, auditLogs, conversations, emailLogs, tasks, waContacts] = await Promise.all([
       prisma.orderTimeline.findMany({
         where: { orderId: { in: orderIds } },
         include: { order: { select: { orderNumber: true } } },
@@ -931,6 +931,31 @@ export async function getContactTimeline(contactId: string, limit = 100) {
         },
         orderBy: { sentAt: "desc" },
         take: 100,
+      }),
+      // Tasks linked to contact or related orders
+      prisma.task.findMany({
+        where: {
+          tenantId: user.tenantId,
+          OR: [
+            { entityType: "contact", entityId: contactId },
+            ...(orderIds.length > 0 ? [{ entityType: "order", entityId: { in: orderIds } }] : []),
+          ],
+        },
+        select: { id: true, title: true, status: true, entityType: true, entityId: true, createdAt: true, slaDeadline: true },
+        orderBy: { createdAt: "desc" },
+        take: 100,
+      }),
+      // WhatsApp conversations via linked WhatsappContact
+      prisma.whatsappContact.findMany({
+        where: { tenantId: user.tenantId, linkedContactId: contactId },
+        select: {
+          id: true,
+          conversations: {
+            select: { id: true, status: true, lastMessageAt: true, createdAt: true },
+            orderBy: { createdAt: "desc" },
+            take: 20,
+          },
+        },
       }),
     ]);
 
@@ -1058,6 +1083,28 @@ export async function getContactTimeline(contactId: string, limit = 100) {
         date: e.sentAt ?? e.createdAt,
         meta: e.status,
       })),
+      // Tasks linked to contact or related orders
+      ...tasks.map((t) => ({
+        id: `task:${t.id}`,
+        type: "task",
+        title: t.title,
+        description: `Statut : ${t.status}${t.slaDeadline ? ` · Échéance SLA : ${t.slaDeadline.toLocaleDateString("fr-FR")}` : ""}`,
+        date: t.createdAt,
+        link: `/tasks?entity=${t.entityType}:${t.entityId}`,
+      })),
+      // WhatsApp conversations
+      ...waContacts.flatMap((wc) =>
+        wc.conversations.map((conv) => ({
+          id: `wa:${conv.id}`,
+          type: "whatsapp",
+          title: `Conversation WhatsApp ${conv.status}`,
+          description: conv.lastMessageAt
+            ? `Dernier message : ${new Date(conv.lastMessageAt).toLocaleDateString("fr-FR")}`
+            : undefined,
+          date: conv.createdAt,
+          link: `/whatsapp?conversationId=${conv.id}`,
+        }))
+      ),
     ];
 
     items.sort((a, b) => b.date.getTime() - a.date.getTime());

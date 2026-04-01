@@ -388,6 +388,7 @@ export function OrderDetail({
   const [isEdiSend, setIsEdiSend] = useState(false);
   const [isClosingDelivery, setIsClosingDelivery] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState(order.status);
+  const [pendingBlockedStatus, setPendingBlockedStatus] = useState<string | null>(null);
   const allowedStatuses = buildAllowedStatuses(order.status);
 
   async function handleStatusChange(newStatus: string) {
@@ -700,6 +701,59 @@ export function OrderDetail({
         </AlertDialog>
       )}
 
+      {/* Blocked status confirmation dialog */}
+      {pendingBlockedStatus && (() => {
+        const readiness = order.projection?.transitionReadiness.find(
+          (r) => r.status === pendingBlockedStatus
+        );
+        return (
+          <AlertDialog open onOpenChange={(open) => { if (!open) setPendingBlockedStatus(null); }}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Transition bloquée — continuer quand même ?</AlertDialogTitle>
+                <AlertDialogDescription asChild>
+                  <div className="space-y-2">
+                    <p>
+                      Le statut{" "}
+                      <strong>{ORDER_STATUS_LABELS[pendingBlockedStatus as keyof typeof ORDER_STATUS_LABELS] ?? pendingBlockedStatus}</strong>{" "}
+                      présente des blocages actifs :
+                    </p>
+                    {readiness && readiness.blockers.length > 0 && (
+                      <ul className="space-y-1 text-sm">
+                        {readiness.blockers.map((b) => (
+                          <li key={b} className="flex items-start gap-2">
+                            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                            <span>{b}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    <p className="text-sm font-medium text-destructive">
+                      Forcer cette transition peut créer des incohérences dans le suivi de la commande.
+                    </p>
+                  </div>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => setPendingBlockedStatus(null)}>
+                  Annuler
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-amber-600 hover:bg-amber-700"
+                  onClick={() => {
+                    const s = pendingBlockedStatus;
+                    setPendingBlockedStatus(null);
+                    handleStatusChange(s);
+                  }}
+                >
+                  Forcer la transition
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        );
+      })()}
+
       {/* Status change */}
       {canUpdateStatus && (
         <Card>
@@ -720,15 +774,38 @@ export function OrderDetail({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {allowedStatuses.map((value) => (
-                    <SelectItem key={value} value={value}>
-                      {ORDER_STATUS_LABELS[value as keyof typeof ORDER_STATUS_LABELS] ?? value}
-                    </SelectItem>
-                  ))}
+                  {allowedStatuses.map((value) => {
+                    const readiness = order.projection?.transitionReadiness.find(
+                      (r) => r.status === value
+                    );
+                    return (
+                      <SelectItem key={value} value={value}>
+                        <span className="flex items-center gap-2">
+                          {readiness ? (
+                            readiness.ready ? (
+                              <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-green-500" />
+                            ) : (
+                              <AlertCircle className="h-3.5 w-3.5 shrink-0 text-amber-500" />
+                            )
+                          ) : null}
+                          {ORDER_STATUS_LABELS[value as keyof typeof ORDER_STATUS_LABELS] ?? value}
+                        </span>
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
               <Button
-                onClick={() => handleStatusChange(selectedStatus)}
+                onClick={() => {
+                  const readiness = order.projection?.transitionReadiness.find(
+                    (r) => r.status === selectedStatus
+                  );
+                  if (readiness && !readiness.ready && readiness.blockers.length > 0) {
+                    setPendingBlockedStatus(selectedStatus);
+                  } else {
+                    handleStatusChange(selectedStatus);
+                  }
+                }}
                 disabled={isUpdating || selectedStatus === order.status}
               >
                 {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

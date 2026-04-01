@@ -106,6 +106,53 @@ export default async function FinanceDashboardPage() {
         </CardContent>
       </Card>
 
+      {/* Cash réel vs attendu cockpit */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Cash réel vs attendu</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div className="rounded-lg border bg-green-50 p-3 space-y-1 dark:bg-green-950/30">
+              <p className="text-xs font-medium uppercase tracking-wide text-green-700 dark:text-green-400">
+                Cash confirmé
+              </p>
+              <p className="text-xl font-semibold text-green-700 dark:text-green-300">
+                {formatCurrency(snapshot.cashReality.confirmedCashXAF, "XAF")}
+              </p>
+              <p className="text-xs text-muted-foreground">Paiements CONFIRMED reçus</p>
+            </div>
+            <div className="rounded-lg border bg-blue-50 p-3 space-y-1 dark:bg-blue-950/30">
+              <p className="text-xs font-medium uppercase tracking-wide text-blue-700 dark:text-blue-400">
+                Cash en attente
+              </p>
+              <p className="text-xl font-semibold text-blue-700 dark:text-blue-300">
+                {formatCurrency(snapshot.cashReality.pendingCashXAF, "XAF")}
+              </p>
+              <p className="text-xs text-muted-foreground">Preuves uploadées / en cours</p>
+            </div>
+            <div className="rounded-lg border bg-amber-50 p-3 space-y-1 dark:bg-amber-950/30">
+              <p className="text-xs font-medium uppercase tracking-wide text-amber-700 dark:text-amber-400">
+                Cash à risque
+              </p>
+              <p className="text-xl font-semibold text-amber-700 dark:text-amber-300">
+                {formatCurrency(snapshot.cashReality.atRiskCashXAF, "XAF")}
+              </p>
+              <p className="text-xs text-muted-foreground">Litiges, expirés, échoués</p>
+            </div>
+            <div className="rounded-lg border bg-slate-50 p-3 space-y-1 dark:bg-slate-800/50">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-700 dark:text-slate-300">
+                Total attendu
+              </p>
+              <p className="text-xl font-semibold">
+                {formatCurrency(snapshot.cashReality.expectedTotalCashXAF, "XAF")}
+              </p>
+              <p className="text-xs text-muted-foreground">Confirmé + en attente</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between">

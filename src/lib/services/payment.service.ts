@@ -23,6 +23,16 @@ export class PaymentService {
     dueAt?: string;
     notes?: string;
   }) {
+    // Idempotency: if a reference is provided, return the existing payment
+    // rather than creating a duplicate. This prevents double-submission on retry.
+    if (data.reference) {
+      const existing = await prisma.payment.findFirst({
+        where: { orderId: data.orderId, reference: data.reference },
+        include: { order: { select: { orderNumber: true } } },
+      });
+      if (existing) return existing;
+    }
+
     const payment = await prisma.payment.create({
       data: {
         orderId: data.orderId,
@@ -102,6 +112,8 @@ export class PaymentService {
         where: { id: paymentId, order: { tenantId } },
       });
       if (!existing) throw new Error("Paiement introuvable");
+      // Idempotency: if already confirmed, return the existing payment silently
+      if (existing.status === "CONFIRMED") return existing;
       if (!["PENDING", "PROCESSING", "PENDING_PROOF", "PROOF_UPLOADED", "PROOF_REJECTED"].includes(existing.status)) {
         throw new Error(`Impossible de confirmer un paiement ${existing.status}`);
       }

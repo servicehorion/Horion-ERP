@@ -48,6 +48,12 @@ type OperationsSnapshot = {
     chinaCash: number;
     netCashPosition: number;
   };
+  cashReality: {
+    confirmedCashXAF: number;
+    pendingCashXAF: number;
+    atRiskCashXAF: number;
+    expectedTotalCashXAF: number;
+  };
   balance: {
     assetsCash: number;
     liabilitiesCustomerOrders: number;
@@ -166,6 +172,7 @@ export class FinanceOperationsService {
         },
         select: {
           id: true,
+          status: true,
           payments: {
             where: {
               direction: "INBOUND",
@@ -243,6 +250,47 @@ export class FinanceOperationsService {
     const assetsCash = netCashPosition;
     const simplifiedEquity = assetsCash - liabilitiesTotal;
 
+    // ── Cash reality breakdown ────────────────────────────────────────────────
+    // Separate confirmed / pending / at-risk so the dashboard can show the
+    // distinction between money we *have* and money we *expect* (or may lose).
+    const allPaymentsIn = await prisma.payment.findMany({
+      where: {
+        order: { tenantId },
+        direction: "INBOUND",
+      },
+      select: {
+        status: true,
+        amountXAF: true,
+        orderId: true,
+      },
+    });
+
+    // Join order status separately to avoid deep nested select type issues
+    const atRiskOrderIds = new Set(
+      activeOrders
+        .filter((o) => o.status === "LITIGE")
+        .map((o) => o.id)
+    );
+
+    const confirmedCashXAF = allPaymentsIn
+      .filter((p) => p.status === "CONFIRMED")
+      .reduce((s, p) => s + toNumber(p.amountXAF), 0);
+
+    const pendingCashXAF = allPaymentsIn
+      .filter((p) => ["PROOF_UPLOADED", "PROCESSING"].includes(p.status))
+      .reduce((s, p) => s + toNumber(p.amountXAF), 0);
+
+    const atRiskCashXAF = allPaymentsIn
+      .filter(
+        (p) =>
+          (atRiskOrderIds.has(p.orderId) && p.status !== "CONFIRMED") ||
+          p.status === "EXPIRED" ||
+          p.status === "FAILED"
+      )
+      .reduce((s, p) => s + toNumber(p.amountXAF), 0);
+
+    const expectedTotalCashXAF = confirmedCashXAF + pendingCashXAF;
+
     return {
       wallets,
       operationalPnl: {
@@ -271,6 +319,12 @@ export class FinanceOperationsService {
       approvals: {
         pendingCount: pendingApprovals.length,
         pendingCashOutXAF: roundMoney(liabilitiesPartnerPayables),
+      },
+      cashReality: {
+        confirmedCashXAF: roundMoney(confirmedCashXAF),
+        pendingCashXAF: roundMoney(pendingCashXAF),
+        atRiskCashXAF: roundMoney(atRiskCashXAF),
+        expectedTotalCashXAF: roundMoney(expectedTotalCashXAF),
       },
       recentTransactions,
     };

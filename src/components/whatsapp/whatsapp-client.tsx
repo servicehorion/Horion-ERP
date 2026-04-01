@@ -47,12 +47,14 @@ import {
   createLeadFromWhatsAppConversation,
   ensureWhatsAppConversationContact,
   getWhatsAppConversationMessages,
+  getContactActiveOrders,
   linkWhatsAppConversationToContact,
   sendWhatsAppMessage,
   updateWhatsAppBotFlow,
   updateWhatsAppConversationStatus,
   updateWhatsAppIntentStatus,
 } from "@/lib/actions/whatsapp.actions";
+import type { ContactActiveOrder } from "@/lib/actions/whatsapp.actions";
 import { EmptyState } from "@/components/shared/empty-state";
 import type {
   WhatsAppAccountItem,
@@ -112,6 +114,7 @@ export function WhatsAppClient({
   const searchParams = useSearchParams();
   const [activeConversationId, setActiveConversationId] = useState<string | null>(() => searchParams.get("conversationId"));
   const [messages, setMessages] = useState<WhatsAppMessageItem[]>([]);
+  const [activeOrders, setActiveOrders] = useState<ContactActiveOrder[]>([]);
   const [messageDraft, setMessageDraft] = useState("");
   const [tagDraft, setTagDraft] = useState("");
   const [templateDraft, setTemplateDraft] = useState("");
@@ -179,14 +182,17 @@ export function WhatsAppClient({
   useEffect(() => {
     if (!activeConversation?.id) return;
     startTransition(async () => {
-      const res = await getWhatsAppConversationMessages(activeConversation.id);
-      if (res?.error) {
-        toast.error(res.error);
-      } else {
-        setMessages(res.data ?? []);
-      }
+      const [msgRes, ordersRes] = await Promise.all([
+        getWhatsAppConversationMessages(activeConversation.id),
+        activeConversation.linkedContactId
+          ? getContactActiveOrders(activeConversation.linkedContactId)
+          : Promise.resolve({ data: [] }),
+      ]);
+      if (msgRes?.error) toast.error(msgRes.error);
+      else setMessages(msgRes.data ?? []);
+      setActiveOrders(ordersRes?.data ?? []);
     });
-  }, [activeConversation?.id]);
+  }, [activeConversation?.id, activeConversation?.linkedContactId]);
 
 
   return (
@@ -443,11 +449,39 @@ export function WhatsAppClient({
                       </div>
                     ) : null}
 
-                    {(activeConversation.latestOrderNumber || activeConversation.linkedDemandId) && (
+                    {(activeOrders.length > 0 || activeConversation.latestOrderNumber || activeConversation.linkedDemandId) && (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
                         <div className="rounded-md border bg-white/70 p-2 space-y-1">
-                          <div className="font-medium">Contexte commande</div>
-                          {activeConversation.latestOrderNumber ? (
+                          <div className="font-medium">
+                            Commandes actives
+                            {activeOrders.length > 0 && (
+                              <span className="ml-1 rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700">
+                                {activeOrders.length}
+                              </span>
+                            )}
+                          </div>
+                          {activeOrders.length > 0 ? (
+                            <div className="space-y-1.5 max-h-[160px] overflow-auto">
+                              {activeOrders.map((o) => (
+                                <Link
+                                  key={o.id}
+                                  href={`/orders/${o.id}`}
+                                  className="flex items-center justify-between rounded border bg-white px-2 py-1 hover:bg-slate-50"
+                                >
+                                  <div className="truncate">
+                                    <span className="font-medium">{o.orderNumber}</span>
+                                    <span className="ml-1.5 text-muted-foreground">{o.status}</span>
+                                  </div>
+                                  <div className="ml-2 shrink-0 text-right">
+                                    <div>{o.totalClientXAF.toLocaleString("fr-FR")} XAF</div>
+                                    {o.pendingPaymentXAF > 0 && (
+                                      <div className="text-amber-600">{o.pendingPaymentXAF.toLocaleString("fr-FR")} en attente</div>
+                                    )}
+                                  </div>
+                                </Link>
+                              ))}
+                            </div>
+                          ) : activeConversation.latestOrderNumber ? (
                             <>
                               <div>{activeConversation.latestOrderNumber}</div>
                               <div className="text-muted-foreground">
@@ -457,7 +491,7 @@ export function WhatsAppClient({
                               </div>
                             </>
                           ) : (
-                            <div className="text-muted-foreground">Aucune commande reliee</div>
+                            <div className="text-muted-foreground">Aucune commande active</div>
                           )}
                         </div>
                         <div className="rounded-md border bg-white/70 p-2 space-y-1">
