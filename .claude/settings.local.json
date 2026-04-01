@@ -179,7 +179,10 @@
       "Bash(cat \"c:/Users/jafred Parker242/Desktop/Horion service/src/app/\\(dashboard\\)/layout.tsx\")",
       "Bash(cat \"c:/Users/jafred Parker242/Desktop/Horion service/src/app/\\(dashboard\\)/dashboard/page.tsx\")",
       "Bash(grep -roh process.env.[A-Z_]* 'c:/Users/jafred Parker242/Desktop/Horion service/src/' 'c:/Users/jafred Parker242/Desktop/Horion service/middleware.ts' 'c:/Users/jafred Parker242/Desktop/Horion service/next.config.ts')",
-      "Bash(npx prisma:*)"
+      "Bash(npx prisma:*)",
+      "Bash(ls \"c:/Users/jafred Parker242/Desktop/Horion service/src/app/\\(dashboard\\)/contacts/\")",
+      "Bash(ls \"c:/Users/jafred Parker242/Desktop/Horion service/src/app/\\(dashboard\\)/contacts/[id]/\")",
+      "Bash(ls \"c:/Users/jafred Parker242/Desktop/Horion service/src/app/\\(dashboard\\)/finance/cash-planning/\")"
     ]
   },
   "hooks": {

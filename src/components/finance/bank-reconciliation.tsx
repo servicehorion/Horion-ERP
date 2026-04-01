@@ -21,7 +21,7 @@ export function BankReconciliationPanel({
         <CardTitle>Import CSV & rapprochement</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <form action={importBankStatement} encType="multipart/form-data" className="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <form action={importBankStatement} className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <select name="connectionId" className="h-9 rounded-md border bg-transparent px-3 text-sm" required>
             <option value="">Connexion</option>
             {connections.map((c) => (

@@ -32,7 +32,7 @@ export default async function BrandingPage() {
           <CardTitle>Identite Horion</CardTitle>
         </CardHeader>
         <CardContent>
-          <form action={updateTenantSettings} className="grid grid-cols-1 lg:grid-cols-2 gap-6" encType="multipart/form-data">
+          <form action={updateTenantSettings} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="space-y-3">
               <label className="text-sm font-medium">Logo</label>
               <div className="flex items-center gap-4">
