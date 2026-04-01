@@ -27,19 +27,20 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
 };
 
 interface PageProps {
-  searchParams: {
+  searchParams: Promise<{
     page?: string;
     status?: string;
     category?: string;
     q?: string;
-  };
+  }>;
 }
 
 export default async function ProductsPage({ searchParams }: PageProps) {
-  const page = Math.max(1, Number(searchParams.page) || 1);
-  const status = searchParams.status === "all" ? undefined : searchParams.status;
-  const categoryId = searchParams.category;
-  const search = searchParams.q;
+  const params = await searchParams;
+  const page = Math.max(1, Number(params.page) || 1);
+  const status = params.status === "all" ? undefined : params.status;
+  const categoryId = params.category;
+  const search = params.q;
 
   const result = await getProductsPageData({ page, status, categoryId, search, limit: 50 });
 
@@ -107,7 +108,7 @@ export default async function ProductsPage({ searchParams }: PageProps) {
       {/* Filters (client component) */}
       <ProductsFilters
         categories={categories}
-        currentStatus={searchParams.status}
+        currentStatus={params.status}
         currentCategory={categoryId}
         currentSearch={search}
       />

@@ -37,11 +37,12 @@ const MODULE_LABELS: Record<string, string> = {
 };
 
 interface PageProps {
-  searchParams: { module?: string };
+  searchParams: Promise<{ module?: string }>;
 }
 
 export default async function TaskTemplatesPage({ searchParams }: PageProps) {
-  const activeModule = searchParams.module;
+  const params = await searchParams;
+  const activeModule = params.module;
   const result = await getTaskTemplates(activeModule);
   const templates = (result.data ?? []) as any[];
 

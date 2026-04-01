@@ -14,7 +14,7 @@ export const metadata = {
 };
 
 interface PageProps {
-  searchParams: { module?: string };
+  searchParams: Promise<{ module?: string }>;
 }
 
 const MODULE_FILTERS = [
@@ -29,7 +29,8 @@ const MODULE_FILTERS = [
 ];
 
 export default async function TasksBoardPage({ searchParams }: PageProps) {
-  const module = searchParams.module === "all" ? undefined : searchParams.module;
+  const params = await searchParams;
+  const module = params.module === "all" ? undefined : params.module;
 
   const [kanbanResult, membersResult, projectsResult] = await Promise.all([
     getKanbanTasks(module),

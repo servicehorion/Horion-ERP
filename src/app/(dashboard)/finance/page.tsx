@@ -30,11 +30,29 @@ const QUICK_LINKS = [
   { href: "/finance/archive", label: "Archive / Future", icon: ArrowRightLeft },
 ];
 
+const EMPTY_SNAPSHOT = {
+  wallets: [],
+  operationalPnl: { grossRevenue: 0, chinaPurchases: 0, shippingFees: 0, platformFees: 0, insuranceRevenue: 0, refunds: 0, netMargin: 0, netMarginPercent: 0 },
+  cash: { lockedCash: 0, operatingCash: 0, chinaCash: 0, netCashPosition: 0 },
+  cashReality: { confirmedCashXAF: 0, pendingCashXAF: 0, atRiskCashXAF: 0, expectedTotalCashXAF: 0 },
+  balance: { assetsCash: 0, liabilitiesCustomerOrders: 0, liabilitiesPartnerPayables: 0, liabilitiesTotal: 0, simplifiedEquity: 0 },
+  approvals: { pendingCount: 0, pendingCashOutXAF: 0 },
+  recentTransactions: [],
+} as const;
+
 export default async function FinanceDashboardPage() {
   const user = await getSession();
   checkPermission(user.role, "finance.view");
 
-  const snapshot = await FinanceOperationsService.getOperationsSnapshot(user.tenantId);
+  let snapshot: Awaited<ReturnType<typeof FinanceOperationsService.getOperationsSnapshot>>;
+  let dbError = false;
+  try {
+    snapshot = await FinanceOperationsService.getOperationsSnapshot(user.tenantId);
+  } catch (err) {
+    console.error("[FinanceDashboardPage] DB timeout — showing empty snapshot:", err);
+    snapshot = EMPTY_SNAPSHOT as typeof snapshot;
+    dbError = true;
+  }
 
   return (
     <div className="space-y-6">
@@ -42,6 +60,12 @@ export default async function FinanceDashboardPage() {
         title="Finance Operations"
         description="Pilotage cash-first par commande. Les modules comptables lourds sont sortis du coeur de navigation."
       />
+
+      {dbError && (
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
+          Base de données temporairement indisponible — chiffres non disponibles. Actualisez la page dans quelques secondes.
+        </div>
+      )}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Card>

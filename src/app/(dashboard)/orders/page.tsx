@@ -17,11 +17,11 @@ export const metadata = {
 };
 
 interface PageProps {
-  searchParams: {
+  searchParams: Promise<{
     page?: string;
     status?: string;
     q?: string;
-  };
+  }>;
 }
 
 const TERMINAL_STATUSES = ["CLOTURE", "ANNULE"];
@@ -29,13 +29,15 @@ const LITIGE_STATUS = "LITIGE";
 const TRANSIT_STATUSES = ["EN_TRANSIT", "DEDOUANE"];
 
 export default async function OrdersPage({ searchParams }: PageProps) {
+  const params = await searchParams;
+
   // Fetch counts + first page of orders in parallel
   const [countsResult, ordersResult] = await Promise.all([
     getOrderStatusCounts(),
     getOrders({
-      status: searchParams.status,
-      search: searchParams.q,
-      page: Math.max(1, Number(searchParams.page) || 1),
+      status: params.status,
+      search: params.q,
+      page: Math.max(1, Number(params.page) || 1),
       limit: 50,
     }),
   ]);
