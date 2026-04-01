@@ -177,46 +177,55 @@ type ProjectionInput = {
   metadata?: Prisma.InputJsonValue;
 };
 
+const globalForFinanceSync = globalThis as unknown as {
+  financeSyncInFlight?: Map<string, Promise<{ projected: number; skipped?: boolean }>>;
+  financeSyncLastAt?: Map<string, number>;
+};
+
+function getFinanceSyncInFlight() {
+  if (!globalForFinanceSync.financeSyncInFlight) {
+    globalForFinanceSync.financeSyncInFlight = new Map();
+  }
+  return globalForFinanceSync.financeSyncInFlight;
+}
+
+function getFinanceSyncLastAt() {
+  if (!globalForFinanceSync.financeSyncLastAt) {
+    globalForFinanceSync.financeSyncLastAt = new Map();
+  }
+  return globalForFinanceSync.financeSyncLastAt;
+}
+
+function getFinanceSyncTtlMs() {
+  return Number(process.env.FINANCE_SYNC_TTL_MS ?? (process.env.NODE_ENV === "production" ? "60000" : "15000"));
+}
+
 export class FinanceTransactionService {
   private static async upsertProjection(input: ProjectionInput) {
-    const existing = await prisma.financeTransaction.findUnique({
+    return prisma.financeTransaction.upsert({
       where: { externalRef: input.externalRef },
-      select: { id: true, status: true },
-    });
-
-    if (!existing) {
-      return prisma.financeTransaction.create({
-        data: {
-          tenantId: input.tenantId,
-          orderId: input.orderId || undefined,
-          externalRef: input.externalRef,
-          walletCode: input.walletCode,
-          sourceType: input.sourceType,
-          sourceId: input.sourceId || undefined,
-          direction: input.direction,
-          category: input.category,
-          amountLocal: input.amountLocal,
-          currency: input.currency,
-          exchangeRate: input.exchangeRate ?? undefined,
-          amountXAF: input.amountXAF,
-          status: input.status,
-          createdById: input.createdById || undefined,
-          approvedById: input.approvedById || undefined,
-          reference: input.reference || undefined,
-          notes: input.notes || undefined,
-          completedAt: input.completedAt || undefined,
-          metadata: input.metadata || {},
-        },
-      });
-    }
-
-    if (existing.status === "COMPLETED") {
-      return prisma.financeTransaction.findUnique({ where: { id: existing.id } });
-    }
-
-    return prisma.financeTransaction.update({
-      where: { id: existing.id },
-      data: {
+      create: {
+        tenantId: input.tenantId,
+        orderId: input.orderId || undefined,
+        externalRef: input.externalRef,
+        walletCode: input.walletCode,
+        sourceType: input.sourceType,
+        sourceId: input.sourceId || undefined,
+        direction: input.direction,
+        category: input.category,
+        amountLocal: input.amountLocal,
+        currency: input.currency,
+        exchangeRate: input.exchangeRate ?? undefined,
+        amountXAF: input.amountXAF,
+        status: input.status,
+        createdById: input.createdById || undefined,
+        approvedById: input.approvedById || undefined,
+        reference: input.reference || undefined,
+        notes: input.notes || undefined,
+        completedAt: input.completedAt || undefined,
+        metadata: input.metadata || {},
+      },
+      update: {
         orderId: input.orderId || undefined,
         walletCode: input.walletCode,
         sourceType: input.sourceType,
@@ -343,9 +352,22 @@ export class FinanceTransactionService {
     return { projected };
   }
 
-  static async syncTenant(tenantId: string) {
-    const [payments, treasuryTransactions, bankTransactions] = await Promise.all([
-      prisma.payment.findMany({
+  static async syncTenant(tenantId: string, options: { force?: boolean } = {}) {
+    const inFlight = getFinanceSyncInFlight();
+    const lastAtMap = getFinanceSyncLastAt();
+    const ttlMs = getFinanceSyncTtlMs();
+    const now = Date.now();
+    const lastAt = lastAtMap.get(tenantId) ?? 0;
+
+    if (!options.force && lastAt > 0 && now - lastAt < ttlMs) {
+      return { projected: 0, skipped: true };
+    }
+
+    const running = inFlight.get(tenantId);
+    if (running) return running;
+
+    const job = (async () => {
+      const payments = await prisma.payment.findMany({
         where: { order: { tenantId } },
         select: {
           id: true,
@@ -364,122 +386,130 @@ export class FinanceTransactionService {
           confirmedAt: true,
           paidAt: true,
         },
-      }),
-      prisma.treasuryTransaction.findMany({
+      });
+
+      const treasuryTransactions = await prisma.treasuryTransaction.findMany({
         where: { account: { tenantId } },
         include: {
           account: {
             select: { id: true, label: true, currency: true },
           },
         },
-      }),
-      prisma.bankTransaction.findMany({
+      });
+
+      const bankTransactions = await prisma.bankTransaction.findMany({
         where: { connection: { tenantId } },
         include: {
           connection: {
             select: { provider: true, accountName: true, currency: true },
           },
         },
-      }),
-    ]);
+      });
 
-    let projected = 0;
+      let projected = 0;
 
-    for (const payment of payments) {
-      const status = mapPaymentStatus(payment);
-      if (status === "CANCELLED" && !["FAILED", "CANCELLED", "EXPIRED", "REFUNDED"].includes(payment.status)) {
-        continue;
-      }
+      for (const payment of payments) {
+        const status = mapPaymentStatus(payment);
+        if (status === "CANCELLED" && !["FAILED", "CANCELLED", "EXPIRED", "REFUNDED"].includes(payment.status)) {
+          continue;
+        }
 
-      await this.upsertProjection({
-        tenantId,
-        orderId: payment.orderId,
-        externalRef: `PAYMENT:${payment.id}`,
-        walletCode: mapPaymentWalletCode(payment),
-        sourceType: "PAYMENT",
-        sourceId: payment.id,
-        direction: payment.direction === "INBOUND" ? "IN" : "OUT",
-        category: mapPaymentCategory(payment),
-        amountLocal: toNumber(payment.amount),
-        currency: payment.currency,
-        exchangeRate: payment.fxRate == null ? null : toNumber(payment.fxRate),
-        amountXAF: toNumber(payment.amountXAF),
-        status,
-        reference: payment.reference || null,
-        notes: payment.notes || null,
-        completedAt: payment.confirmedAt || payment.paidAt || null,
+        await this.upsertProjection({
+          tenantId,
+          orderId: payment.orderId,
+          externalRef: `PAYMENT:${payment.id}`,
+          walletCode: mapPaymentWalletCode(payment),
+          sourceType: "PAYMENT",
+          sourceId: payment.id,
+          direction: payment.direction === "INBOUND" ? "IN" : "OUT",
+          category: mapPaymentCategory(payment),
+          amountLocal: toNumber(payment.amount),
+          currency: payment.currency,
+          exchangeRate: payment.fxRate == null ? null : toNumber(payment.fxRate),
+          amountXAF: toNumber(payment.amountXAF),
+          status,
+          reference: payment.reference || null,
+          notes: payment.notes || null,
+          completedAt: payment.confirmedAt || payment.paidAt || null,
           metadata: {
             paymentStatus: payment.status,
             paymentType: payment.type,
             methodKey: payment.methodKey,
           } as Prisma.InputJsonValue,
-      });
-      projected++;
-    }
+        });
+        projected++;
+      }
 
-    for (const transaction of treasuryTransactions) {
-      const amountXAF =
-        transaction.account.currency === "XAF"
-          ? toNumber(transaction.amount)
-          : roundMoney(toNumber(transaction.amount) * toNumber(transaction.fxRate));
+      for (const transaction of treasuryTransactions) {
+        const amountXAF =
+          transaction.account.currency === "XAF"
+            ? toNumber(transaction.amount)
+            : roundMoney(toNumber(transaction.amount) * toNumber(transaction.fxRate));
 
-      await this.upsertProjection({
-        tenantId,
-        orderId: transaction.orderId || null,
-        externalRef: `TREASURY:${transaction.id}`,
-        walletCode: mapTreasuryWalletCode(transaction.account.label, transaction.account.currency),
-        sourceType: "TREASURY",
-        sourceId: transaction.id,
-        direction: transaction.type === "TOP_UP" ? "IN" : "OUT",
-        category: mapTreasuryCategory(transaction.type),
-        amountLocal: toNumber(transaction.amount),
-        currency: transaction.account.currency,
-        exchangeRate: transaction.fxRate == null ? null : toNumber(transaction.fxRate),
-        amountXAF,
-        status: "COMPLETED",
-        reference: transaction.reference || null,
-        completedAt: transaction.createdAt,
+        await this.upsertProjection({
+          tenantId,
+          orderId: transaction.orderId || null,
+          externalRef: `TREASURY:${transaction.id}`,
+          walletCode: mapTreasuryWalletCode(transaction.account.label, transaction.account.currency),
+          sourceType: "TREASURY",
+          sourceId: transaction.id,
+          direction: transaction.type === "TOP_UP" ? "IN" : "OUT",
+          category: mapTreasuryCategory(transaction.type),
+          amountLocal: toNumber(transaction.amount),
+          currency: transaction.account.currency,
+          exchangeRate: transaction.fxRate == null ? null : toNumber(transaction.fxRate),
+          amountXAF,
+          status: "COMPLETED",
+          reference: transaction.reference || null,
+          completedAt: transaction.createdAt,
           metadata: {
             treasuryType: transaction.type,
             reconciliationStatus: transaction.status,
             accountId: transaction.accountId,
           } as Prisma.InputJsonValue,
-      });
-      projected++;
-    }
+        });
+        projected++;
+      }
 
-    for (const transaction of bankTransactions) {
-      await this.upsertProjection({
-        tenantId,
-        orderId: null,
-        externalRef: `BANK:${transaction.id}`,
-        walletCode: mapBankWalletCode(
-          transaction.connection.provider,
-          transaction.connection.accountName,
-          transaction.currency || transaction.connection.currency,
-        ),
-        sourceType: "BANK",
-        sourceId: transaction.id,
-        direction: String(transaction.direction).toUpperCase().startsWith("OUT") ? "OUT" : "IN",
-        category: "BANK_SETTLEMENT",
-        amountLocal: toNumber(transaction.amount),
-        currency: transaction.currency || transaction.connection.currency,
-        amountXAF: toNumber(transaction.amount),
-        status: transaction.status === "RECONCILED" ? "COMPLETED" : "PENDING_APPROVAL",
-        reference: transaction.reference || null,
-        notes: transaction.description || null,
-        completedAt: transaction.status === "RECONCILED" ? transaction.occurredAt : null,
-        metadata: {
-          bankStatus: transaction.status,
-          matchedPaymentId: transaction.matchedPaymentId,
-          provider: transaction.connection.provider,
-          matchScore: transaction.matchScore == null ? null : toNumber(transaction.matchScore),
-        } as Prisma.InputJsonValue,
-      });
-      projected++;
-    }
+      for (const transaction of bankTransactions) {
+        await this.upsertProjection({
+          tenantId,
+          orderId: null,
+          externalRef: `BANK:${transaction.id}`,
+          walletCode: mapBankWalletCode(
+            transaction.connection.provider,
+            transaction.connection.accountName,
+            transaction.currency || transaction.connection.currency,
+          ),
+          sourceType: "BANK",
+          sourceId: transaction.id,
+          direction: String(transaction.direction).toUpperCase().startsWith("OUT") ? "OUT" : "IN",
+          category: "BANK_SETTLEMENT",
+          amountLocal: toNumber(transaction.amount),
+          currency: transaction.currency || transaction.connection.currency,
+          amountXAF: toNumber(transaction.amount),
+          status: transaction.status === "RECONCILED" ? "COMPLETED" : "PENDING_APPROVAL",
+          reference: transaction.reference || null,
+          notes: transaction.description || null,
+          completedAt: transaction.status === "RECONCILED" ? transaction.occurredAt : null,
+          metadata: {
+            bankStatus: transaction.status,
+            matchedPaymentId: transaction.matchedPaymentId,
+            provider: transaction.connection.provider,
+            matchScore: transaction.matchScore == null ? null : toNumber(transaction.matchScore),
+          } as Prisma.InputJsonValue,
+        });
+        projected++;
+      }
 
-    return { projected };
+      lastAtMap.set(tenantId, Date.now());
+      return { projected };
+    })().finally(() => {
+      inFlight.delete(tenantId);
+    });
+
+    inFlight.set(tenantId, job);
+    return job;
   }
 
   static async getPendingApprovals(tenantId: string) {
@@ -502,9 +532,12 @@ export class FinanceTransactionService {
       sourceType?: FinanceTransactionSourceType;
       direction?: FinanceTransactionDirection;
       categories?: FinanceTransactionCategory[];
+      skipSync?: boolean;
     } = {},
   ) {
-    await this.syncTenant(tenantId);
+    if (!options.skipSync) {
+      await this.syncTenant(tenantId);
+    }
     return prisma.financeTransaction.findMany({
       where: {
         tenantId,

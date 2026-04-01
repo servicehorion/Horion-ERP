@@ -117,7 +117,7 @@ export class FinanceOperationsService {
   }
 
   static async listUnifiedTransactions(tenantId: string, limit = 40): Promise<UnifiedFinanceTransaction[]> {
-    const transactions = await FinanceTransactionService.getRecentTransactions(tenantId, { limit });
+    const transactions = await FinanceTransactionService.getRecentTransactions(tenantId, { limit, skipSync: true });
 
     return transactions.map((transaction) => ({
       id: transaction.id,
@@ -141,49 +141,51 @@ export class FinanceOperationsService {
   static async getOperationsSnapshot(tenantId: string): Promise<OperationsSnapshot> {
     await FinanceTransactionService.syncTenant(tenantId);
 
-    const [fxRates, treasuryAccounts, recentTransactions, completedTransactions, pendingApprovals, activeOrders] = await Promise.all([
-      this.getFxRatesToXaf(),
-      prisma.treasuryAccount.findMany({
-        where: { tenantId },
-        orderBy: [{ currency: "asc" }, { label: "asc" }],
-      }),
-      this.listUnifiedTransactions(tenantId, 18),
-      prisma.financeTransaction.findMany({
-        where: { tenantId, status: "COMPLETED" },
-        select: {
-          orderId: true,
-          category: true,
-          amountXAF: true,
-          walletCode: true,
-        },
-      }),
-      prisma.financeTransaction.findMany({
-        where: {
-          tenantId,
-          status: "PENDING_APPROVAL",
-          direction: "OUT",
-        },
-        select: { amountXAF: true },
-      }),
-      prisma.order.findMany({
-        where: {
-          tenantId,
-          status: { in: ACTIVE_ORDER_STATUSES },
-        },
-        select: {
-          id: true,
-          status: true,
-          payments: {
-            where: {
-              direction: "INBOUND",
-              status: "CONFIRMED",
-              type: { in: ["CLIENT_DEPOSIT", "CLIENT_BALANCE"] },
-            },
-            select: { amountXAF: true },
+    // Keep the finance home snapshot intentionally low-concurrency.
+    // This page tends to load alongside the global layout and nav badge queries,
+    // so blasting 6 parallel DB reads can starve the connection pool in dev and
+    // on smaller pooled environments.
+    const fxRates = await this.getFxRatesToXaf();
+    const treasuryAccounts = await prisma.treasuryAccount.findMany({
+      where: { tenantId },
+      orderBy: [{ currency: "asc" }, { label: "asc" }],
+    });
+    const recentTransactions = await this.listUnifiedTransactions(tenantId, 18);
+    const completedTransactions = await prisma.financeTransaction.findMany({
+      where: { tenantId, status: "COMPLETED" },
+      select: {
+        orderId: true,
+        category: true,
+        amountXAF: true,
+        walletCode: true,
+      },
+    });
+    const pendingApprovals = await prisma.financeTransaction.findMany({
+      where: {
+        tenantId,
+        status: "PENDING_APPROVAL",
+        direction: "OUT",
+      },
+      select: { amountXAF: true },
+    });
+    const activeOrders = await prisma.order.findMany({
+      where: {
+        tenantId,
+        status: { in: ACTIVE_ORDER_STATUSES },
+      },
+      select: {
+        id: true,
+        status: true,
+        payments: {
+          where: {
+            direction: "INBOUND",
+            status: "CONFIRMED",
+            type: { in: ["CLIENT_DEPOSIT", "CLIENT_BALANCE"] },
           },
+          select: { amountXAF: true },
         },
-      }),
-    ]);
+      },
+    });
 
     const wallets = treasuryAccounts.map((account) => {
       const balance = toNumber(account.balance);
