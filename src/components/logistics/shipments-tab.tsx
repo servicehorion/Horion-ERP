@@ -1249,7 +1249,7 @@ export function ShipmentsTab({
                 </Button>
                 <Button
                   variant="outline"
-                  onClick={() => toast.success("Email client prepare")}
+                  onClick={() => toast.success("Email client préparé")}
                 >
                   <Mail className="h-4 w-4 mr-2" />
                   Email

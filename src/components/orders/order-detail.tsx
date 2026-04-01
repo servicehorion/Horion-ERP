@@ -882,9 +882,9 @@ export function OrderDetail({
             )}
           </TabsTrigger>
           <TabsTrigger value="documents">Documents ({order.attachments.length})</TabsTrigger>
-          <TabsTrigger value="approvals">Approvals</TabsTrigger>
-          <TabsTrigger value="team">Equipe</TabsTrigger>
-          <TabsTrigger value="timeline">Timeline ({order.timeline.length})</TabsTrigger>
+          <TabsTrigger value="approvals">Approbations</TabsTrigger>
+          <TabsTrigger value="team">Équipe</TabsTrigger>
+          <TabsTrigger value="timeline">Chronologie ({order.timeline.length})</TabsTrigger>
           <TabsTrigger value="tasks">Tâches ({order.tasks.length})</TabsTrigger>
         </TabsList>
 

@@ -71,7 +71,7 @@ export default async function ProductsPage({ searchParams }: PageProps) {
           <Button variant="outline" size="sm" asChild>
             <Link href="/catalog/analytics">
               <BarChart3 className="mr-2 h-4 w-4" />
-              Analytics
+              Analytique
             </Link>
           </Button>
           <Button asChild size="sm">
@@ -205,7 +205,7 @@ export default async function ProductsPage({ searchParams }: PageProps) {
           <div className="flex items-center gap-2">
             {page > 1 && (
               <Button variant="outline" size="sm" asChild>
-                <Link href={buildUrl(searchParams, { page: page - 1 })}>
+                <Link href={buildUrl(params,{ page: page - 1 })}>
                   <ChevronLeft className="h-4 w-4 mr-1" />
                   Précédent
                 </Link>
@@ -224,14 +224,14 @@ export default async function ProductsPage({ searchParams }: PageProps) {
                     className="w-9 h-8 p-0"
                     asChild
                   >
-                    <Link href={buildUrl(searchParams, { page: p as number })}>{p}</Link>
+                    <Link href={buildUrl(params,{ page: p as number })}>{p}</Link>
                   </Button>
                 )
               )}
             </div>
             {page < totalPages && (
               <Button variant="outline" size="sm" asChild>
-                <Link href={buildUrl(searchParams, { page: page + 1 })}>
+                <Link href={buildUrl(params,{ page: page + 1 })}>
                   Suivant
                   <ChevronRight className="h-4 w-4 ml-1" />
                 </Link>

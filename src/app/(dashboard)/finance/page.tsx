@@ -23,7 +23,7 @@ export const metadata = { title: "Finance Operations | Horion ERP" };
 const QUICK_LINKS = [
   { href: "/finance/treasury", label: "Tresorerie & Wallets", icon: Wallet },
   { href: "/finance/payments", label: "Paiements", icon: CreditCard },
-  { href: "/finance/approvals", label: "Approvals", icon: ShieldCheck },
+  { href: "/finance/approvals", label: "Approbations", icon: ShieldCheck },
   { href: "/finance/invoices", label: "Facturation", icon: BadgeDollarSign },
   { href: "/finance/margins", label: "Marges", icon: BarChart3 },
   { href: "/finance/statements", label: "Etats financiers", icon: ArrowRightLeft },
@@ -50,7 +50,7 @@ export default async function FinanceDashboardPage() {
     snapshot = await FinanceOperationsService.getOperationsSnapshot(user.tenantId);
   } catch (err) {
     console.error("[FinanceDashboardPage] DB timeout — showing empty snapshot:", err);
-    snapshot = EMPTY_SNAPSHOT as typeof snapshot;
+    snapshot = EMPTY_SNAPSHOT as unknown as typeof snapshot;
     dbError = true;
   }
 
@@ -181,7 +181,7 @@ export default async function FinanceDashboardPage() {
         <Card className="lg:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>P&L operationnel</CardTitle>
-            <Badge variant="secondary">Read-only</Badge>
+            <Badge variant="secondary">Lecture seule</Badge>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
             <div className="flex items-center justify-between">

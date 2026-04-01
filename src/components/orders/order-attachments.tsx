@@ -135,7 +135,7 @@ export function OrderAttachments({ orderId, attachments, canEdit }: OrderAttachm
                 <ExternalLink className="h-3 w-3 shrink-0 opacity-50" />
               </a>
               <span className="text-xs text-muted-foreground hidden group-hover:block shrink-0">
-                {(att.user?.name || "System")} · {formatDate(att.createdAt)}
+                {(att.user?.name || "Système")} · {formatDate(att.createdAt)}
               </span>
               {canEdit && (
                 <Button

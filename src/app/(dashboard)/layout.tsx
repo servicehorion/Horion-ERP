@@ -47,7 +47,7 @@ async function DashboardLayoutInner({
         <Header />
         <main
           id="main-content"
-          className="flex-1 overflow-auto p-6 focus:outline-none"
+          className="flex-1 overflow-auto p-3 sm:p-6 focus:outline-none"
           tabIndex={-1}
         >
           {children}

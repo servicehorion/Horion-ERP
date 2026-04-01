@@ -128,7 +128,7 @@ export function TaskCreateDialog({ teamMembers = [], projects = [] }: TaskCreate
           Nouvelle tache
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[520px]">
+      <DialogContent className="max-w-[95vw] sm:max-w-[520px]">
         <DialogHeader>
           <DialogTitle>Creer une tache</DialogTitle>
           <DialogDescription>
@@ -157,7 +157,7 @@ export function TaskCreateDialog({ teamMembers = [], projects = [] }: TaskCreate
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label>Module</Label>
               <Select value={module} onValueChange={setModule}>
@@ -191,7 +191,7 @@ export function TaskCreateDialog({ teamMembers = [], projects = [] }: TaskCreate
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label>SLA interne</Label>
               <Select value={slaHours} onValueChange={setSlaHours}>

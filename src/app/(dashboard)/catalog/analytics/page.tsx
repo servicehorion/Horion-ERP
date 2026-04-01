@@ -14,7 +14,7 @@ import { getCatalogAnalytics } from "@/lib/actions/catalog.actions";
 import { formatCurrency } from "@/config/currencies";
 
 export const metadata = {
-  title: "Analytics Catalogue | Horion ERP",
+  title: "Analytique Catalogue | Horion ERP",
   description: "Intelligence catalogue — revenus, performance, prix",
 };
 
@@ -62,7 +62,7 @@ export default async function CatalogAnalyticsPage() {
         <div className="flex-1">
           <h1 className="text-3xl font-bold flex items-center gap-2">
             <BarChart3 className="h-7 w-7 text-blue-600" />
-            Analytics Catalogue
+            Analytique Catalogue
           </h1>
           <p className="text-muted-foreground">
             Intelligence revenus, performance catégories, écarts de prix

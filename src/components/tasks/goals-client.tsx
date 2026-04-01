@@ -193,7 +193,7 @@ export function GoalsClient({ goals, members }: GoalsClientProps) {
                 value={goalOwner || ""}
                 onChange={(e) => setGoalOwner(e.target.value || undefined)}
               >
-                <option value="">Owner</option>
+                <option value="">Responsable</option>
                 {members.map((m) => (
                   <option key={m.id} value={m.id}>{m.name || m.email}</option>
                 ))}

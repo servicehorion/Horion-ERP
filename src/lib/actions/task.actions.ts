@@ -18,16 +18,29 @@ import {
   getTaskRolesForModule,
   getTaskRolesForModules,
 } from "@/lib/access-control";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { prisma } from "@/lib/db";
+import { getTenantCacheTags } from "@/lib/server-cache";
+import { TaskDashboardSnapshotService } from "@/lib/services/task-dashboard-snapshot.service";
 import type { TaskStatus, Priority, DependencyType } from "@prisma/client";
 import * as taskExtrasActions from "./task-extras.actions";
+
+const TASK_CACHE_NAMESPACES = ["task-dashboard"];
 
 function revalidateTask(taskId?: string) {
   revalidatePath("/tasks");
   revalidatePath("/tasks/board");
   revalidatePath("/dashboard");
+  revalidatePath("/tasks/analytics");
   if (taskId) revalidatePath(`/tasks/${taskId}`);
+}
+
+function revalidateTaskCaches(tenantId: string) {
+  for (const namespace of TASK_CACHE_NAMESPACES) {
+    for (const tag of getTenantCacheTags(namespace, tenantId)) {
+      revalidateTag(tag, "max");
+    }
+  }
 }
 
 function parseOptionalDateInput(value?: string | Date | null) {
@@ -118,21 +131,22 @@ export async function getTasks(options?: {
         ? [{ updatedAt: sortDirection }]
         : [{ priority: "desc" }, { slaDeadline: "asc" }, { createdAt: "desc" }];
 
-    const [tasks, total] = await Promise.all([
-      prisma.task.findMany({
-        where,
-        include: {
-          assignments: { include: { user: { select: { id: true, name: true } } } },
-          order: { select: { orderNumber: true, contact: { select: { name: true } } } },
-          project: { select: { id: true, name: true } },
-          _count: { select: { children: true, dependencies: true, comments: true } },
-        },
-        orderBy,
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-      prisma.task.count({ where }),
-    ]);
+    // Keep the list query ahead of the count to avoid opening two DB reads at once
+    // on the already-busy Tasks page.
+    const tasks = await prisma.task.findMany({
+      where,
+      include: {
+        assignments: { include: { user: { select: { id: true, name: true } } } },
+        order: { select: { orderNumber: true, contact: { select: { name: true } } } },
+        project: { select: { id: true, name: true } },
+        _count: { select: { children: true, dependencies: true, comments: true } },
+      },
+      orderBy,
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+
+    const total = await prisma.task.count({ where });
 
     return { data: tasks, total, page, totalPages: Math.ceil(total / limit) };
   } catch (error) {
@@ -242,18 +256,8 @@ export async function getTaskDashboardData() {
     const user = await getSession();
     checkPermission(user.role, "task.view");
     const allowedModules = getTaskAllowedModules(user.role);
-    await TaskWorkflowService.checkSLABreachesWithConsequences(user.tenantId);
-
-    const [metrics, moduleBreakdown, priorities, urgencies, myTasks, teamWorkload] = await Promise.all([
-      TaskIntelligenceService.getDashboardMetrics(user.tenantId, user.id, allowedModules),
-      TaskIntelligenceService.getModuleBreakdown(user.tenantId, allowedModules),
-      TaskIntelligenceService.getPriorityDistribution(user.tenantId, allowedModules),
-      TaskIntelligenceService.getUrgencies(user.tenantId, 10, allowedModules),
-      TaskIntelligenceService.getMyTasks(user.tenantId, user.id, 15, allowedModules),
-      TaskIntelligenceService.getTeamWorkload(user.tenantId, allowedModules),
-    ]);
-
-    return { data: { metrics, moduleBreakdown, priorities, urgencies, myTasks, teamWorkload, currentUserId: user.id } };
+    const snapshot = await TaskDashboardSnapshotService.getDashboard(user.tenantId, user.id, allowedModules);
+    return { data: snapshot };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur dashboard" };
   }

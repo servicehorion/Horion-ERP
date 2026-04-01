@@ -51,7 +51,7 @@ export function LeadAssigneeSelect({
       onValueChange={handleChange}
       disabled={loading}
     >
-      <SelectTrigger className="w-[200px]">
+      <SelectTrigger className="w-full sm:w-[200px]">
         <SelectValue placeholder="Assigner" />
       </SelectTrigger>
       <SelectContent>

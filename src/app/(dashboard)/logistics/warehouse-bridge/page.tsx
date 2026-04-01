@@ -86,7 +86,7 @@ export default async function WarehouseBridgePage() {
                 <div className="space-y-3">
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge variant={badgeVariant(draft.status) as any}>{draft.status}</Badge>
-                    <Badge variant="outline">Source: WhatsApp</Badge>
+                    <Badge variant="outline">Source : WhatsApp</Badge>
                     {draft.order?.orderNumber && <Badge variant="outline">#{draft.order.orderNumber}</Badge>}
                   </div>
                   <div>

@@ -1,5 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { MarketingLiteClient } from "@/components/marketing/marketing-lite-client";
+import { getSession } from "@/lib/session";
+import { hasPermission } from "@/lib/permissions";
 import {
   getAudienceData,
   getBrandSettings,
@@ -10,6 +12,21 @@ import {
 export const metadata = { title: "Marketing OS Lite | Horion ERP" };
 
 export default async function MarketingPage() {
+  const session = await getSession();
+
+  if (!hasPermission(session.role, "marketing.view")) {
+    return (
+      <div className="space-y-6">
+        <div className="space-y-1">
+          <h1 className="text-3xl font-bold">Marketing OS Lite</h1>
+          <p className="text-muted-foreground">
+            Cette vue n&apos;est pas ouverte pour le rôle <span className="font-medium text-foreground">{session.role}</span>.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   const [audienceData, brandSettings, campaignsResult, emailCampaignsResult] = await Promise.all([
     getAudienceData(),
     getBrandSettings(),

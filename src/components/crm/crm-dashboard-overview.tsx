@@ -107,8 +107,8 @@ export function CrmDashboardOverview({
       <Card className="mb-2">
         <CardHeader className="flex flex-row items-center justify-between pb-3">
           <div>
-            <CardTitle className="text-sm font-semibold">Priority Actions</CardTitle>
-            <p className="text-xs text-muted-foreground">Next best actions derives du CRM et du Task OS</p>
+            <CardTitle className="text-sm font-semibold">Actions prioritaires</CardTitle>
+            <p className="text-xs text-muted-foreground">{"Prochaines meilleures actions dérivées du CRM et des modules OS"}</p>
           </div>
           <Badge className="bg-primary text-primary-foreground">{priorityActions.length} actions</Badge>
         </CardHeader>
@@ -123,7 +123,7 @@ export function CrmDashboardOverview({
                     <div>
                       <p className="text-sm font-semibold text-foreground">{action.name}</p>
                       <p className="text-xs text-muted-foreground">
-                        {action.entityType} · Owner: {action.owner}
+                        {action.entityType} · Responsable : {action.owner}
                       </p>
                     </div>
                     <Badge variant="outline" className="text-xs">

@@ -56,7 +56,7 @@ export function LeadFilters({ teamMembers }: LeadFiltersProps) {
   return (
     <div className="rounded-xl border bg-card p-4 shadow-sm">
       <div className="flex flex-wrap items-center gap-3">
-      <div className="w-64">
+      <div className="w-full sm:w-64">
         <Input
           placeholder="Rechercher un lead..."
           value={search}
@@ -82,7 +82,7 @@ export function LeadFilters({ teamMembers }: LeadFiltersProps) {
           updateParams({ status: v });
         }}
       >
-        <SelectTrigger className="w-[180px]">
+        <SelectTrigger className="w-full sm:w-[180px]">
           <SelectValue placeholder="Statut" />
         </SelectTrigger>
         <SelectContent>
@@ -99,7 +99,7 @@ export function LeadFilters({ teamMembers }: LeadFiltersProps) {
           updateParams({ assignee: v });
         }}
       >
-        <SelectTrigger className="w-[200px]">
+        <SelectTrigger className="w-full sm:w-[200px]">
           <SelectValue placeholder="AssignÃ©" />
         </SelectTrigger>
         <SelectContent>

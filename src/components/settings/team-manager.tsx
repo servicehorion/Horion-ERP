@@ -202,7 +202,7 @@ export function TeamManager({ members }: { members: TeamMember[] }) {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Role</Label>
+                <Label>Rôle</Label>
                 <Select
                   value={inviteForm.role}
                   onValueChange={(value) =>
@@ -238,7 +238,7 @@ export function TeamManager({ members }: { members: TeamMember[] }) {
               <TableRow>
                 <TableHead>Nom</TableHead>
                 <TableHead>Email</TableHead>
-                <TableHead>Role</TableHead>
+                <TableHead>Rôle</TableHead>
                 <TableHead>Statut</TableHead>
                 <TableHead>Derniere connexion</TableHead>
                 <TableHead>Active</TableHead>

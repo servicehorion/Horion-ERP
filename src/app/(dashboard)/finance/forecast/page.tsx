@@ -75,11 +75,11 @@ export default async function FinanceForecastPage() {
                       <form action={addForecastLine} className="grid grid-cols-1 md:grid-cols-6 gap-2">
                         <input type="hidden" name="scenarioId" value={s.id} />
                         <Input name="month" placeholder="2026-03" className="h-8" required />
-                        <Input name="revenue" placeholder="Revenue" type="number" step="0.01" className="h-8" required />
+                        <Input name="revenue" placeholder="Revenus" type="number" step="0.01" className="h-8" required />
                         <Input name="cogs" placeholder="COGS" type="number" step="0.01" className="h-8" required />
                         <Input name="expenses" placeholder="Expenses" type="number" step="0.01" className="h-8" required />
-                        <Input name="cashIn" placeholder="Cash In" type="number" step="0.01" className="h-8" required />
-                        <Input name="cashOut" placeholder="Cash Out" type="number" step="0.01" className="h-8" required />
+                        <Input name="cashIn" placeholder="Entrées de trésorerie" type="number" step="0.01" className="h-8" required />
+                        <Input name="cashOut" placeholder="Sorties de trésorerie" type="number" step="0.01" className="h-8" required />
                         <Button size="sm" variant="outline">Ajouter</Button>
                       </form>
                     </TableCell>

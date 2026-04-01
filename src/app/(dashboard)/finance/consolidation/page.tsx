@@ -55,7 +55,7 @@ export default async function FinanceConsolidationPage() {
               <Input name="name" placeholder="Nom" required />
               <Input name="country" placeholder="Pays" />
               <Input name="baseCurrency" defaultValue="XAF" />
-              <Input name="taxId" placeholder="Tax ID" />
+              <Input name="taxId" placeholder="Numéro fiscal" />
               <Button type="submit">Ajouter</Button>
             </form>
           </CardContent>
@@ -142,7 +142,7 @@ export default async function FinanceConsolidationPage() {
                             <option key={e.id} value={e.id}>{e.name}</option>
                           ))}
                         </select>
-                        <Input name="metric" placeholder="Metric" className="h-8" required />
+                        <Input name="metric" placeholder="Indicateur" className="h-8" required />
                         <Input name="amount" type="number" step="0.01" className="h-8" required />
                         <Input name="currency" defaultValue={r.baseCurrency} className="h-8" />
                         <Button size="sm" variant="outline">Ajouter</Button>

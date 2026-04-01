@@ -81,8 +81,8 @@ export async function POST(req: Request) {
         ).map((task) => task.tenantId);
 
     for (const currentTenantId of tenantIds) {
-      tasksEscalated += await TaskWorkflowService.checkSLABreachesWithConsequences(currentTenantId);
-    }
+        tasksEscalated += await TaskWorkflowService.checkSLABreachesWithConsequences(currentTenantId, { force: true });
+      }
 
     return NextResponse.json({
       data: {

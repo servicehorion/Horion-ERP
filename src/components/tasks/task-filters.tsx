@@ -117,7 +117,7 @@ export function TaskFilters({
       </div>
 
       <Select value={currentModule || "all"} onValueChange={(v) => updateParams({ module: v === "all" ? undefined : v })}>
-        <SelectTrigger className="w-[160px]">
+        <SelectTrigger className="w-full sm:w-[160px]">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -129,7 +129,7 @@ export function TaskFilters({
 
       {projects.length > 0 && (
         <Select value={currentProject || "all"} onValueChange={(v) => updateParams({ project: v === "all" ? undefined : v })}>
-          <SelectTrigger className="w-[180px]">
+          <SelectTrigger className="w-full sm:w-[180px]">
             <SelectValue placeholder="Projet" />
           </SelectTrigger>
           <SelectContent>
@@ -142,7 +142,7 @@ export function TaskFilters({
       )}
 
       <Select value={currentStatus || "all"} onValueChange={(v) => updateParams({ status: v === "all" ? undefined : v })}>
-        <SelectTrigger className="w-[160px]">
+        <SelectTrigger className="w-full sm:w-[160px]">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -153,7 +153,7 @@ export function TaskFilters({
       </Select>
 
       <Select value={currentPriority || "all"} onValueChange={(v) => updateParams({ priority: v === "all" ? undefined : v })}>
-        <SelectTrigger className="w-[140px]">
+        <SelectTrigger className="w-full sm:w-[140px]">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -165,7 +165,7 @@ export function TaskFilters({
 
       {teamMembers.length > 0 && (
         <Select value={currentAssignee || "all"} onValueChange={(v) => updateParams({ assignee: v === "all" ? undefined : v })}>
-          <SelectTrigger className="w-[180px]">
+          <SelectTrigger className="w-full sm:w-[180px]">
             <SelectValue placeholder="Assigne a" />
           </SelectTrigger>
           <SelectContent>
@@ -178,7 +178,7 @@ export function TaskFilters({
       )}
 
       <Select value={currentSortBy || "priority"} onValueChange={(v) => updateParams({ sortBy: v })}>
-        <SelectTrigger className="w-[140px]">
+        <SelectTrigger className="w-full sm:w-[140px]">
           <SelectValue placeholder="Trier par" />
         </SelectTrigger>
         <SelectContent>
@@ -189,7 +189,7 @@ export function TaskFilters({
       </Select>
 
       <Select value={currentSortDir || "desc"} onValueChange={(v) => updateParams({ sortDir: v })}>
-        <SelectTrigger className="w-[90px]">
+        <SelectTrigger className="w-full sm:w-[90px]">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

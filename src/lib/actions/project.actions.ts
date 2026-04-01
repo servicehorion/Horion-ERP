@@ -21,6 +21,7 @@ export async function getProjects(options?: {
   search?: string;
   memberId?: string;
   limit?: number;
+  compact?: boolean;
 }) {
   try {
     const user = await getSession();
@@ -42,17 +43,24 @@ export async function getProjects(options?: {
         : {}),
     };
 
-    const projects = await prisma.project.findMany({
-      where,
-      include: {
-        members: { include: { user: { select: { id: true, name: true, avatarUrl: true } } } },
-        milestones: { orderBy: { dueDate: "asc" }, take: 5 },
-        sprints: { where: { status: "ACTIVE" }, take: 1 },
-        _count: { select: { tasks: true, milestones: true, sprints: true } },
-      },
-      orderBy: { updatedAt: "desc" },
-      take: options?.limit ?? 50,
-    });
+      const projects = options?.compact
+        ? await prisma.project.findMany({
+            where,
+            select: { id: true, name: true },
+            orderBy: { updatedAt: "desc" },
+            take: options?.limit ?? 50,
+          })
+        : await prisma.project.findMany({
+            where,
+            include: {
+              members: { include: { user: { select: { id: true, name: true, avatarUrl: true } } } },
+              milestones: { orderBy: { dueDate: "asc" }, take: 5 },
+              sprints: { where: { status: "ACTIVE" }, take: 1 },
+              _count: { select: { tasks: true, milestones: true, sprints: true } },
+            },
+            orderBy: { updatedAt: "desc" },
+            take: options?.limit ?? 50,
+          });
 
     return { data: projects };
   } catch (error) {

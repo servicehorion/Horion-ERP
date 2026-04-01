@@ -129,7 +129,7 @@ export default async function FinanceBanksPage() {
             <Button type="submit">Ajouter</Button>
           </form>
 
-          <div className="rounded-md border">
+          <div className="overflow-x-auto rounded-md border">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -172,7 +172,7 @@ export default async function FinanceBanksPage() {
           <CardTitle>Transactions bancaires brutes</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border">
+          <div className="overflow-x-auto rounded-md border">
             <Table>
               <TableHeader>
                 <TableRow>

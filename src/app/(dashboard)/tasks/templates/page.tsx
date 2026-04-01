@@ -79,7 +79,7 @@ export default async function TaskTemplatesPage({ searchParams }: PageProps) {
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" asChild>
-            <Link href="/tasks"><Layers className="mr-2 h-4 w-4" />Dashboard</Link>
+            <Link href="/tasks"><Layers className="mr-2 h-4 w-4" />Tableau de bord</Link>
           </Button>
           <Button variant="outline" size="sm" asChild>
             <Link href="/tasks/board"><RefreshCw className="mr-2 h-4 w-4" />Kanban</Link>

@@ -11,7 +11,7 @@ import { Progress } from "@/components/ui/progress";
 import { ProjectAnalyticsClient } from "@/components/projects/project-analytics-client";
 import { cn } from "@/lib/utils";
 
-export const metadata = { title: "Analytics Projet | Horion ERP" };
+export const metadata = { title: "Analytique projet | Horion ERP" };
 
 export default async function ProjectAnalyticsPage({
   params,
@@ -81,7 +81,7 @@ export default async function ProjectAnalyticsPage({
   const milestonePct = milestones.length > 0 ? Math.round((achievedMilestones / milestones.length) * 100) : 0;
 
   return (
-    <div className="flex flex-col gap-6 p-6">
+    <div className="flex flex-col gap-6 p-3 sm:p-6">
       {/* Header */}
       <div className="flex items-center gap-4">
         <Link href={`/projects/${params.id}`}>
@@ -90,7 +90,7 @@ export default async function ProjectAnalyticsPage({
             {project.name}
           </Button>
         </Link>
-        <h1 className="text-xl font-bold">Analytics</h1>
+        <h1 className="text-xl font-bold">Analytique</h1>
       </div>
 
       {/* KPI top row */}
@@ -183,3 +183,4 @@ export default async function ProjectAnalyticsPage({
     </div>
   );
 }
+

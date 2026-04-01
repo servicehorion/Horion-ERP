@@ -61,40 +61,35 @@ export class TaskIntelligenceService {
     weekStart.setDate(weekStart.getDate() - weekStart.getDay());
     const moduleFilter = modules && modules !== "*" ? { module: { in: modules } } : {};
 
-    const [
-      statusCounts,
-      slaBreaches,
-      completedToday,
-      completedWeek,
-      totalCompleted,
-      totalCancelled,
-      myTasks,
-    ] = await Promise.all([
-      prisma.task.groupBy({
-        by: ["status"],
-        where: { tenantId, status: { notIn: ["COMPLETED", "CANCELLED"] }, ...moduleFilter },
-        _count: { id: true },
-      }),
-      prisma.task.count({
-        where: { tenantId, slaBreach: true, status: { notIn: ["COMPLETED", "CANCELLED"] }, ...moduleFilter },
-      }),
-      prisma.task.count({
-        where: { tenantId, status: "COMPLETED", completedAt: { gte: todayStart }, ...moduleFilter },
-      }),
-      prisma.task.count({
-        where: { tenantId, status: "COMPLETED", completedAt: { gte: weekStart }, ...moduleFilter },
-      }),
-      prisma.task.count({ where: { tenantId, status: "COMPLETED", ...moduleFilter } }),
-      prisma.task.count({ where: { tenantId, status: "CANCELLED", ...moduleFilter } }),
-      prisma.task.count({
-        where: {
-          tenantId,
-          status: { notIn: ["COMPLETED", "CANCELLED"] },
-          assignments: { some: { userId } },
-          ...moduleFilter,
-        },
-      }),
-    ]);
+    const statusCounts = await prisma.task.groupBy({
+      by: ["status"],
+      where: { tenantId, status: { notIn: ["COMPLETED", "CANCELLED"] }, ...moduleFilter },
+      _count: { id: true },
+    });
+
+    const slaBreaches = await prisma.task.count({
+      where: { tenantId, slaBreach: true, status: { notIn: ["COMPLETED", "CANCELLED"] }, ...moduleFilter },
+    });
+
+    const completedToday = await prisma.task.count({
+      where: { tenantId, status: "COMPLETED", completedAt: { gte: todayStart }, ...moduleFilter },
+    });
+
+    const completedWeek = await prisma.task.count({
+      where: { tenantId, status: "COMPLETED", completedAt: { gte: weekStart }, ...moduleFilter },
+    });
+
+    const totalCompleted = await prisma.task.count({ where: { tenantId, status: "COMPLETED", ...moduleFilter } });
+    const totalCancelled = await prisma.task.count({ where: { tenantId, status: "CANCELLED", ...moduleFilter } });
+
+    const myTasks = await prisma.task.count({
+      where: {
+        tenantId,
+        status: { notIn: ["COMPLETED", "CANCELLED"] },
+        assignments: { some: { userId } },
+        ...moduleFilter,
+      },
+    });
 
     const statusMap: Record<string, number> = {};
     for (const row of statusCounts) {
@@ -175,6 +170,9 @@ export class TaskIntelligenceService {
    */
   static async getTeamWorkload(tenantId: string, modules?: string[] | "*"): Promise<TeamMemberWorkload[]> {
     const moduleFilter = modules && modules !== "*" ? { module: { in: modules } } : {};
+    const recentCompletionWindow = new Date();
+    recentCompletionWindow.setDate(recentCompletionWindow.getDate() - 30);
+
     const users = await prisma.user.findMany({
       where: { tenantId, isActive: true },
       select: {
@@ -182,28 +180,91 @@ export class TaskIntelligenceService {
         name: true,
         email: true,
         role: true,
-        taskAssignments: {
-          include: {
-            task: { select: { status: true, slaBreach: true, module: true } },
+      },
+    });
+
+    const activeAssignments = await prisma.taskAssignment.findMany({
+      where: {
+        task: {
+          is: {
+            tenantId,
+            status: { notIn: ["COMPLETED", "CANCELLED"] },
+            ...moduleFilter,
+          },
+        },
+      },
+      select: {
+        userId: true,
+        task: {
+          select: {
+            status: true,
+            slaBreach: true,
           },
         },
       },
     });
 
+    const recentCompletedAssignments = await prisma.taskAssignment.findMany({
+      where: {
+        task: {
+          is: {
+            tenantId,
+            status: "COMPLETED",
+            completedAt: { gte: recentCompletionWindow },
+            ...moduleFilter,
+          },
+        },
+      },
+      select: {
+        userId: true,
+      },
+    });
+
+    const activeCounts = new Map<string, { assignedCount: number; completedCount: number; slaBreaches: number; inProgressCount: number }>();
+
+    for (const assignment of activeAssignments) {
+      const current = activeCounts.get(assignment.userId) ?? {
+        assignedCount: 0,
+        completedCount: 0,
+        slaBreaches: 0,
+        inProgressCount: 0,
+      };
+
+      current.assignedCount += 1;
+      if (assignment.task.slaBreach) current.slaBreaches += 1;
+      if (assignment.task.status === "IN_PROGRESS") current.inProgressCount += 1;
+      activeCounts.set(assignment.userId, current);
+    }
+
+    for (const assignment of recentCompletedAssignments) {
+      const current = activeCounts.get(assignment.userId) ?? {
+        assignedCount: 0,
+        completedCount: 0,
+        slaBreaches: 0,
+        inProgressCount: 0,
+      };
+
+      current.completedCount += 1;
+      activeCounts.set(assignment.userId, current);
+    }
+
     return users
       .map((u) => {
-        const tasks = moduleFilter.module
-          ? u.taskAssignments.map((a) => a.task).filter((t) => moduleFilter.module?.in?.includes(t.module))
-          : u.taskAssignments.map((a) => a.task);
+        const counts = activeCounts.get(u.id) ?? {
+          assignedCount: 0,
+          completedCount: 0,
+          slaBreaches: 0,
+          inProgressCount: 0,
+        };
         return {
           userId: u.id,
           name: u.name,
           email: u.email,
           role: u.role,
-          assignedCount: tasks.filter((t) => !["COMPLETED", "CANCELLED"].includes(t.status)).length,
-          completedCount: tasks.filter((t) => t.status === "COMPLETED").length,
-          slaBreaches: tasks.filter((t) => t.slaBreach && !["COMPLETED", "CANCELLED"].includes(t.status)).length,
-          inProgressCount: tasks.filter((t) => t.status === "IN_PROGRESS").length,
+          assignedCount: counts.assignedCount,
+          completedCount: counts.completedCount,
+          slaBreaches: counts.slaBreaches,
+          inProgressCount: counts.inProgressCount,
         };
       })
       .sort((a, b) => b.assignedCount - a.assignedCount);

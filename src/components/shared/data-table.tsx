@@ -47,7 +47,7 @@ export function DataTable<TData, TValue>({
   columns,
   data,
   searchKey,
-  searchPlaceholder = "Search...",
+  searchPlaceholder = "Rechercher...",
   paginate = true,
   virtualize,
   maxBodyHeight = 620,
@@ -90,9 +90,9 @@ export function DataTable<TData, TValue>({
 
   return (
     <div data-slot="data-table" className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         {searchKey ? (
-          <div className="relative max-w-sm flex-1">
+          <div className="relative w-full flex-1 sm:max-w-sm">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder={searchPlaceholder}
@@ -107,8 +107,8 @@ export function DataTable<TData, TValue>({
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="ml-auto">
-              Columns <ChevronDown className="ml-2 h-4 w-4" />
+            <Button variant="outline" className="w-full sm:ml-auto sm:w-auto">
+              Colonnes <ChevronDown className="ml-2 h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
@@ -129,7 +129,7 @@ export function DataTable<TData, TValue>({
         </DropdownMenu>
       </div>
 
-      <div data-slot="data-table-surface" className="rounded-md border bg-card">
+      <div data-slot="data-table-surface" className="overflow-x-auto rounded-md border bg-card">
         {enableVirtualization ? (
           <div ref={bodyRef} className="overflow-auto" style={{ maxHeight: `${maxBodyHeight}px` }}>
             <Table>
@@ -170,7 +170,7 @@ export function DataTable<TData, TValue>({
                 ) : (
                   <TableRow>
                     <TableCell colSpan={columns.length} className="h-24 text-center">
-                      No result.
+                      Aucun resultat.
                     </TableCell>
                   </TableRow>
                 )}
@@ -202,7 +202,7 @@ export function DataTable<TData, TValue>({
               ) : (
                 <TableRow>
                   <TableCell colSpan={columns.length} className="h-24 text-center">
-                    No result.
+                    Aucun resultat.
                   </TableCell>
                 </TableRow>
               )}
@@ -212,16 +212,16 @@ export function DataTable<TData, TValue>({
       </div>
 
       {shouldPaginate ? (
-        <div className="flex items-center justify-end space-x-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end sm:space-x-2">
           <div className="flex-1 text-sm text-muted-foreground">
-            {table.getFilteredSelectedRowModel().rows.length} of {table.getFilteredRowModel().rows.length} selected row(s).
+            {table.getFilteredSelectedRowModel().rows.length} sur {table.getFilteredRowModel().rows.length} ligne(s) selectionnee(s).
           </div>
-          <div className="space-x-2">
+          <div className="flex items-center gap-2 self-end sm:self-auto">
             <Button variant="outline" size="sm" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>
-              Previous
+              Precedent
             </Button>
             <Button variant="outline" size="sm" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>
-              Next
+              Suivant
             </Button>
           </div>
         </div>

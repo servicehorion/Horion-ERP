@@ -621,7 +621,7 @@ export function AudienceIntelligence({ audienceData: initialData, personas: init
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-sm font-semibold">
               <Crown className="h-4 w-4 text-yellow-500" />
-              Top clients par valeur (Orders OS)
+              Top clients par valeur (Commandes)
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -669,7 +669,7 @@ export function AudienceIntelligence({ audienceData: initialData, personas: init
               href: "/crm",
             },
             {
-              title: "Orders OS", icon: <ShoppingCart className="h-5 w-5 text-blue-600" />,
+              title: "Module Commandes", icon: <ShoppingCart className="h-5 w-5 text-blue-600" />,
               bg: "from-blue-50 to-cyan-50 dark:from-blue-950/20 dark:to-cyan-950/20",
               border: "border-blue-200 dark:border-blue-800",
               stats: [
@@ -683,13 +683,13 @@ export function AudienceIntelligence({ audienceData: initialData, personas: init
               bg: "from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20",
               border: "border-green-200 dark:border-green-800",
               stats: [
-                { label: "Contacts WA", value: data.contacts.total },
+                { label: "Contacts WhatsApp", value: data.contacts.total },
                 { label: "Canaux actifs", value: "—" },
               ],
               href: "/whatsapp",
             },
             {
-              title: "Finance OS", icon: <BarChart3 className="h-5 w-5 text-orange-600" />,
+              title: "Module Finance", icon: <BarChart3 className="h-5 w-5 text-orange-600" />,
               bg: "from-orange-50 to-yellow-50 dark:from-orange-950/20 dark:to-yellow-950/20",
               border: "border-orange-200 dark:border-orange-800",
               stats: [

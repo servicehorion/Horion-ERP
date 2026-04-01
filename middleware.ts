@@ -17,7 +17,7 @@ const ROUTE_GUARDS: [string, string][] = [
   ["/ai",         "ai.view"],
   // Marketing OS
   ["/marketing",  "marketing.view"],
-  ["/whatsapp",   "marketing.view"],
+  ["/whatsapp",   "whatsapp.view"],
   // Finance OS
   ["/finance",    "finance.view"],
   // Logistics OS

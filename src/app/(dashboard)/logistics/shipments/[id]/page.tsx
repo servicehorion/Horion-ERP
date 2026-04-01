@@ -300,18 +300,18 @@ export default async function ShipmentDetailPage({ params }: { params: { id: str
           <CardContent className="space-y-4">
             <div className="grid gap-3 md:grid-cols-2">
               <div className="rounded-lg border p-3">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">Scope</p>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Périmètre</p>
                 <p className="mt-1 font-medium">{projection.deliveryModel.scope}</p>
               </div>
               <div className="rounded-lg border p-3">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">Role</p>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Rôle</p>
                 <p className="mt-1 font-medium">{projection.deliveryModel.role}</p>
               </div>
             </div>
 
             {projection.deliveryModel.parentShipment ? (
               <div className="rounded-lg border p-3 text-sm">
-                <p className="font-medium">Shipment parent</p>
+                <p className="font-medium">Expédition parente</p>
                 <p className="text-muted-foreground">
                   {projection.deliveryModel.parentShipment.orderNumber || projection.deliveryModel.parentShipment.id.slice(-8)} · {projection.deliveryModel.parentShipment.status}
                 </p>
@@ -322,9 +322,9 @@ export default async function ShipmentDetailPage({ params }: { params: { id: str
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Leg / split</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Scope</TableHead>
+                    <TableHead>Tronçon / split</TableHead>
+                    <TableHead>Rôle</TableHead>
+                    <TableHead>Périmètre</TableHead>
                     <TableHead>Statut</TableHead>
                   </TableRow>
                 </TableHeader>

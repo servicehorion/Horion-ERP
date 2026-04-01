@@ -62,7 +62,7 @@ export default async function MyTasksPage() {
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" asChild>
-            <Link href="/tasks">Dashboard</Link>
+            <Link href="/tasks">Tableau de bord</Link>
           </Button>
           <Button variant="outline" size="sm" asChild>
             <Link href="/tasks/board">Kanban</Link>

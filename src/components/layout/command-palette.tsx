@@ -194,12 +194,12 @@ export function CommandPalette() {
         description="Fast Horion navigation"
         className="max-w-2xl"
       >
-        <CommandInput placeholder="Type a page, module, or keyword..." />
+        <CommandInput placeholder="Rechercher une page, un module, un mot-clé..." />
         <CommandList>
-          <CommandEmpty>No result.</CommandEmpty>
+          <CommandEmpty>Aucun résultat.</CommandEmpty>
 
           {favoriteItems.length > 0 && (
-            <CommandGroup heading="Favorites">
+            <CommandGroup heading="Favoris">
               {favoriteItems.map((item) => (
                 <CommandItem key={`fav-${item.href}`} onSelect={() => navigate(item.href)} value={`${item.title} ${item.keywords}`}>
                   <Star className="h-4 w-4 fill-current text-amber-500" />
@@ -213,7 +213,7 @@ export function CommandPalette() {
           {recentItems.length > 0 && (
             <>
               <CommandSeparator />
-              <CommandGroup heading="Recent">
+              <CommandGroup heading="Récents">
                 {recentItems.map((item) => (
                   <CommandItem key={`recent-${item.href}`} onSelect={() => navigate(item.href)} value={`${item.title} ${item.keywords}`}>
                     <Command className="h-4 w-4" />
@@ -228,7 +228,7 @@ export function CommandPalette() {
                   }}
                 >
                   <X className="h-4 w-4" />
-                  <span>Clear recent</span>
+                  <span>Effacer l'historique</span>
                 </CommandItem>
               </CommandGroup>
             </>

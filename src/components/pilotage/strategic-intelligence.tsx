@@ -72,16 +72,16 @@ export function StrategicIntelligence({ data }: { data: StrategicIntelligenceDat
         <Card className="lg:col-span-2">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base">
-              <Activity className="h-4 w-4 text-indigo-500" /> Operational Health
+              <Activity className="h-4 w-4 text-indigo-500" /> Santé opérationnelle
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-4xl font-semibold">{data.operationalHealth.score}</div>
-                <Badge className={statusColor[data.operationalHealth.status]}>Health</Badge>
+                <Badge className={statusColor[data.operationalHealth.status]}>Santé</Badge>
               </div>
-              <div className="text-xs text-muted-foreground">Updated {new Date(data.generatedAt).toLocaleString("fr-FR")}</div>
+              <div className="text-xs text-muted-foreground">Mis à jour le {new Date(data.generatedAt).toLocaleString("fr-FR")}</div>
             </div>
             <div className="mt-4 grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
               <StableResponsiveChart className="h-[280px]">
@@ -145,15 +145,15 @@ export function StrategicIntelligence({ data }: { data: StrategicIntelligenceDat
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
             {[
-              { key: "red", label: "Red", className: "border-red-200 bg-red-50" },
+              { key: "red", label: "Rouge", className: "border-red-200 bg-red-50" },
               { key: "orange", label: "Orange", className: "border-amber-200 bg-amber-50" },
-              { key: "green", label: "Green", className: "border-emerald-200 bg-emerald-50" },
+              { key: "green", label: "Vert", className: "border-emerald-200 bg-emerald-50" },
             ].map((lane) => {
               const items = data.signals[lane.key as keyof StrategicIntelligenceData["signals"]];
               return (
                 <div key={lane.key}>
                   <div className="text-xs uppercase text-muted-foreground">{lane.label}</div>
-                  {items.length === 0 ? <div className="text-xs text-muted-foreground">None</div> : null}
+                  {items.length === 0 ? <div className="text-xs text-muted-foreground">Aucun</div> : null}
                   {items.slice(0, 3).map((signal) => (
                     <Link key={signal.id} href={signal.href} className={`mt-1 block rounded border px-2 py-1 ${lane.className}`}>
                       {signal.title}

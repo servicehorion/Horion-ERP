@@ -93,7 +93,7 @@ export default async function FinancePayrollPage() {
                 <Button type="submit" size="sm" variant="outline">Ajouter ligne</Button>
               </form>
 
-              <div className="rounded-md border">
+              <div className="overflow-x-auto rounded-md border">
                 <Table>
                   <TableHeader>
                     <TableRow>

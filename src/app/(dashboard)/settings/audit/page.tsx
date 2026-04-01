@@ -34,19 +34,20 @@ const MODULES = [
 export default async function AuditPage({
   searchParams,
 }: {
-  searchParams: Record<string, string | string[] | undefined>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const user = await getSession();
   checkPermission(user.role, "user.manage");
+  const resolvedSearchParams = await searchParams;
 
   const filters: AuditFilters = {
-    module: getParam(searchParams, "module"),
-    userId: getParam(searchParams, "userId"),
-    action: getParam(searchParams, "action"),
-    from: getParam(searchParams, "from"),
-    to: getParam(searchParams, "to"),
-    page: Number(getParam(searchParams, "page") || 1),
-    pageSize: Number(getParam(searchParams, "pageSize") || 50),
+    module: getParam(resolvedSearchParams, "module"),
+    userId: getParam(resolvedSearchParams, "userId"),
+    action: getParam(resolvedSearchParams, "action"),
+    from: getParam(resolvedSearchParams, "from"),
+    to: getParam(resolvedSearchParams, "to"),
+    page: Number(getParam(resolvedSearchParams, "page") || 1),
+    pageSize: Number(getParam(resolvedSearchParams, "pageSize") || 50),
   };
 
   const [logsRes, users] = await Promise.all([
@@ -137,7 +138,7 @@ export default async function AuditPage({
             <div className="flex items-end gap-2">
               <Button type="submit">Filtrer</Button>
               <Link href="/settings/audit">
-                <Button type="button" variant="ghost">Reset</Button>
+                <Button type="button" variant="ghost">Réinitialiser</Button>
               </Link>
             </div>
           </form>
@@ -158,7 +159,7 @@ export default async function AuditPage({
                   <TableHead>Action</TableHead>
                   <TableHead>Module</TableHead>
                   <TableHead>ID</TableHead>
-                  <TableHead>Details</TableHead>
+                  <TableHead>Détails</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

@@ -12,7 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { getTaskAnalytics, getTaskDashboardData } from "@/lib/actions/task.actions";
 import { cn } from "@/lib/utils";
 
-export const metadata = { title: "Analytics Tâches | Horion ERP" };
+export const metadata = { title: "Analytique Taches | Horion ERP" };
 
 const STATUS_LABELS: Record<string, string> = {
   PENDING: "En attente",
@@ -50,7 +50,7 @@ export default async function TaskAnalyticsPage() {
   if (!analytics || !dashboard) {
     return (
       <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-6 text-center text-destructive">
-        Erreur lors du chargement des analytics
+        Erreur lors du chargement des donnees analytiques
       </div>
     );
   }
@@ -76,7 +76,7 @@ export default async function TaskAnalyticsPage() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
               <BarChart3 className="h-6 w-6 text-violet-600" />
-              Analytics & Rapports
+              Analytique & rapports
             </h1>
             <p className="text-sm text-muted-foreground">Performance, SLA, vélocité et tendances</p>
           </div>
@@ -212,7 +212,7 @@ export default async function TaskAnalyticsPage() {
           </CardContent>
         </Card>
 
-        {/* Owner type breakdown */}
+        {/* Repartition par type de responsable */}
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
@@ -257,7 +257,7 @@ export default async function TaskAnalyticsPage() {
                 return (
                   <div key={member.userId} className="space-y-1">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium truncate max-w-[120px]">{member.userName}</span>
+                      <span className="font-medium truncate max-w-[120px]">{member.name}</span>
                       <div className="flex items-center gap-2 text-xs">
                         <span>{member.completedCount}/{member.assignedCount}</span>
                         <Badge variant={completionRate >= 80 ? "default" : completionRate >= 50 ? "secondary" : "destructive"} className="text-xs px-1">
@@ -300,3 +300,4 @@ export default async function TaskAnalyticsPage() {
     </div>
   );
 }
+

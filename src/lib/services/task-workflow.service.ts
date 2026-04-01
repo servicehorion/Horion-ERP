@@ -8,6 +8,11 @@ const WORKFLOW_KEY = "__workflow";
 const SYSTEM_ESCALATION_ROLES = ["ADMIN", "DIRECTION", "CEO"] as const;
 const TERMINAL_STATUSES: TaskStatus[] = ["COMPLETED", "CANCELLED"];
 
+type TaskWorkflowRuntimeCache = {
+  slaSyncInFlight: Map<string, Promise<number>>;
+  slaSyncLastAt: Map<string, number>;
+};
+
 type CompletionRequirements = {
   requireAllSubtasks: boolean;
   requireAllChecklistItems: boolean;
@@ -73,6 +78,30 @@ type WorkflowSnapshot = {
   responsibility: ResponsibilitySnapshot;
   operationalImpact: OperationalImpactSummary;
 };
+
+const globalForTaskWorkflow = globalThis as typeof globalThis & {
+  __horionTaskWorkflowCache?: TaskWorkflowRuntimeCache;
+};
+
+function getTaskWorkflowCache() {
+  if (!globalForTaskWorkflow.__horionTaskWorkflowCache) {
+    globalForTaskWorkflow.__horionTaskWorkflowCache = {
+      slaSyncInFlight: new Map(),
+      slaSyncLastAt: new Map(),
+    };
+  }
+
+  return globalForTaskWorkflow.__horionTaskWorkflowCache;
+}
+
+function getTaskSlaSyncTtlMs() {
+  const configured = Number(process.env.TASK_SLA_SYNC_TTL_MS);
+  if (Number.isFinite(configured) && configured > 0) {
+    return configured;
+  }
+
+  return process.env.NODE_ENV === "production" ? 60_000 : 15_000;
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
@@ -752,74 +781,99 @@ export class TaskWorkflowService {
     return operationalImpact;
   }
 
-  static async checkSLABreachesWithConsequences(tenantId: string) {
-    const now = new Date();
-    const newlyBreached = await prisma.task.findMany({
-      where: {
-        tenantId,
-        slaBreach: false,
-        slaDeadline: { lt: now },
-        status: { notIn: TERMINAL_STATUSES },
-      },
-      select: {
-        id: true,
-        title: true,
-        tenantId: true,
-        riskLevel: true,
-        customFields: true,
-      },
-    });
+  static async checkSLABreachesWithConsequences(tenantId: string, options?: { force?: boolean }) {
+    const cache = getTaskWorkflowCache();
+    const ttlMs = getTaskSlaSyncTtlMs();
+    const nowMs = Date.now();
+    const force = options?.force ?? false;
 
-    for (const task of newlyBreached) {
-      const operationalImpact = await this.computeOperationalImpact(task.id);
-      await prisma.task.update({
-        where: { id: task.id },
-        data: {
-          slaBreach: true,
-          customFields: mergeWorkflowState(task.customFields, {
-            operationalImpact,
-            responsibility: {
-              ...getResponsibilityState(task.customFields),
-              escalationLevel: 2,
-            },
-            lastSlaBreachAt: new Date().toISOString(),
-          }) as Prisma.InputJsonValue,
-        },
-      });
+    if (!force) {
+      const lastAt = cache.slaSyncLastAt.get(tenantId);
+      if (lastAt && nowMs - lastAt < ttlMs) {
+        return 0;
+      }
 
-      await NotificationService.onSLABreach(task.id, tenantId, task.title);
-      await notifyResponsibilityChain(
-        task.id,
-        tenantId,
-        `Escalade SLA: ${task.title}`,
-        operationalImpact.summary,
-        "SLA_BREACH"
-      );
-
-      if (operationalImpact.downstreamTaskCount > 0 || ["HIGH", "CRITICAL"].includes(task.riskLevel)) {
-        const escalators = await prisma.user.findMany({
-          where: {
-            tenantId,
-            isActive: true,
-            role: { in: [...SYSTEM_ESCALATION_ROLES] },
-          },
-          select: { id: true },
-        });
-
-        await NotificationService.notifyMany(
-          escalators.map((user) => user.id),
-          {
-            tenantId,
-            type: "SLA_BREACH",
-            title: `Escalade SLA: ${task.title}`,
-            message: operationalImpact.summary,
-            entityType: "task",
-            entityId: task.id,
-          }
-        );
+      const inFlight = cache.slaSyncInFlight.get(tenantId);
+      if (inFlight) {
+        return inFlight;
       }
     }
 
-    return newlyBreached.length;
+    const syncPromise = (async () => {
+      const now = new Date();
+      const newlyBreached = await prisma.task.findMany({
+        where: {
+          tenantId,
+          slaBreach: false,
+          slaDeadline: { lt: now },
+          status: { notIn: TERMINAL_STATUSES },
+        },
+        select: {
+          id: true,
+          title: true,
+          tenantId: true,
+          riskLevel: true,
+          customFields: true,
+        },
+      });
+
+      for (const task of newlyBreached) {
+        const operationalImpact = await this.computeOperationalImpact(task.id);
+        await prisma.task.update({
+          where: { id: task.id },
+          data: {
+            slaBreach: true,
+            customFields: mergeWorkflowState(task.customFields, {
+              operationalImpact,
+              responsibility: {
+                ...getResponsibilityState(task.customFields),
+                escalationLevel: 2,
+              },
+              lastSlaBreachAt: new Date().toISOString(),
+            }) as Prisma.InputJsonValue,
+          },
+        });
+
+        await NotificationService.onSLABreach(task.id, tenantId, task.title);
+        await notifyResponsibilityChain(
+          task.id,
+          tenantId,
+          `Escalade SLA: ${task.title}`,
+          operationalImpact.summary,
+          "SLA_BREACH"
+        );
+
+        if (operationalImpact.downstreamTaskCount > 0 || ["HIGH", "CRITICAL"].includes(task.riskLevel)) {
+          const escalators = await prisma.user.findMany({
+            where: {
+              tenantId,
+              isActive: true,
+              role: { in: [...SYSTEM_ESCALATION_ROLES] },
+            },
+            select: { id: true },
+          });
+
+          await NotificationService.notifyMany(
+            escalators.map((user) => user.id),
+            {
+              tenantId,
+              type: "SLA_BREACH",
+              title: `Escalade SLA: ${task.title}`,
+              message: operationalImpact.summary,
+              entityType: "task",
+              entityId: task.id,
+            }
+          );
+        }
+      }
+
+      cache.slaSyncLastAt.set(tenantId, Date.now());
+      return newlyBreached.length;
+    })().finally(() => {
+      cache.slaSyncInFlight.delete(tenantId);
+    });
+
+    cache.slaSyncInFlight.set(tenantId, syncPromise);
+    return syncPromise;
   }
 }

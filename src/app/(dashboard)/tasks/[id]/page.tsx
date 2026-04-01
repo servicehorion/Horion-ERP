@@ -562,7 +562,7 @@ export default async function TaskDetailPage({ params }: PageProps) {
                 <Badge variant="outline" className="capitalize">{task.module}</Badge>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Owner</span>
+                <span className="text-muted-foreground">Responsable</span>
                 <Badge variant={task.ownerType === "AI_AGENT" ? "default" : "outline"} className="text-xs">
                   {task.ownerType === "AI_AGENT" ? "Agent IA" : task.ownerType === "SYSTEM" ? "Système" : "Humain"}
                 </Badge>

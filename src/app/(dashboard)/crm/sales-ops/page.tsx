@@ -130,7 +130,7 @@ export default async function SalesOpsPage() {
                 </option>
               ))}
             </select>
-            <Input name="targetAmount" placeholder="Target XAF" type="number" min="0" />
+            <Input name="targetAmount" placeholder="Objectif XAF" type="number" min="0" />
             <Button type="submit">Ajouter</Button>
           </form>
 

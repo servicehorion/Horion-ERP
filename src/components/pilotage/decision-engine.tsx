@@ -455,11 +455,11 @@ export function DecisionEngine({
                   <Textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} />
                 </div>
                 <div className="md:col-span-2">
-                  <Label>Strategic objective</Label>
+                  <Label>Objectif stratégique</Label>
                   <Textarea value={objective} onChange={(event) => setObjective(event.target.value)} rows={2} />
                 </div>
                 <div>
-                  <Label>Priority</Label>
+                  <Label>Priorité</Label>
                   <Select value={priority} onValueChange={setPriority}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>

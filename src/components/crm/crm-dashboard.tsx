@@ -1030,7 +1030,7 @@ export function CrmDashboard({
                 <div className="flex-1 relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input 
-                    placeholder="Search by name, phone, email, country..." 
+                    placeholder="Rechercher par nom, téléphone, email, pays..." 
                     className="pl-10"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -1055,10 +1055,10 @@ export function CrmDashboard({
                   </Button>
                   <Select value={selectedOwner} onValueChange={setSelectedOwner}>
                     <SelectTrigger className="w-44 h-9">
-                      <SelectValue placeholder="Owner" />
+                      <SelectValue placeholder="Responsable" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">Tous les owners</SelectItem>
+                      <SelectItem value="all">Tous les responsables</SelectItem>
                       {ownerOptions.map((owner) => (
                         <SelectItem key={owner} value={owner}>{owner}</SelectItem>
                       ))}
@@ -1082,7 +1082,7 @@ export function CrmDashboard({
                       onClick={handleBulkDelete}
                     >
                       <Trash2 className="w-4 h-4" />
-                      Delete ({selectedCustomers.length})
+                      Supprimer ({selectedCustomers.length})
                     </Button>
                   )}
                 </div>
@@ -1167,7 +1167,7 @@ export function CrmDashboard({
                             <p className="font-medium">{customer.name}</p>
                             {customer.city && <p className="text-xs text-muted-foreground">{customer.city}</p>}
                             <p className="text-xs text-muted-foreground mt-1">
-                              Owner: <span className="text-muted-foreground">{customer.owner}</span> · Onboarded:{" "}
+                              Responsable : <span className="text-muted-foreground">{customer.owner}</span> · Intégré par :{" "}
                               <span className="text-muted-foreground">{customer.onboardedBy}</span>
                             </p>
                             {customer.collaborators.length > 0 && (
@@ -1284,7 +1284,7 @@ export function CrmDashboard({
                               <DropdownMenuItem asChild>
                                 <Link href={demoMode ? "/demo/customer-profile" : `/contacts/${customer.id}`} className="flex items-center gap-2">
                                   <Eye className="w-4 h-4" />
-                                  View Profile
+                                  Voir le profil
                                 </Link>
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => {
@@ -1292,7 +1292,7 @@ export function CrmDashboard({
                                 setShowEditCustomerDialog(true);
                               }}>
                                 <Edit className="w-4 h-4" />
-                                Edit
+                                Modifier
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem onClick={() => handleWhatsAppContact(customer.phone, customer.name)}>
@@ -1301,7 +1301,7 @@ export function CrmDashboard({
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => handleCall(customer.phone, customer.name)}>
                                 <Phone className="w-4 h-4" />
-                                Call
+                                Appeler
                               </DropdownMenuItem>
                               {customer.email && (
                                 <DropdownMenuItem onClick={() => handleEmail(customer.email!, customer.name)}>
@@ -1315,17 +1315,17 @@ export function CrmDashboard({
                                 setShowAddNoteDialog(true);
                               }}>
                                 <FileText className="w-4 h-4" />
-                                Add Note
+                                Ajouter une note
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => {
                                 setSelectedCustomer(customer);
                                 setShowAddTagDialog(true);
                               }}>
                                 <Tag className="w-4 h-4" />
-                                Add Tag
+                                Ajouter un tag
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem 
+                              <DropdownMenuItem
                                 className="text-red-600"
                                 onClick={() => {
                                   setCustomerToDelete(customer.id);
@@ -1333,7 +1333,7 @@ export function CrmDashboard({
                                 }}
                               >
                                 <Trash2 className="w-4 h-4" />
-                                Delete
+                                Supprimer
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -1348,16 +1348,16 @@ export function CrmDashboard({
               {totalPages > 1 && (
                 <div className="flex items-center justify-between p-4 border-t">
                   <p className="text-sm text-muted-foreground">
-                    Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, sortedCustomers.length)} of {sortedCustomers.length} customers
+                    Affichage {((currentPage - 1) * itemsPerPage) + 1}–{Math.min(currentPage * itemsPerPage, sortedCustomers.length)} sur {sortedCustomers.length} clients
                   </p>
                   <div className="flex gap-2">
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       size="sm"
                       disabled={currentPage === 1}
                       onClick={() => setCurrentPage(currentPage - 1)}
                     >
-                      Previous
+                      Précédent
                     </Button>
                     {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
                       <Button 
@@ -1370,13 +1370,13 @@ export function CrmDashboard({
                         {page}
                       </Button>
                     ))}
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       size="sm"
                       disabled={currentPage === totalPages}
                       onClick={() => setCurrentPage(currentPage + 1)}
                     >
-                      Next
+                      Suivant
                     </Button>
                   </div>
                 </div>
@@ -1389,8 +1389,8 @@ export function CrmDashboard({
               <div className="p-6 border-b border-border">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="font-semibold">Active Leads</h2>
-                    <p className="text-sm text-muted-foreground mt-0.5">Qualified sales opportunities</p>
+                    <h2 className="font-semibold">Leads actifs</h2>
+                    <p className="text-sm text-muted-foreground mt-0.5">Opportunités commerciales qualifiées</p>
                   </div>
                   <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">{visibleLeads.length}</Badge>
                 </div>
@@ -1403,7 +1403,7 @@ export function CrmDashboard({
                         <p className="font-medium text-foreground">{lead.name}</p>
                         <p className="text-xs text-muted-foreground mt-0.5">{lead.country} • {lead.phone}</p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          Owner: <span className="text-muted-foreground">{lead.owner}</span> · Onboarded:{" "}
+                          Responsable : <span className="text-muted-foreground">{lead.owner}</span> · Intégré par :{" "}
                           <span className="text-muted-foreground">{lead.onboardedBy}</span>
                         </p>
                         {lead.collaborators.length > 0 && (
@@ -1436,10 +1436,10 @@ export function CrmDashboard({
                     </div>
                     <div className="flex items-center justify-between text-sm mb-3">
                       <div>
-                        <p className="text-muted-foreground">Product: <span className="font-medium text-foreground">{lead.product}</span></p>
-                        <p className="text-muted-foreground mt-1">Estimated: <span className="font-medium text-green-600">{lead.estimatedValue}</span></p>
+                        <p className="text-muted-foreground">Produit : <span className="font-medium text-foreground">{lead.product}</span></p>
+                        <p className="text-muted-foreground mt-1">Estimé : <span className="font-medium text-green-600">{lead.estimatedValue}</span></p>
                         <p className="text-muted-foreground mt-1">
-                          Source: <span className="font-medium text-foreground">{lead.source}</span> · AI Score:{" "}
+                          Source : <span className="font-medium text-foreground">{lead.source}</span> · Score IA :{" "}
                           <span className="font-semibold text-violet-600 dark:text-violet-400">{lead.aiScore}/100</span>
                         </p>
                         {(lead.containerType || lead.originCountry) && (
@@ -1449,7 +1449,7 @@ export function CrmDashboard({
                           </p>
                         )}
                         <p className="text-muted-foreground mt-1">
-                          Next action: <span className="font-medium text-foreground">{lead.nextAction}</span>
+                          Prochaine action : <span className="font-medium text-foreground">{lead.nextAction}</span>
                         </p>
                         <div className="mt-1.5 flex gap-1.5 flex-wrap">
                           <LeadSLABadge updatedAtTs={lead.updatedAtTs} status={lead.status} slaStatus={lead.slaStatus} />
@@ -1462,7 +1462,7 @@ export function CrmDashboard({
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="Zelia AI">Zelia AI</SelectItem>
-                            <SelectItem value="Human Agent">Human Agent</SelectItem>
+                            <SelectItem value="Human Agent">Agent humain</SelectItem>
                             <SelectItem value="Sales Manager">Sales Manager</SelectItem>
                           </SelectContent>
                         </Select>
@@ -1470,28 +1470,28 @@ export function CrmDashboard({
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      <Button 
-                        size="sm" 
-                        variant="outline" 
+                      <Button
+                        size="sm"
+                        variant="outline"
                         className="flex-1 gap-2"
                         onClick={() => handleWhatsAppContact(lead.phone, lead.name)}
                       >
                         <MessageSquare className="w-3 h-3" />
-                        Contact
+                        Contacter
                       </Button>
-                      <Button 
-                        size="sm" 
-                        variant="outline" 
+                      <Button
+                        size="sm"
+                        variant="outline"
                         className="flex-1 gap-2"
                         onClick={() => {
                           openLeadDetails(lead);
                         }}
                       >
                         <Eye className="w-3 h-3" />
-                        Details
+                        Détails
                       </Button>
-                      <Button 
-                        size="sm" 
+                      <Button
+                        size="sm"
                         className="flex-1 gap-2 bg-primary hover:bg-primary/90"
                         onClick={() => {
                           setSelectedLead(lead);
@@ -1499,7 +1499,7 @@ export function CrmDashboard({
                         }}
                       >
                         <UserCheck className="w-3 h-3" />
-                        Convert
+                        Convertir
                       </Button>
                     </div>
                   </div>
@@ -1513,8 +1513,8 @@ export function CrmDashboard({
               <div className="p-6 border-b border-border">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="font-semibold">New Prospects</h2>
-                    <p className="text-sm text-muted-foreground mt-0.5">Unqualified inquiries</p>
+                    <h2 className="font-semibold">Nouveaux prospects</h2>
+                    <p className="text-sm text-muted-foreground mt-0.5">Demandes non qualifiées</p>
                   </div>
                   <Badge variant="outline">{visibleProspects.length}</Badge>
                 </div>
@@ -1527,7 +1527,7 @@ export function CrmDashboard({
                         <p className="font-medium text-foreground">{prospect.name}</p>
                         <p className="text-xs text-muted-foreground mt-0.5">{prospect.country} • {prospect.phone}</p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          Owner: <span className="text-muted-foreground">{prospect.owner}</span> · Onboarded:{" "}
+                          Responsable : <span className="text-muted-foreground">{prospect.owner}</span> · Intégré par :{" "}
                           <span className="text-muted-foreground">{prospect.onboardedBy}</span>
                         </p>
                         {prospect.collaborators.length > 0 && (
@@ -1558,10 +1558,10 @@ export function CrmDashboard({
                       </Badge>
                     </div>
                     <div className="text-sm mb-3">
-                      <p className="text-muted-foreground">Inquiry: <span className="font-medium text-foreground">{prospect.inquiry}</span></p>
-                      <p className="text-xs text-muted-foreground mt-1">Source: {prospect.source}</p>
+                      <p className="text-muted-foreground">Demande : <span className="font-medium text-foreground">{prospect.inquiry}</span></p>
+                      <p className="text-xs text-muted-foreground mt-1">Source : {prospect.source}</p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Intent score: <span className="font-semibold text-violet-600 dark:text-violet-400">{prospect.intentScore}/100</span>
+                        Score intention : <span className="font-semibold text-violet-600 dark:text-violet-400">{prospect.intentScore}/100</span>
                       </p>
                       {prospect.notes && (
                         <p className="text-xs text-muted-foreground mt-1 italic">Note: {prospect.notes}</p>
@@ -1569,17 +1569,17 @@ export function CrmDashboard({
                     </div>
                     {prospect.status !== "Rejected" && prospect.status !== "Qualified" && (
                       <div className="flex gap-2">
-                        <Button 
-                          size="sm" 
-                          variant="outline" 
+                        <Button
+                          size="sm"
+                          variant="outline"
                           className="flex-1 gap-2"
                           onClick={() => handleContactProspect(prospect)}
                         >
                           <MessageSquare className="w-3 h-3" />
-                          Reply
+                          Répondre
                         </Button>
-                        <Button 
-                          size="sm" 
+                        <Button
+                          size="sm"
                           className="flex-1 gap-2 bg-primary hover:bg-primary/90 text-primary-foreground"
                           onClick={() => {
                             setSelectedProspect(prospect);
@@ -1591,10 +1591,10 @@ export function CrmDashboard({
                           }}
                         >
                           <CheckCircle className="w-3 h-3" />
-                          Qualify
+                          Qualifier
                         </Button>
-                        <Button 
-                          size="sm" 
+                        <Button
+                          size="sm"
                           variant="destructive"
                           className="flex-1 gap-2"
                           onClick={() => {
@@ -1603,7 +1603,7 @@ export function CrmDashboard({
                           }}
                         >
                           <XCircle className="w-3 h-3" />
-                          Reject
+                          Rejeter
                         </Button>
                       </div>
                     )}
@@ -1616,26 +1616,26 @@ export function CrmDashboard({
 
       {/* Add Customer Dialog */}
       <Dialog open={showAddCustomerDialog} onOpenChange={setShowAddCustomerDialog}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="max-w-[95vw] sm:max-w-[600px]">
           <DialogHeader>
-            <DialogTitle>Add New Customer</DialogTitle>
+            <DialogTitle>Ajouter un nouveau client</DialogTitle>
             <DialogDescription>
-              Enter the customer details below. Fields marked with * are required.
+              Saisissez les informations du client ci-dessous. Les champs marqués * sont obligatoires.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Name *</Label>
+                <Label htmlFor="name">Nom *</Label>
                 <Input
                   id="name"
-                  placeholder="Company or Person Name"
+                  placeholder="Nom de l'entreprise ou de la personne"
                   value={newCustomer.name}
                   onChange={(e) => setNewCustomer({ ...newCustomer, name: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="phone">Phone *</Label>
+                <Label htmlFor="phone">Téléphone *</Label>
                 <Input
                   id="phone"
                   placeholder="+234 801 234 5678"
@@ -1656,10 +1656,10 @@ export function CrmDashboard({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="country">Country *</Label>
+                <Label htmlFor="country">Pays *</Label>
                 <Select value={newCustomer.country} onValueChange={(value) => setNewCustomer({ ...newCustomer, country: value })}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select country" />
+                    <SelectValue placeholder="Sélectionner un pays" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Nigeria">Nigeria</SelectItem>
@@ -1678,10 +1678,10 @@ export function CrmDashboard({
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="owner">Owner</Label>
+                <Label htmlFor="owner">Responsable</Label>
                 <Select value={newCustomer.owner} onValueChange={(value) => setNewCustomer({ ...newCustomer, owner: value })}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select owner" />
+                    <SelectValue placeholder="Sélectionner un responsable" />
                   </SelectTrigger>
                   <SelectContent>
                     {ownerOptions.map((owner) => (
@@ -1691,7 +1691,7 @@ export function CrmDashboard({
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="collaborators">Collaborators</Label>
+                <Label htmlFor="collaborators">Collaborateurs</Label>
                 <Input
                   id="collaborators"
                   placeholder="Awa Mbemba, Jean Kouamé"
@@ -1701,7 +1701,7 @@ export function CrmDashboard({
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="city">City</Label>
+              <Label htmlFor="city">Ville</Label>
               <Input
                 id="city"
                 placeholder="Lagos, Nairobi, Accra..."
@@ -1713,7 +1713,7 @@ export function CrmDashboard({
               <Label htmlFor="notes">Notes</Label>
               <Textarea
                 id="notes"
-                placeholder="Additional information about the customer..."
+                placeholder="Informations complémentaires sur le client..."
                 value={newCustomer.notes}
                 onChange={(e) => setNewCustomer({ ...newCustomer, notes: e.target.value })}
                 rows={3}
@@ -1722,13 +1722,13 @@ export function CrmDashboard({
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAddCustomerDialog(false)}>
-              Cancel
+              Annuler
             </Button>
-            <Button 
+            <Button
               className="bg-amber-500 hover:bg-amber-600 text-white"
               onClick={handleAddCustomer}
             >
-              Add Customer
+              Ajouter le client
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1736,25 +1736,25 @@ export function CrmDashboard({
 
       {/* Edit Customer Dialog */}
       <Dialog open={showEditCustomerDialog} onOpenChange={setShowEditCustomerDialog}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="max-w-[95vw] sm:max-w-[600px]">
           <DialogHeader>
-            <DialogTitle>Edit Customer</DialogTitle>
+            <DialogTitle>Modifier le client</DialogTitle>
             <DialogDescription>
-              Update customer information
+              Mettre à jour les informations du client
             </DialogDescription>
           </DialogHeader>
           {editingCustomer && (
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Name *</Label>
+                  <Label>Nom *</Label>
                   <Input
                     value={editingCustomer.name}
                     onChange={(e) => setEditingCustomer({ ...editingCustomer, name: e.target.value })}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Phone *</Label>
+                  <Label>Téléphone *</Label>
                   <Input
                     value={editingCustomer.phone}
                     onChange={(e) => setEditingCustomer({ ...editingCustomer, phone: e.target.value })}
@@ -1771,7 +1771,7 @@ export function CrmDashboard({
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Country</Label>
+                  <Label>Pays</Label>
                   <Select value={editingCustomer.country} onValueChange={(value) => setEditingCustomer({ ...editingCustomer, country: value })}>
                     <SelectTrigger>
                       <SelectValue />
@@ -1785,7 +1785,7 @@ export function CrmDashboard({
                 </div>
               </div>
               <div className="space-y-2">
-                <Label>Owner</Label>
+                <Label>Responsable</Label>
                 <Select value={editingCustomer.owner} onValueChange={(value) => setEditingCustomer({ ...editingCustomer, owner: value })}>
                   <SelectTrigger>
                     <SelectValue />
@@ -1798,7 +1798,7 @@ export function CrmDashboard({
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Collaborators</Label>
+                <Label>Collaborateurs</Label>
                 <Input
                   value={(editingCustomer.collaborators || []).join(", ")}
                   onChange={(e) =>
@@ -1810,22 +1810,22 @@ export function CrmDashboard({
                 />
               </div>
               <div className="space-y-2">
-                <Label>City</Label>
+                <Label>Ville</Label>
                 <Input
                   value={editingCustomer.city || ""}
                   onChange={(e) => setEditingCustomer({ ...editingCustomer, city: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
-                <Label>Risk Score</Label>
+                <Label>Niveau de risque</Label>
                 <Select value={editingCustomer.riskScore} onValueChange={(value) => setEditingCustomer({ ...editingCustomer, riskScore: value as Customer["riskScore"] })}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Low">Low Risk</SelectItem>
-                    <SelectItem value="Medium">Medium Risk</SelectItem>
-                    <SelectItem value="High">High Risk</SelectItem>
+                    <SelectItem value="Low">Risque faible</SelectItem>
+                    <SelectItem value="Medium">Risque moyen</SelectItem>
+                    <SelectItem value="High">Risque élevé</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1833,13 +1833,13 @@ export function CrmDashboard({
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowEditCustomerDialog(false)}>
-              Cancel
+              Annuler
             </Button>
             <Button 
               className="bg-amber-500 hover:bg-amber-600 text-white"
               onClick={handleEditCustomer}
             >
-              Save Changes
+              Enregistrer les modifications
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1849,19 +1849,18 @@ export function CrmDashboard({
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogTitle>Êtes-vous absolument sûr ?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the customer
-              and all associated data.
+              Cette action est irréversible. Le client et toutes ses données associées seront définitivement supprimés.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
               onClick={handleDeleteCustomer}
               className="bg-red-600 hover:bg-red-700"
             >
-              Delete
+              Supprimer
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1869,24 +1868,24 @@ export function CrmDashboard({
 
       {/* Add Tag Dialog */}
       <Dialog open={showAddTagDialog} onOpenChange={setShowAddTagDialog}>
-        <DialogContent className="sm:max-w-[400px]">
+        <DialogContent className="max-w-[95vw] sm:max-w-[400px]">
           <DialogHeader>
-            <DialogTitle>Add Tag</DialogTitle>
+            <DialogTitle>Ajouter un tag</DialogTitle>
             <DialogDescription>
-              Add a tag to {selectedCustomer?.name}
+              Ajouter un tag à {selectedCustomer?.name}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>Tag Name</Label>
+              <Label>Nom du tag</Label>
               <Input
-                placeholder="e.g., VIP, Premium, etc."
+                placeholder="ex : VIP, Premium, etc."
                 value={newTag}
                 onChange={(e) => setNewTag(e.target.value)}
               />
             </div>
             <div className="space-y-2">
-              <Label>Quick Select</Label>
+              <Label>Sélection rapide</Label>
               <div className="flex flex-wrap gap-2">
                 {["VIP", "Premium", "Wholesale", "Retail", "Distributor"].map(tag => (
                   <Badge 
@@ -1903,10 +1902,10 @@ export function CrmDashboard({
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAddTagDialog(false)}>
-              Cancel
+              Annuler
             </Button>
             <Button onClick={handleAddTag}>
-              Add Tag
+              Ajouter le tag
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1914,16 +1913,16 @@ export function CrmDashboard({
 
       {/* Add Note Dialog */}
       <Dialog open={showAddNoteDialog} onOpenChange={setShowAddNoteDialog}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="max-w-[95vw] sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>Add Note</DialogTitle>
+            <DialogTitle>Ajouter une note</DialogTitle>
             <DialogDescription>
-              Add a note for {selectedCustomer?.name}
+              Ajouter une note pour {selectedCustomer?.name}
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
             <Textarea
-              placeholder="Enter your note..."
+              placeholder="Saisir votre note..."
               value={newNote}
               onChange={(e) => setNewNote(e.target.value)}
               rows={5}
@@ -1931,10 +1930,10 @@ export function CrmDashboard({
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAddNoteDialog(false)}>
-              Cancel
+              Annuler
             </Button>
             <Button onClick={handleAddNote}>
-              Add Note
+              Ajouter la note
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1942,10 +1941,10 @@ export function CrmDashboard({
 
       {/* Lead Details Dialog */}
       <Dialog open={showLeadDetailsDialog} onOpenChange={setShowLeadDetailsDialog}>
-        <DialogContent className="sm:max-w-[640px]">
+        <DialogContent className="max-w-[95vw] sm:max-w-[640px]">
           <DialogHeader>
-            <DialogTitle>Lead Details</DialogTitle>
-            <DialogDescription>Review, update, and convert this lead.</DialogDescription>
+            <DialogTitle>Détails du lead</DialogTitle>
+            <DialogDescription>Consulter, mettre à jour et convertir ce lead.</DialogDescription>
           </DialogHeader>
           {selectedLead ? (
             <div className="space-y-4">
@@ -1957,7 +1956,7 @@ export function CrmDashboard({
                     {selectedLead.country} • {selectedLead.phone}
                   </p>
                   <p className="text-xs text-muted-foreground mt-2">
-                    Owner: <span className="text-muted-foreground">{selectedLead.owner}</span> · Onboarded:{" "}
+                    Responsable : <span className="text-muted-foreground">{selectedLead.owner}</span> · Intégré par :{" "}
                     <span className="text-muted-foreground">{selectedLead.onboardedBy}</span>
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2">
@@ -1982,21 +1981,21 @@ export function CrmDashboard({
                   </div>
                 </div>
                 <div className="rounded-lg border border-border p-4">
-                  <p className="text-xs text-muted-foreground">Opportunity</p>
+                  <p className="text-xs text-muted-foreground">Opportunité</p>
                   <p className="text-lg font-semibold text-foreground">{selectedLead.product}</p>
                   <p className="text-sm font-medium text-green-600">{selectedLead.estimatedValue}</p>
-                  <p className="text-xs text-muted-foreground mt-2">Source: {selectedLead.source}</p>
+                  <p className="text-xs text-muted-foreground mt-2">Source : {selectedLead.source}</p>
                   <div className="mt-2 flex items-center gap-2">
                     <Badge className="bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300 border border-violet-200 dark:border-violet-800">
-                      AI {selectedLead.aiScore}/100
+                      IA {selectedLead.aiScore}/100
                     </Badge>
-                    <span className="text-xs text-muted-foreground">Last contact: {selectedLead.lastContact}</span>
+                    <span className="text-xs text-muted-foreground">Dernier contact : {selectedLead.lastContact}</span>
                   </div>
                 </div>
               </div>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label>Status</Label>
+                  <Label>Statut</Label>
                   <Select value={leadStatus} onValueChange={(value) => setLeadStatus(value as Lead["status"])}>
                     <SelectTrigger>
                       <SelectValue />
@@ -2011,21 +2010,21 @@ export function CrmDashboard({
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Assigned Agent</Label>
+                  <Label>Agent assigné</Label>
                   <Select value={assignedAgent} onValueChange={setAssignedAgent}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="Zelia AI">Zelia AI</SelectItem>
-                      <SelectItem value="Human Agent">Human Agent</SelectItem>
+                      <SelectItem value="Human Agent">Agent humain</SelectItem>
                       <SelectItem value="Sales Manager">Sales Manager</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
               <div className="space-y-2">
-                <Label>Owner</Label>
+                <Label>Responsable</Label>
                 <Select value={leadOwner} onValueChange={setLeadOwner}>
                   <SelectTrigger>
                     <SelectValue />
@@ -2038,7 +2037,7 @@ export function CrmDashboard({
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Collaborators</Label>
+                <Label>Collaborateurs</Label>
                 <Input
                   placeholder="Awa Mbemba, Jean Kouamé"
                   value={leadCollaborators}
@@ -2046,9 +2045,9 @@ export function CrmDashboard({
                 />
               </div>
               <div className="space-y-2">
-                <Label>Next Action</Label>
+                <Label>Prochaine action</Label>
                 <Input
-                  placeholder="Example: Send pricing breakdown"
+                  placeholder="Exemple : Envoyer la grille de prix"
                   value={leadNextAction}
                   onChange={(e) => setLeadNextAction(e.target.value)}
                 />
@@ -2056,34 +2055,34 @@ export function CrmDashboard({
               <div className="space-y-2">
                 <Label>Notes</Label>
                 <Textarea
-                  placeholder="Add context, objections, next steps..."
+                  placeholder="Ajouter du contexte, des objections, les prochaines étapes..."
                   value={leadNotes}
                   onChange={(e) => setLeadNotes(e.target.value)}
                   rows={4}
                 />
               </div>
               <div className="rounded-lg border border-border p-4">
-                <p className="text-xs font-semibold text-muted-foreground mb-2">Activity Timeline</p>
+                <p className="text-xs font-semibold text-muted-foreground mb-2">{"Fil d'activité"}</p>
                 <ul className="space-y-2 text-sm text-muted-foreground">
-                  <li>• Lead onboarded by {selectedLead.onboardedBy} ({selectedLead.source})</li>
-                  <li>• Status set to {leadStatus} · Last contact {selectedLead.lastContact}</li>
-                  <li>• Next action: {leadNextAction || selectedLead.nextAction}</li>
+                  <li>{"• Lead intégré par"} {selectedLead.onboardedBy} ({selectedLead.source})</li>
+                  <li>{"• Statut :"} {leadStatus} · {"Dernier contact"} {selectedLead.lastContact}</li>
+                  <li>{"• Prochaine action :"} {leadNextAction || selectedLead.nextAction}</li>
                 </ul>
               </div>
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">No lead selected.</p>
+            <p className="text-sm text-muted-foreground">Aucun lead sélectionné.</p>
           )}
           <DialogFooter className="gap-2 sm:gap-0">
             <Button variant="outline" onClick={() => setShowLeadDetailsDialog(false)}>
-              Close
+              Fermer
             </Button>
             <Button
               variant="outline"
               className="border-border text-foreground hover:bg-accent"
               onClick={handleSaveLeadDetails}
             >
-              Save Updates
+              Enregistrer
             </Button>
             <Button
               className="bg-primary hover:bg-primary/90"
@@ -2092,7 +2091,7 @@ export function CrmDashboard({
                 setShowConvertLeadDialog(true);
               }}
             >
-              Convert
+              Convertir
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2100,27 +2099,27 @@ export function CrmDashboard({
 
       {/* Convert Lead Dialog */}
       <Dialog open={showConvertLeadDialog} onOpenChange={setShowConvertLeadDialog}>
-        <DialogContent className="sm:max-w-[400px]">
+        <DialogContent className="max-w-[95vw] sm:max-w-[400px]">
           <DialogHeader>
-            <DialogTitle>Convert Lead to Customer</DialogTitle>
+            <DialogTitle>Convertir le lead en client</DialogTitle>
             <DialogDescription>
-              Convert {selectedLead?.name} to a customer?
+              Convertir {selectedLead?.name} en client ?
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
             <p className="text-sm text-muted-foreground">
-              This will create a new customer record and remove this lead from the leads list.
+              Un nouveau profil client sera créé et ce lead sera retiré de la liste des leads.
             </p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowConvertLeadDialog(false)}>
-              Cancel
+              Annuler
             </Button>
-            <Button 
+            <Button
               className="bg-primary hover:bg-primary/90"
               onClick={handleConvertLead}
             >
-              Convert to Customer
+              Convertir en client
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2128,20 +2127,20 @@ export function CrmDashboard({
 
       {/* Qualify Prospect Dialog */}
       <Dialog open={showQualifyProspectDialog} onOpenChange={setShowQualifyProspectDialog}>
-        <DialogContent className="sm:max-w-[520px]">
+        <DialogContent className="max-w-[95vw] sm:max-w-[520px]">
           <DialogHeader>
-            <DialogTitle>Qualify Prospect</DialogTitle>
+            <DialogTitle>Qualifier le prospect</DialogTitle>
             <DialogDescription>
-              Convert {selectedProspect?.name} to an active lead?
+              Convertir {selectedProspect?.name} en lead actif ?
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2">
             <p className="text-sm text-muted-foreground">
-              This will create a new lead and mark this prospect as qualified.
+              Un nouveau lead sera créé et ce prospect sera marqué comme qualifié.
             </p>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Estimated Value</Label>
+                <Label>Valeur estimée</Label>
                 <Input
                   placeholder="$0"
                   value={qualifyEstimatedValue}
@@ -2156,7 +2155,7 @@ export function CrmDashboard({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Zelia AI">Zelia AI</SelectItem>
-                    <SelectItem value="Human Agent">Human Agent</SelectItem>
+                    <SelectItem value="Human Agent">Agent humain</SelectItem>
                     <SelectItem value="Sales Manager">Sales Manager</SelectItem>
                   </SelectContent>
                 </Select>
@@ -2164,7 +2163,7 @@ export function CrmDashboard({
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Initial Status</Label>
+                <Label>Statut initial</Label>
                 <Select value={qualifyStatus} onValueChange={(value) => setQualifyStatus(value as Lead["status"])}>
                   <SelectTrigger>
                     <SelectValue />
@@ -2179,7 +2178,7 @@ export function CrmDashboard({
               <div className="space-y-2">
                 <Label>Notes</Label>
                 <Input
-                  placeholder="Optional notes"
+                  placeholder="Notes optionnelles"
                   value={qualifyNotes}
                   onChange={(e) => setQualifyNotes(e.target.value)}
                 />
@@ -2188,13 +2187,13 @@ export function CrmDashboard({
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowQualifyProspectDialog(false)}>
-              Cancel
+              Annuler
             </Button>
-            <Button 
+            <Button
               className="bg-primary hover:bg-primary/90"
               onClick={handleQualifyProspect}
             >
-              Qualify as Lead
+              Qualifier en lead
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2202,16 +2201,16 @@ export function CrmDashboard({
 
       {/* Reject Prospect Dialog */}
       <Dialog open={showRejectProspectDialog} onOpenChange={setShowRejectProspectDialog}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="max-w-[95vw] sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>Reject Prospect</DialogTitle>
+            <DialogTitle>Rejeter le prospect</DialogTitle>
             <DialogDescription>
-              Why are you rejecting {selectedProspect?.name}?
+              Pourquoi rejetez-vous {selectedProspect?.name} ?
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
             <Textarea
-              placeholder="Enter rejection reason..."
+              placeholder="Saisir la raison du rejet..."
               value={rejectionReason}
               onChange={(e) => setRejectionReason(e.target.value)}
               rows={4}
@@ -2219,13 +2218,13 @@ export function CrmDashboard({
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowRejectProspectDialog(false)}>
-              Cancel
+              Annuler
             </Button>
-            <Button 
+            <Button
               variant="destructive"
               onClick={handleRejectProspect}
             >
-              Reject Prospect
+              Rejeter le prospect
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2235,20 +2234,20 @@ export function CrmDashboard({
       <Sheet open={showFiltersSheet} onOpenChange={setShowFiltersSheet}>
         <SheetContent>
           <SheetHeader>
-            <SheetTitle>Filter Customers</SheetTitle>
+            <SheetTitle>Filtrer les clients</SheetTitle>
             <SheetDescription>
-              Apply filters to refine your customer list
+              Appliquer des filtres pour affiner la liste clients
             </SheetDescription>
           </SheetHeader>
           <div className="space-y-6 mt-6">
             <div className="space-y-2">
-              <Label>Country</Label>
+              <Label>Pays</Label>
               <Select value={selectedCountry} onValueChange={setSelectedCountry}>
                 <SelectTrigger>
-                  <SelectValue placeholder="All countries" />
+                  <SelectValue placeholder="Tous les pays" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All countries</SelectItem>
+                  <SelectItem value="all">Tous les pays</SelectItem>
                   {countries.map(country => (
                     <SelectItem key={country} value={country}>{country}</SelectItem>
                   ))}
@@ -2257,13 +2256,13 @@ export function CrmDashboard({
             </div>
 
             <div className="space-y-2">
-              <Label>Owner</Label>
+              <Label>Responsable</Label>
               <Select value={selectedOwner} onValueChange={setSelectedOwner}>
                 <SelectTrigger>
-                  <SelectValue placeholder="All owners" />
+                  <SelectValue placeholder="Tous les responsables" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All owners</SelectItem>
+                  <SelectItem value="all">Tous les responsables</SelectItem>
                   {ownerOptions.map((owner) => (
                     <SelectItem key={owner} value={owner}>{owner}</SelectItem>
                   ))}
@@ -2272,30 +2271,30 @@ export function CrmDashboard({
             </div>
 
             <div className="space-y-2">
-              <Label>Risk Score</Label>
+              <Label>Niveau de risque</Label>
               <Select value={selectedRiskScore} onValueChange={setSelectedRiskScore}>
                 <SelectTrigger>
-                  <SelectValue placeholder="All risk levels" />
+                  <SelectValue placeholder="Tous les niveaux" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All risk levels</SelectItem>
-                  <SelectItem value="Low">Low Risk</SelectItem>
-                  <SelectItem value="Medium">Medium Risk</SelectItem>
-                  <SelectItem value="High">High Risk</SelectItem>
+                  <SelectItem value="all">Tous les niveaux</SelectItem>
+                  <SelectItem value="Low">Risque faible</SelectItem>
+                  <SelectItem value="Medium">Risque moyen</SelectItem>
+                  <SelectItem value="High">Risque élevé</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-2">
-              <Label>WhatsApp Status</Label>
+              <Label>Statut WhatsApp</Label>
               <Select value={selectedWhatsappStatus} onValueChange={setSelectedWhatsappStatus}>
                 <SelectTrigger>
-                  <SelectValue placeholder="All statuses" />
+                  <SelectValue placeholder="Tous les statuts" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All statuses</SelectItem>
-                  <SelectItem value="Active">Active</SelectItem>
-                  <SelectItem value="Inactive">Inactive</SelectItem>
+                  <SelectItem value="all">Tous les statuts</SelectItem>
+                  <SelectItem value="Active">Actif</SelectItem>
+                  <SelectItem value="Inactive">Inactif</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -2330,15 +2329,15 @@ export function CrmDashboard({
                   toast.success("Filters applied successfully");
                 }}
               >
-                Apply Filters
+                Appliquer les filtres
               </Button>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="w-full gap-2"
                 onClick={clearFilters}
               >
                 <X className="w-4 h-4" />
-                Clear All Filters
+                Effacer tous les filtres
               </Button>
             </div>
           </div>
@@ -2347,32 +2346,32 @@ export function CrmDashboard({
 
       {/* Import Dialog */}
       <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="max-w-[95vw] sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>Import Customers</DialogTitle>
+            <DialogTitle>Importer des clients</DialogTitle>
             <DialogDescription>
-              Upload a CSV file to import customers in bulk
+              Importer des clients en masse via un fichier CSV
             </DialogDescription>
           </DialogHeader>
           <div className="py-4 space-y-4">
             <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
               <Upload className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-sm text-muted-foreground mb-2">Drag and drop your CSV file here, or click to browse</p>
+              <p className="text-sm text-muted-foreground mb-2">Glissez-déposez votre fichier CSV ici, ou cliquez pour parcourir</p>
               <Button variant="outline" size="sm">
-                Choose File
+                Choisir un fichier
               </Button>
             </div>
             <div className="bg-blue-50 p-4 rounded-lg">
-              <p className="text-sm font-medium text-blue-900 mb-2">CSV Format:</p>
-              <p className="text-xs text-blue-700">Name, Phone, Email, Country, City, Tags</p>
+              <p className="text-sm font-medium text-blue-900 mb-2">Format CSV :</p>
+              <p className="text-xs text-blue-700">Nom, Téléphone, Email, Pays, Ville, Tags</p>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowImportDialog(false)}>
-              Cancel
+              Annuler
             </Button>
             <Button className="bg-amber-500 hover:bg-amber-600 text-white">
-              Import
+              Importer
             </Button>
           </DialogFooter>
         </DialogContent>

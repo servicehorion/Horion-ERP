@@ -114,15 +114,15 @@ const statusTheme: Record<string, string> = {
 };
 
 const metricLabel: Record<string, string> = {
-  marginPercent: "Margin",
-  cashPosition: "Cash",
-  overdueRate: "Overdue",
-  logisticsDelayRate: "Delay",
-  qcFailRate: "QC fail",
-  supplierRiskScore: "Supplier risk",
-  fxExposure: "FX exposure",
-  liquidityMetric: "Liquidity",
-  crmConversionRate: "CRM conversion",
+  marginPercent: "Marge",
+  cashPosition: "Trésorerie",
+  overdueRate: "Retard",
+  logisticsDelayRate: "Délai logistique",
+  qcFailRate: "Échec QC",
+  supplierRiskScore: "Risque fournisseur",
+  fxExposure: "Exposition FX",
+  liquidityMetric: "Liquidité",
+  crmConversionRate: "Conversion CRM",
 };
 
 function formatMetric(metric?: string | null, value?: number | null) {
@@ -172,7 +172,7 @@ export function RiskCommand({ data }: { data: RiskCommandData }) {
         toast.error(res.error);
         return;
       }
-      toast.success("Risk owner updated");
+      toast.success("Responsable mis à jour");
       refreshPage();
     });
   }
@@ -186,7 +186,7 @@ export function RiskCommand({ data }: { data: RiskCommandData }) {
         toast.error(res.error);
         return;
       }
-      toast.success("Risk status updated");
+      toast.success("Statut du risque mis à jour");
       refreshPage();
     });
   }
@@ -198,14 +198,14 @@ export function RiskCommand({ data }: { data: RiskCommandData }) {
         toast.error(res.error);
         return;
       }
-      toast.success("Mitigation task created");
+      toast.success("Tâche corrective créée");
       refreshPage();
     });
   }
 
   function submitNote() {
     if (!noteRiskId || !noteTitle.trim()) {
-      toast.error("Mitigation title required");
+      toast.error("Le titre de l'action corrective est requis");
       return;
     }
 
@@ -219,7 +219,7 @@ export function RiskCommand({ data }: { data: RiskCommandData }) {
         toast.error(res.error);
         return;
       }
-      toast.success("Mitigation entry added");
+      toast.success("Entrée corrective ajoutée");
       setNoteRiskId(null);
       setNoteTitle("");
       setNoteDetail("");
@@ -233,46 +233,46 @@ export function RiskCommand({ data }: { data: RiskCommandData }) {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base">
-              <ShieldAlert className="h-4 w-4 text-red-500" /> Critical risks
+              <ShieldAlert className="h-4 w-4 text-red-500" /> Risques critiques
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-semibold">{data.summary.critical}</div>
-            <div className="text-xs text-muted-foreground">Need immediate command action</div>
+            <div className="text-xs text-muted-foreground">Nécessitent une action immédiate</div>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base">
-              <Siren className="h-4 w-4 text-amber-500" /> Escalated
+              <Siren className="h-4 w-4 text-amber-500" /> Escaladés
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-semibold">{data.summary.escalated}</div>
-            <div className="text-xs text-muted-foreground">Cross-OS mitigation in flight</div>
+            <div className="text-xs text-muted-foreground">Atténuation inter-modules en cours</div>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base">
-              <UserCog className="h-4 w-4 text-blue-500" /> Mitigating
+              <UserCog className="h-4 w-4 text-blue-500" /> En atténuation
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-semibold">{data.summary.mitigating}</div>
-            <div className="text-xs text-muted-foreground">Owned with active follow-up</div>
+            <div className="text-xs text-muted-foreground">Assignés avec suivi actif</div>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base">
-              <ShieldCheck className="h-4 w-4 text-emerald-500" /> Recent registry activity
+              <ShieldCheck className="h-4 w-4 text-emerald-500" /> Activité récente du registre
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-1 text-sm">
-            <div>Created 24h: {data.summary.sync.created}</div>
-            <div>Updated 24h: {data.summary.sync.updated}</div>
-            <div>Resolved 24h: {data.summary.sync.resolved}</div>
+            <div>Créés 24h : {data.summary.sync.created}</div>
+            <div>Mis à jour 24h : {data.summary.sync.updated}</div>
+            <div>Résolus 24h : {data.summary.sync.resolved}</div>
           </CardContent>
         </Card>
       </div>
@@ -281,9 +281,9 @@ export function RiskCommand({ data }: { data: RiskCommandData }) {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <div>
-              <CardTitle className="text-base">Risk registry</CardTitle>
+              <CardTitle className="text-base">Registre des risques</CardTitle>
               <div className="text-xs text-muted-foreground">
-                Strategic risks detected across finance, logistics, sourcing, QC, and CRM.
+                Risques stratégiques détectés sur finance, logistique, sourcing, QC et CRM.
               </div>
             </div>
             <Button variant="outline" onClick={handleSync} disabled={pending}>
@@ -296,10 +296,10 @@ export function RiskCommand({ data }: { data: RiskCommandData }) {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Risk</TableHead>
+                    <TableHead>Risque</TableHead>
                     <TableHead>Signal</TableHead>
-                    <TableHead>Owner</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead>Responsable</TableHead>
+                    <TableHead>Statut</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -324,13 +324,13 @@ export function RiskCommand({ data }: { data: RiskCommandData }) {
                           </div>
                           {risk.linkedHref ? (
                             <Link href={risk.linkedHref} className="text-xs text-blue-600">
-                              Drill-down to OS
+                              Voir le module
                             </Link>
                           ) : null}
                         </div>
                       </TableCell>
                       <TableCell className="align-top">
-                        <div className="text-sm">{risk.entries[0]?.title || "No entry"}</div>
+                        <div className="text-sm">{risk.entries[0]?.title || "Aucune entrée"}</div>
                         <div className="text-xs text-muted-foreground">
                           {new Date(risk.lastDetectedAt).toLocaleString("fr-FR")}
                         </div>
@@ -341,10 +341,10 @@ export function RiskCommand({ data }: { data: RiskCommandData }) {
                           onValueChange={(value) => handleOwnerChange(risk.id, value)}
                         >
                           <SelectTrigger className="w-[180px]">
-                            <SelectValue placeholder="Owner" />
+                            <SelectValue placeholder="Responsable" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="unassigned">Unassigned</SelectItem>
+                            <SelectItem value="unassigned">Non assigné</SelectItem>
                             {data.owners.map((owner) => (
                               <SelectItem key={owner.id} value={owner.id}>
                                 {owner.name}
@@ -356,7 +356,7 @@ export function RiskCommand({ data }: { data: RiskCommandData }) {
                       <TableCell className="align-top">
                         <Select value={risk.status} onValueChange={(value) => handleStatusChange(risk.id, value)}>
                           <SelectTrigger className="w-[150px]">
-                            <SelectValue placeholder="Status" />
+                            <SelectValue placeholder="Statut" />
                           </SelectTrigger>
                           <SelectContent>
                             {["OPEN", "MITIGATING", "ESCALATED", "RESOLVED", "ACCEPTED"].map((status) => (
@@ -370,10 +370,10 @@ export function RiskCommand({ data }: { data: RiskCommandData }) {
                       <TableCell className="align-top text-right">
                         <div className="flex justify-end gap-2">
                           <Button size="sm" variant="outline" onClick={() => setNoteRiskId(risk.id)}>
-                            Add note
+                            Ajouter note
                           </Button>
                           <Button size="sm" onClick={() => handleEscalate(risk.id)}>
-                            Escalate
+                            Escalader
                           </Button>
                         </div>
                       </TableCell>
@@ -382,7 +382,7 @@ export function RiskCommand({ data }: { data: RiskCommandData }) {
                   {criticalRisks.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={5} className="py-6 text-center text-sm text-muted-foreground">
-                        No critical risk currently requires escalation.
+                        Aucun risque critique ne nécessite d'escalade pour le moment.
                       </TableCell>
                     </TableRow>
                   ) : null}
@@ -394,7 +394,7 @@ export function RiskCommand({ data }: { data: RiskCommandData }) {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">AI-assisted priorities</CardTitle>
+            <CardTitle className="text-base">Priorités assistées par IA</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {data.assistantNotes.map((note, index) => (
@@ -418,7 +418,7 @@ export function RiskCommand({ data }: { data: RiskCommandData }) {
       <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Mitigation timeline</CardTitle>
+            <CardTitle className="text-base">Chronologie des actions correctives</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {data.timeline.map((entry) => (
@@ -441,14 +441,14 @@ export function RiskCommand({ data }: { data: RiskCommandData }) {
               </div>
             ))}
             {data.timeline.length === 0 ? (
-              <div className="text-sm text-muted-foreground">No mitigation activity yet.</div>
+              <div className="text-sm text-muted-foreground">Aucune activité corrective pour le moment.</div>
             ) : null}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Action plans</CardTitle>
+            <CardTitle className="text-base">Plans d'action</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {activeRisks.slice(0, 5).map((risk) => (
@@ -476,19 +476,19 @@ export function RiskCommand({ data }: { data: RiskCommandData }) {
       <Dialog open={Boolean(noteRiskId)} onOpenChange={(open) => !open && setNoteRiskId(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add mitigation entry</DialogTitle>
+            <DialogTitle>Ajouter une entrée corrective</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Title</Label>
+              <Label>Titre</Label>
               <Input value={noteTitle} onChange={(event) => setNoteTitle(event.target.value)} />
             </div>
             <div className="space-y-2">
-              <Label>Detail</Label>
+              <Label>Détail</Label>
               <Textarea value={noteDetail} onChange={(event) => setNoteDetail(event.target.value)} rows={5} />
             </div>
             <Button onClick={submitNote} disabled={pending}>
-              Save mitigation entry
+              Enregistrer l'entrée
             </Button>
           </div>
         </DialogContent>

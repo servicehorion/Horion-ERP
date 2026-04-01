@@ -32,7 +32,8 @@ export default async function ProjectsPage() {
   if (!session?.user?.tenantId) redirect("/login");
 
   const result = await getProjects({ limit: 100 });
-  const projects = result.data || [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const projects = (result.data || []) as any[];
 
   const stats = {
     total: projects.length,
@@ -207,7 +208,7 @@ export default async function ProjectsPage() {
                     {/* Member avatars */}
                     {project.members && project.members.length > 0 && (
                       <div className="flex -space-x-1.5 pt-1">
-                        {project.members.slice(0, 5).map((m) => (
+                        {project.members.slice(0, 5).map((m: any) => (
                           <div
                             key={m.userId}
                             className="w-6 h-6 rounded-full bg-primary/20 border border-background flex items-center justify-center text-[9px] font-medium"

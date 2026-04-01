@@ -419,19 +419,19 @@ export function CustomerProfileReplica() {
                     </span>
                     <span className="flex items-center gap-1">
                       <Calendar className="w-4 h-4" />
-                      Customer since {customer.joinedDate}
+                      Client depuis {customer.joinedDate}
                     </span>
                     <span className="flex items-center gap-1">
                       <Clock className="w-4 h-4" />
-                      Last contact: {customer.lastContact}
+                      Dernier contact : {customer.lastContact}
                     </span>
                     <span className="flex items-center gap-1">
                       <Users className="w-4 h-4" />
-                      Onboarded by {customer.onboardedBy}
+                      Intégré par {customer.onboardedBy}
                     </span>
                     <span className="flex items-center gap-1">
                       <Users className="w-4 h-4" />
-                      Account manager {customer.accountManager}
+                      Responsable de compte {customer.accountManager}
                     </span>
                   </div>
                 </div>
@@ -452,19 +452,19 @@ export function CustomerProfileReplica() {
                   <Mail className="w-4 h-4 mr-2" />
                   Email
                 </Button>
-                <Button 
+                <Button
                   onClick={() => setShowEditDialog(true)}
                   className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
                 >
                   <Edit className="w-4 h-4 mr-2" />
-                  Edit
+                  Modifier
                 </Button>
-                <Button 
-                  onClick={() => toast.success("Customer data exported")}
+                <Button
+                  onClick={() => toast.success("Données client exportées")}
                   className="bg-[#010150] hover:bg-[#010150]/90 text-white"
                 >
                   <Download className="w-4 h-4 mr-2" />
-                  Export
+                  Exporter
                 </Button>
               </div>
             </div>
@@ -477,35 +477,35 @@ export function CustomerProfileReplica() {
             <TabsList className="bg-white border border-gray-200 p-1">
               <TabsTrigger value="intelligence" className="data-[state=active]:bg-[#010150] data-[state=active]:text-white">
                 <Brain className="w-4 h-4 mr-2" />
-                Intelligence Dashboard
+                Tableau de bord intelligence
               </TabsTrigger>
               <TabsTrigger value="financial" className="data-[state=active]:bg-[#010150] data-[state=active]:text-white">
                 <DollarSign className="w-4 h-4 mr-2" />
-                Financial Performance
+                Performance financière
               </TabsTrigger>
               <TabsTrigger value="pipeline" className="data-[state=active]:bg-[#010150] data-[state=active]:text-white">
                 <Target className="w-4 h-4 mr-2" />
-                Future Pipeline
+                Pipeline futur
               </TabsTrigger>
               <TabsTrigger value="risk" className="data-[state=active]:bg-[#010150] data-[state=active]:text-white">
                 <Shield className="w-4 h-4 mr-2" />
-                Risk & Exposure
+                Risque & exposition
               </TabsTrigger>
               <TabsTrigger value="supply" className="data-[state=active]:bg-[#010150] data-[state=active]:text-white">
                 <Ship className="w-4 h-4 mr-2" />
-                Supply Chain
+                Chaîne logistique
               </TabsTrigger>
               <TabsTrigger value="ai" className="data-[state=active]:bg-[#010150] data-[state=active]:text-white">
                 <Sparkles className="w-4 h-4 mr-2" />
-                AI Customer Brain
+                IA Client
               </TabsTrigger>
               <TabsTrigger value="timeline" className="data-[state=active]:bg-[#010150] data-[state=active]:text-white">
                 <Clock className="w-4 h-4 mr-2" />
-                Timeline
+                {"Fil d'activité"}
               </TabsTrigger>
               <TabsTrigger value="orders" className="data-[state=active]:bg-[#010150] data-[state=active]:text-white">
                 <Package className="w-4 h-4 mr-2" />
-                Orders & History
+                Commandes & historique
               </TabsTrigger>
             </TabsList>
 
@@ -519,8 +519,8 @@ export function CustomerProfileReplica() {
                     <ArrowUpRight className="w-4 h-4 text-green-600" />
                   </div>
                   <p className="text-2xl font-bold text-[#010150]">${(customer.financialIntelligence.lifetimeNetProfit / 1000).toFixed(1)}K</p>
-                  <p className="text-xs text-gray-600 mt-1">Net Profit (LTD)</p>
-                  <p className="text-xs text-green-600 font-medium mt-1">+{customer.financialIntelligence.profitGrowth}% YoY</p>
+                  <p className="text-xs text-gray-600 mt-1">Bénéfice net (LTD)</p>
+                  <p className="text-xs text-green-600 font-medium mt-1">+{customer.financialIntelligence.profitGrowth}% annuel</p>
                 </Card>
 
                 <Card className="p-4 border-2 border-blue-200 bg-blue-50">
@@ -529,8 +529,8 @@ export function CustomerProfileReplica() {
                     <TrendingUp className="w-4 h-4 text-blue-600" />
                   </div>
                   <p className="text-2xl font-bold text-[#010150]">{customer.financialIntelligence.averageMargin}%</p>
-                  <p className="text-xs text-gray-600 mt-1">Avg Margin</p>
-                  <p className="text-xs text-gray-500 font-medium mt-1">vs {avgCustomerBenchmark.averageMargin}% avg</p>
+                  <p className="text-xs text-gray-600 mt-1">Marge moyenne</p>
+                  <p className="text-xs text-gray-500 font-medium mt-1">vs {avgCustomerBenchmark.averageMargin}% moy.</p>
                 </Card>
 
                 <Card className="p-4 border-2 border-purple-200 bg-purple-50">
@@ -539,8 +539,8 @@ export function CustomerProfileReplica() {
                     <Badge className="bg-purple-600 text-white text-xs px-2 py-0">Top 5%</Badge>
                   </div>
                   <p className="text-2xl font-bold text-[#010150]">{customer.financialIntelligence.contributionScore}</p>
-                  <p className="text-xs text-gray-600 mt-1">Contribution Score</p>
-                  <p className="text-xs text-purple-600 font-medium mt-1">Critical to cashflow</p>
+                  <p className="text-xs text-gray-600 mt-1">Score de contribution</p>
+                  <p className="text-xs text-purple-600 font-medium mt-1">Critique pour la trésorerie</p>
                 </Card>
 
                 <Card className="p-4 border-2 border-orange-200 bg-orange-50">
@@ -559,8 +559,8 @@ export function CustomerProfileReplica() {
                     <Zap className="w-4 h-4 text-[#5F27CD]" />
                   </div>
                   <p className="text-2xl font-bold text-[#010150]">${(weightedPipelineValue / 1000).toFixed(1)}K</p>
-                  <p className="text-xs text-gray-600 mt-1">Pipeline Value</p>
-                  <p className="text-xs text-[#5F27CD] font-medium mt-1">{customer.futurePipeline.length} opportunities</p>
+                  <p className="text-xs text-gray-600 mt-1">Valeur pipeline</p>
+                  <p className="text-xs text-[#5F27CD] font-medium mt-1">{customer.futurePipeline.length} opportunités</p>
                 </Card>
               </div>
 
@@ -570,28 +570,28 @@ export function CustomerProfileReplica() {
                 <Card className="p-5 border-2 border-[#010150]">
                   <h3 className="text-sm font-bold text-[#010150] mb-4 flex items-center">
                     <DollarSign className="w-4 h-4 mr-2 text-[#DBA000]" />
-                    Financial Performance
+                    Performance financière
                   </h3>
                   <div className="space-y-3">
                     <div className="flex items-center justify-between p-3 bg-gray-50 rounded">
-                      <span className="text-xs text-gray-600">Gross Revenue</span>
+                      <span className="text-xs text-gray-600">Chiffre d'affaires brut</span>
                       <span className="text-sm font-bold text-[#010150]">${(customer.financialIntelligence.lifetimeGrossRevenue / 1000).toFixed(1)}K</span>
                     </div>
                     <div className="flex items-center justify-between p-3 bg-green-50 rounded">
-                      <span className="text-xs text-gray-600">Net Profit</span>
+                      <span className="text-xs text-gray-600">Bénéfice net</span>
                       <span className="text-sm font-bold text-green-600">${(customer.financialIntelligence.lifetimeNetProfit / 1000).toFixed(1)}K</span>
                     </div>
                     <div className="flex items-center justify-between p-3 bg-blue-50 rounded">
-                      <span className="text-xs text-gray-600">Avg Order Value</span>
+                      <span className="text-xs text-gray-600">Valeur moy. commande</span>
                       <span className="text-sm font-bold text-blue-600">${(customer.financialIntelligence.avgOrderValue / 1000).toFixed(1)}K</span>
                     </div>
                     <div className="flex items-center justify-between p-3 bg-purple-50 rounded">
-                      <span className="text-xs text-gray-600">Order Frequency</span>
-                      <span className="text-sm font-bold text-purple-600">Every {customer.financialIntelligence.orderFrequency}d</span>
+                      <span className="text-xs text-gray-600">Fréquence commandes</span>
+                      <span className="text-sm font-bold text-purple-600">Tous les {customer.financialIntelligence.orderFrequency}j</span>
                     </div>
                   </div>
                   <Button className="w-full mt-4 bg-[#010150] hover:bg-[#010150]/90 text-white text-xs">
-                    View Full Financial Report
+                    Voir le rapport financier complet
                   </Button>
                 </Card>
 
@@ -599,36 +599,36 @@ export function CustomerProfileReplica() {
                 <Card className="p-5 border-2 border-[#010150]">
                   <h3 className="text-sm font-bold text-[#010150] mb-4 flex items-center">
                     <Shield className="w-4 h-4 mr-2 text-[#5F27CD]" />
-                    Risk Assessment
+                    Évaluation du risque
                   </h3>
                   <div className="text-center mb-4">
                     <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-green-100 border-4 border-green-600 mb-2">
                       <span className="text-2xl font-bold text-green-600">{customer.riskEngine.globalRiskScore}</span>
                     </div>
-                    <p className="text-xs font-bold text-green-600">LOW RISK</p>
+                    <p className="text-xs font-bold text-green-600">RISQUE FAIBLE</p>
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-gray-600">Payment Risk</span>
+                      <span className="text-gray-600">Risque paiement</span>
                       <Badge className="bg-green-100 text-green-700 px-2 py-0">{customer.riskEngine.paymentRisk}</Badge>
                     </div>
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-gray-600">Logistics Risk</span>
+                      <span className="text-gray-600">Risque logistique</span>
                       <Badge className="bg-green-100 text-green-700 px-2 py-0">{customer.riskEngine.logisticsRisk}</Badge>
                     </div>
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-gray-600">Customs Risk</span>
+                      <span className="text-gray-600">Risque douanier</span>
                       <Badge className="bg-yellow-100 text-yellow-700 px-2 py-0">{customer.riskEngine.customsRisk}</Badge>
                     </div>
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-gray-600">Country Risk</span>
+                      <span className="text-gray-600">Risque pays</span>
                       <Badge className="bg-yellow-100 text-yellow-700 px-2 py-0">{customer.riskEngine.countryRisk}</Badge>
                     </div>
                   </div>
                   <div className="mt-4 p-3 bg-green-50 rounded border border-green-200">
                     <p className="text-xs text-gray-700">
                       <CheckCircle className="w-3 h-3 inline text-green-600 mr-1" />
-                      Safe for exposure up to <strong>${(customer.riskEngine.maxRecommendedExposure / 1000).toFixed(0)}K</strong>
+                      Exposition sécurisée jusqu'à <strong>${(customer.riskEngine.maxRecommendedExposure / 1000).toFixed(0)}K</strong>
                     </p>
                   </div>
                 </Card>
@@ -637,11 +637,11 @@ export function CustomerProfileReplica() {
                 <Card className="p-5 border-2 border-[#5F27CD] bg-gradient-to-br from-purple-50 to-blue-50">
                   <h3 className="text-sm font-bold text-[#010150] mb-4 flex items-center">
                     <Brain className="w-4 h-4 mr-2 text-[#5F27CD]" />
-                    AI Customer Brain
+                    IA Client
                   </h3>
                   <div className="space-y-3">
                     <div className="p-3 bg-white rounded border border-purple-200">
-                      <p className="text-xs text-gray-600 mb-1">Buying Personality</p>
+                      <p className="text-xs text-gray-600 mb-1">Profil acheteur</p>
                       <p className="text-sm font-bold text-[#010150]">{customer.aiBrain.buyingPersonality.primary}</p>
                       <div className="flex flex-wrap gap-1 mt-2">
                         {customer.aiBrain.buyingPersonality.traits.map(trait => (
@@ -650,16 +650,16 @@ export function CustomerProfileReplica() {
                       </div>
                     </div>
                     <div className="p-3 bg-white rounded border border-blue-200">
-                      <p className="text-xs text-gray-600 mb-1">Negotiation Style</p>
+                      <p className="text-xs text-gray-600 mb-1">Style de négociation</p>
                       <p className="text-sm font-bold text-[#010150]">{customer.aiBrain.negotiationStyle.style}</p>
                       <p className="text-xs text-gray-600 mt-1">
-                        Price flex: {customer.aiBrain.negotiationStyle.priceFlexibility}
+                        Flexibilité prix : {customer.aiBrain.negotiationStyle.priceFlexibility}
                       </p>
                     </div>
                     <div className="p-3 bg-yellow-50 rounded border border-yellow-200">
                       <p className="text-xs text-gray-600 mb-1 flex items-center">
                         <Sparkles className="w-3 h-3 mr-1" />
-                        Top Upsell Opportunity
+                        {"Meilleure opportunité d'upsell"}
                       </p>
                       <p className="text-sm font-bold text-[#010150]">{customer.aiBrain.upsellOpportunities[0].product}</p>
                       <p className="text-xs text-yellow-700 mt-1">
@@ -677,7 +677,7 @@ export function CustomerProfileReplica() {
                   <h3 className="text-sm font-bold text-[#010150] mb-4 flex items-center justify-between">
                     <span className="flex items-center">
                       <Target className="w-4 h-4 mr-2 text-purple-600" />
-                      Active Pipeline
+                      Pipeline actif
                     </span>
                     <Badge className="bg-purple-100 text-purple-700 px-2 py-1">{customer.futurePipeline.length} deals</Badge>
                   </h3>
@@ -705,9 +705,9 @@ export function CustomerProfileReplica() {
                   <h3 className="text-sm font-bold text-[#010150] mb-4 flex items-center justify-between">
                     <span className="flex items-center">
                       <Ship className="w-4 h-4 mr-2 text-blue-600" />
-                      Supply Chain Status
+                      Statut chaîne logistique
                     </span>
-                    <Badge className="bg-blue-100 text-blue-700 px-2 py-1">{customer.supplyChain.preferredSuppliers.length} suppliers</Badge>
+                    <Badge className="bg-blue-100 text-blue-700 px-2 py-1">{customer.supplyChain.preferredSuppliers.length} fournisseurs</Badge>
                   </h3>
                   <div className="space-y-3 mb-4">
                     {customer.supplyChain.preferredSuppliers.map((supplier) => (
@@ -750,32 +750,32 @@ export function CustomerProfileReplica() {
               <Card className="p-5 border-2 border-[#DBA000]">
                 <h3 className="text-sm font-bold text-[#010150] mb-4 flex items-center">
                   <Activity className="w-4 h-4 mr-2 text-[#DBA000]" />
-                  Cross-Module Intelligence
+                  Intelligence multi-modules
                 </h3>
                 <div className="grid grid-cols-4 gap-4">
                   <div className="p-4 bg-green-50 rounded border border-green-200">
                     <MessageSquare className="w-6 h-6 text-green-600 mb-2" />
-                    <p className="text-xs text-gray-600 mb-1">WhatsApp Groups</p>
+                    <p className="text-xs text-gray-600 mb-1">Groupes WhatsApp</p>
                     <p className="text-sm font-bold text-[#010150]">{customer.crossModuleData.whatsappGroups.length}</p>
                     <p className="text-xs text-gray-600 mt-1">{customer.crossModuleData.whatsappGroups.join(", ")}</p>
                   </div>
                   <div className="p-4 bg-blue-50 rounded border border-blue-200">
                     <Bot className="w-6 h-6 text-blue-600 mb-2" />
-                    <p className="text-xs text-gray-600 mb-1">AI Agents</p>
+                    <p className="text-xs text-gray-600 mb-1">Agents IA</p>
                     <p className="text-sm font-bold text-[#010150]">{customer.crossModuleData.assignedAIAgents.length}</p>
                     <p className="text-xs text-gray-600 mt-1">{customer.crossModuleData.assignedAIAgents[0]}</p>
                   </div>
                   <div className="p-4 bg-purple-50 rounded border border-purple-200">
                     <BarChart3 className="w-6 h-6 text-purple-600 mb-2" />
-                    <p className="text-xs text-gray-600 mb-1">Marketing ROI</p>
+                    <p className="text-xs text-gray-600 mb-1">ROI Marketing</p>
                     <p className="text-sm font-bold text-purple-600">{customer.crossModuleData.marketingAttribution.roiMultiple}x</p>
-                    <p className="text-xs text-gray-600 mt-1">From {customer.crossModuleData.marketingAttribution.acquisitionChannel}</p>
+                    <p className="text-xs text-gray-600 mt-1">Via {customer.crossModuleData.marketingAttribution.acquisitionChannel}</p>
                   </div>
                   <div className="p-4 bg-orange-50 rounded border border-orange-200">
                     <Package className="w-6 h-6 text-orange-600 mb-2" />
-                    <p className="text-xs text-gray-600 mb-1">Top Product</p>
+                    <p className="text-xs text-gray-600 mb-1">Produit principal</p>
                     <p className="text-sm font-bold text-[#010150]">{customer.crossModuleData.topProducts[0].name}</p>
-                    <p className="text-xs text-orange-600 mt-1">${(customer.crossModuleData.topProducts[0].revenue / 1000).toFixed(1)}K revenue</p>
+                    <p className="text-xs text-orange-600 mt-1">${(customer.crossModuleData.topProducts[0].revenue / 1000).toFixed(1)}K CA</p>
                   </div>
                 </div>
               </Card>
@@ -788,13 +788,13 @@ export function CustomerProfileReplica() {
                 <Card className="p-4 border-2 border-green-200 bg-green-50">
                   <div className="flex items-center justify-between mb-3">
                     <div>
-                      <p className="text-xs text-gray-600 mb-1">Lifetime Gross Revenue</p>
+                      <p className="text-xs text-gray-600 mb-1">Chiffre d'affaires brut cumulé</p>
                       <p className="text-2xl font-bold text-[#010150]">${(customer.financialIntelligence.lifetimeGrossRevenue / 1000).toFixed(1)}K</p>
                     </div>
                     <DollarSign className="w-8 h-8 text-green-600" />
                   </div>
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-gray-600">Growth YoY</span>
+                    <span className="text-gray-600">Croissance annuelle</span>
                     <span className="text-green-600 font-semibold flex items-center">
                       <ArrowUpRight className="w-3 h-3 mr-1" />
                       +{customer.financialIntelligence.revenueGrowth}%
@@ -805,13 +805,13 @@ export function CustomerProfileReplica() {
                 <Card className="p-4 border-2 border-blue-200 bg-blue-50">
                   <div className="flex items-center justify-between mb-3">
                     <div>
-                      <p className="text-xs text-gray-600 mb-1">Lifetime Net Profit</p>
+                      <p className="text-xs text-gray-600 mb-1">Bénéfice net cumulé</p>
                       <p className="text-2xl font-bold text-[#010150]">${(customer.financialIntelligence.lifetimeNetProfit / 1000).toFixed(1)}K</p>
                     </div>
                     <TrendingUp className="w-8 h-8 text-blue-600" />
                   </div>
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-gray-600">vs Avg Customer</span>
+                    <span className="text-gray-600">vs client moyen</span>
                     <span className="text-blue-600 font-semibold">
                       +{((customer.financialIntelligence.lifetimeNetProfit / avgCustomerBenchmark.lifetimeNetProfit - 1) * 100).toFixed(0)}%
                     </span>
@@ -821,13 +821,13 @@ export function CustomerProfileReplica() {
                 <Card className="p-4 border-2 border-purple-200 bg-purple-50">
                   <div className="flex items-center justify-between mb-3">
                     <div>
-                      <p className="text-xs text-gray-600 mb-1">Average Margin</p>
+                      <p className="text-xs text-gray-600 mb-1">Marge moyenne</p>
                       <p className="text-2xl font-bold text-[#010150]">{customer.financialIntelligence.averageMargin}%</p>
                     </div>
                     <Percent className="w-8 h-8 text-purple-600" />
                   </div>
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-gray-600">Industry Avg</span>
+                    <span className="text-gray-600">Moy. secteur</span>
                     <span className="text-purple-600 font-semibold">{avgCustomerBenchmark.averageMargin}%</span>
                   </div>
                 </Card>
@@ -835,13 +835,13 @@ export function CustomerProfileReplica() {
                 <Card className="p-4 border-2 border-orange-200 bg-orange-50">
                   <div className="flex items-center justify-between mb-3">
                     <div>
-                      <p className="text-xs text-gray-600 mb-1">Contribution Score</p>
+                      <p className="text-xs text-gray-600 mb-1">Score de contribution</p>
                       <p className="text-2xl font-bold text-[#010150]">{customer.financialIntelligence.contributionScore}</p>
                     </div>
                     <Star className="w-8 h-8 text-orange-600" />
                   </div>
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-gray-600">Ranking</span>
+                    <span className="text-gray-600">Classement</span>
                     <Badge className="bg-orange-600 text-white px-2 py-0">Top 5%</Badge>
                   </div>
                 </Card>

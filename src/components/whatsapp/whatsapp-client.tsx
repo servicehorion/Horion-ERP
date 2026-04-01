@@ -201,15 +201,15 @@ export function WhatsAppClient({
         <TabsList className="h-10 flex-wrap">
           <TabsTrigger value="overview" className="gap-1.5 text-xs sm:text-sm">
             <MessageCircle className="h-3.5 w-3.5" />
-            Overview
+            Vue d'ensemble
           </TabsTrigger>
           <TabsTrigger value="inbox" className="gap-1.5 text-xs sm:text-sm">
             <Inbox className="h-3.5 w-3.5" />
-            Inbox
+            Boîte de réception
           </TabsTrigger>
           <TabsTrigger value="intents" className="gap-1.5 text-xs sm:text-sm">
             <Zap className="h-3.5 w-3.5" />
-            Intents
+            Intentions
           </TabsTrigger>
           <TabsTrigger value="groups" className="gap-1.5 text-xs sm:text-sm">
             <Users className="h-3.5 w-3.5" />
@@ -217,11 +217,11 @@ export function WhatsAppClient({
           </TabsTrigger>
           <TabsTrigger value="broadcasts" className="gap-1.5 text-xs sm:text-sm">
             <Megaphone className="h-3.5 w-3.5" />
-            Broadcasts
+            Diffusions
           </TabsTrigger>
           <TabsTrigger value="templates" className="gap-1.5 text-xs sm:text-sm">
             <FileText className="h-3.5 w-3.5" />
-            Templates
+            Modèles
           </TabsTrigger>
           <TabsTrigger value="automations" className="gap-1.5 text-xs sm:text-sm">
             <Sparkles className="h-3.5 w-3.5" />
@@ -229,7 +229,7 @@ export function WhatsAppClient({
           </TabsTrigger>
           <TabsTrigger value="settings" className="gap-1.5 text-xs sm:text-sm">
             <Settings className="h-3.5 w-3.5" />
-            Settings
+            Paramètres
           </TabsTrigger>
         </TabsList>
 
@@ -487,7 +487,7 @@ export function WhatsAppClient({
                               <div className="text-muted-foreground">
                                 Statut {activeConversation.latestOrderStatus ?? "-"}
                                 {activeConversation.latestPaymentStatus ? ` · Paiement ${activeConversation.latestPaymentStatus}` : ""}
-                                {activeConversation.latestShipmentStatus ? ` · Shipment ${activeConversation.latestShipmentStatus}` : ""}
+                                {activeConversation.latestShipmentStatus ? ` · Expedition ${activeConversation.latestShipmentStatus}` : ""}
                               </div>
                             </>
                           ) : (
@@ -556,10 +556,10 @@ export function WhatsAppClient({
                           }}
                         >
                           <SelectTrigger className="h-8">
-                            <SelectValue placeholder="Choisir owner" />
+                            <SelectValue placeholder="Choisir un responsable" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="none">Non assignee</SelectItem>
+                            <SelectItem value="none">Non assigne</SelectItem>
                             {assignableUsers.map((entry) => (
                               <SelectItem key={entry.id} value={entry.id}>
                                 {entry.name} · {entry.role}
@@ -595,7 +595,7 @@ export function WhatsAppClient({
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs text-muted-foreground">
                     <div>
-                      <div className="uppercase">Intent</div>
+                      <div className="uppercase">Intention</div>
                       <div className="mt-1">
                         {activeConversation.intentScore ? (
                           <Badge variant="outline" className="text-xs">{activeConversation.intentScore}</Badge>
@@ -614,13 +614,13 @@ export function WhatsAppClient({
                       </div>
                     </div>
                     <div>
-                      <div className="uppercase">Reponse</div>
+                      <div className="uppercase">Réponse</div>
                       <div className="mt-1">
                         {activeConversation.responseState ? <ResponseBadge state={activeConversation.responseState} /> : "-"}
                       </div>
                     </div>
                     <div>
-                      <div className="uppercase">Owner</div>
+                      <div className="uppercase">Responsable</div>
                       <div className="mt-1">{activeConversation.assignedTo ?? activeConversation.ownerName ?? "-"}</div>
                     </div>
                   </div>
@@ -757,7 +757,7 @@ export function WhatsAppClient({
                         }}
                       >
                         <ShieldAlert className="mr-1.5 h-3.5 w-3.5" />
-                        Handoff task
+                        Déléguer
                       </Button>
                     </div>
                   </div>
@@ -860,7 +860,7 @@ export function WhatsAppClient({
                         }}
                       >
                         <SelectTrigger className="h-8 w-[220px]">
-                          <SelectValue placeholder="Inserer template" />
+                          <SelectValue placeholder="Inserer un modele" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="none">Aucun</SelectItem>
@@ -932,10 +932,10 @@ function WhatsAppOverview({
       <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
         <KpiCard label="Convos ouvertes" value={stats.openConversations} color="emerald" />
         <KpiCard label="SLA en retard" value={stats.slaBreaches} color="red" urgent={stats.slaBreaches > 0} />
-        <KpiCard label="Attendent reponse" value={stats.needsReply} color="orange" urgent={stats.needsReply > 0} />
+        <KpiCard label="En attente de reponse" value={stats.needsReply} color="orange" urgent={stats.needsReply > 0} />
         <KpiCard label="Messages jour" value={stats.messagesToday} color="blue" />
         <KpiCard label="Convos non liees" value={stats.unlinkedConversations} color="purple" urgent={stats.unlinkedConversations > 0} />
-        <KpiCard label="Intents high" value={stats.highIntents} color="indigo" />
+        <KpiCard label="Intentions prioritaires" value={stats.highIntents} color="indigo" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -975,12 +975,12 @@ function WhatsAppOverview({
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
               <Zap className="h-4 w-4 text-orange-500" />
-              Intents prioritaires
+              Intentions prioritaires
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             {hotIntents.length === 0 ? (
-              <EmptyState label="Aucun intent critique" />
+              <EmptyState label="Aucune intention critique" />
             ) : (
               <div className="divide-y">
                 {hotIntents.map((intent) => (
@@ -1003,12 +1003,12 @@ function WhatsAppOverview({
         <CardHeader className="pb-2">
           <CardTitle className="text-base flex items-center gap-2">
             <CalendarDays className="h-4 w-4 text-indigo-500" />
-            Broadcasts a venir
+            Diffusions a venir
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           {campaigns.length === 0 ? (
-            <EmptyState label="Aucun broadcast programme" />
+            <EmptyState label="Aucune diffusion programmee" />
           ) : (
             <Table>
               <TableHeader>
@@ -1082,7 +1082,7 @@ function WhatsAppInbox({
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-base flex items-center justify-between">
-          <span>Inbox centralisee</span>
+          <span>Boite de reception centralisee</span>
           <Badge variant="secondary" className="text-xs">{conversations.length} convos</Badge>
         </CardTitle>
       </CardHeader>
@@ -1112,10 +1112,10 @@ function WhatsAppInbox({
           </Select>
           <Select value={intentFilter} onValueChange={onIntentChange}>
             <SelectTrigger className="h-8">
-              <SelectValue placeholder="Intent" />
+              <SelectValue placeholder="Intention" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="ALL">Tous intents</SelectItem>
+              <SelectItem value="ALL">Toutes les intentions</SelectItem>
               <SelectItem value="LOW">LOW</SelectItem>
               <SelectItem value="MEDIUM">MEDIUM</SelectItem>
               <SelectItem value="HIGH">HIGH</SelectItem>
@@ -1219,7 +1219,7 @@ function WhatsAppIntents({ intents }: { intents: WhatsAppIntentItem[] }) {
       const res = await convertWhatsAppIntentToCrm(intentId);
       if (res?.error) toast.error(res.error);
       else {
-        toast.success("Intent transfere au CRM");
+        toast.success("Intention transferee au CRM");
         router.refresh();
       }
     });
@@ -1230,7 +1230,7 @@ function WhatsAppIntents({ intents }: { intents: WhatsAppIntentItem[] }) {
       const res = await updateWhatsAppIntentStatus(intentId, status);
       if (res?.error) toast.error(res.error);
       else {
-        toast.success("Intent mis a jour");
+        toast.success("Intention mise a jour");
         router.refresh();
       }
     });
@@ -1383,7 +1383,7 @@ function WhatsAppBroadcasts({ campaigns }: { campaigns: WhatsAppCampaignItem[] }
 
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Campagnes & Broadcasts</CardTitle>
+          <CardTitle className="text-base">Campagnes & diffusions</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           {campaigns.length === 0 ? (
@@ -1443,7 +1443,7 @@ function WhatsAppTemplates({ templates }: { templates: WhatsAppTemplateItem[] })
       });
       if (res?.error) toast.error(res.error);
       else {
-        toast.success("Template cree");
+        toast.success("Modele cree");
         setName("");
         router.refresh();
       }
@@ -1452,7 +1452,7 @@ function WhatsAppTemplates({ templates }: { templates: WhatsAppTemplateItem[] })
 
   const handleAddVersion = () => {
     if (!versionTemplateId || !versionBody.trim()) {
-      toast.error("Template et contenu requis");
+      toast.error("Modele et contenu requis");
       return;
     }
     const vars = versionVars
@@ -1488,10 +1488,10 @@ function WhatsAppTemplates({ templates }: { templates: WhatsAppTemplateItem[] })
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Nouveau template</CardTitle>
+            <CardTitle className="text-base">Nouveau modele</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nom template" />
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nom du modele" />
             <div className="grid grid-cols-2 gap-2">
               <Select value={category} onValueChange={setCategory}>
                 <SelectTrigger className="h-8">
@@ -1514,7 +1514,7 @@ function WhatsAppTemplates({ templates }: { templates: WhatsAppTemplateItem[] })
               </Select>
             </div>
             <Button size="sm" disabled={pending} onClick={handleCreate}>
-              Creer template
+              Creer le modele
             </Button>
           </CardContent>
         </Card>
@@ -1526,7 +1526,7 @@ function WhatsAppTemplates({ templates }: { templates: WhatsAppTemplateItem[] })
           <CardContent className="space-y-3">
             <Select value={versionTemplateId} onValueChange={setVersionTemplateId}>
               <SelectTrigger className="h-8">
-                <SelectValue placeholder="Choisir template" />
+                <SelectValue placeholder="Choisir un modele" />
               </SelectTrigger>
               <SelectContent>
                 {templates.map((t) => (
@@ -1553,17 +1553,17 @@ function WhatsAppTemplates({ templates }: { templates: WhatsAppTemplateItem[] })
 
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Templates approuves</CardTitle>
+          <CardTitle className="text-base">Modeles approuves</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           {templates.length === 0 ? (
-            <EmptyState label="Aucun template" />
+            <EmptyState label="Aucun modele" />
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Nom</TableHead>
-                  <TableHead>Category</TableHead>
+                  <TableHead>Catégorie</TableHead>
                   <TableHead>Langue</TableHead>
                   <TableHead>Statut</TableHead>
                   <TableHead>Versions</TableHead>
@@ -1626,7 +1626,7 @@ function WhatsAppAutomations({ flows }: { flows: WhatsAppBotFlowItem[] }) {
       });
       if (res?.error) toast.error(res.error);
       else {
-        toast.success("Automation creee");
+        toast.success("Automatisation creee");
         setName("");
         setTrigger("KEYWORD");
         setTriggerValue("");
@@ -1663,7 +1663,7 @@ function WhatsAppAutomations({ flows }: { flows: WhatsAppBotFlowItem[] }) {
       });
       if (res?.error) toast.error(res.error);
       else {
-        toast.success("Automation mise a jour");
+        toast.success("Automatisation mise a jour");
         router.refresh();
       }
     });
@@ -1689,7 +1689,7 @@ function WhatsAppAutomations({ flows }: { flows: WhatsAppBotFlowItem[] }) {
                 <SelectItem value="UNHANDLED">UNHANDLED</SelectItem>
               </SelectContent>
             </Select>
-            <Input value={triggerValue} onChange={(e) => setTriggerValue(e.target.value)} placeholder="Trigger value" />
+            <Input value={triggerValue} onChange={(e) => setTriggerValue(e.target.value)} placeholder="Valeur de declenchement" />
             <Input value={priority} onChange={(e) => setPriority(e.target.value)} placeholder="Priorite" type="number" />
           </div>
           <Textarea value={response} onChange={(e) => setResponse(e.target.value)} placeholder="Reponse automatique" />
@@ -1715,7 +1715,7 @@ function WhatsAppAutomations({ flows }: { flows: WhatsAppBotFlowItem[] }) {
         </CardHeader>
         <CardContent className="p-0">
           {flows.length === 0 ? (
-            <EmptyState label="Aucune automation" />
+            <EmptyState label="Aucune automatisation" />
           ) : (
             <Table>
               <TableHeader>
@@ -1803,9 +1803,9 @@ function WhatsAppSettings({ accounts }: { accounts: WhatsAppAccountItem[] }) {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Provider</TableHead>
+                  <TableHead>Fournisseur</TableHead>
                   <TableHead>Nom</TableHead>
-                  <TableHead>Phone ID</TableHead>
+                  <TableHead>ID telephone</TableHead>
                   <TableHead>Statut</TableHead>
                 </TableRow>
               </TableHeader>
@@ -1919,3 +1919,8 @@ function formatDateSafe(value?: string | null) {
     return "-";
   }
 }
+
+
+
+
+

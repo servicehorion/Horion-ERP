@@ -12,7 +12,7 @@ export function DemoHeader() {
       <Separator orientation="vertical" className="h-6" />
       <div className="flex-1" />
       <Badge variant="secondary" className="font-medium">
-        Demo mode
+        Mode démo
       </Badge>
       <Button variant="outline" size="sm" onClick={() => window.location.assign("/login")}>
         Connexion

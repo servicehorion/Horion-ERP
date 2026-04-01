@@ -83,7 +83,7 @@ export default async function CatalogDashboardPage() {
           <Button variant="outline" size="sm" asChild>
             <Link href="/catalog/analytics">
               <BarChart3 className="mr-2 h-4 w-4" />
-              Analytics
+              Analytique
             </Link>
           </Button>
           <Button variant="outline" size="sm" asChild>

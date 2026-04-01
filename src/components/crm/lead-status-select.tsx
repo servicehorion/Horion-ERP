@@ -48,7 +48,7 @@ export function LeadStatusSelect({ leadId, currentStatus }: LeadStatusSelectProp
 
   return (
     <Select defaultValue={currentStatus} onValueChange={handleChange} disabled={loading}>
-      <SelectTrigger className="w-[180px]">
+      <SelectTrigger className="w-full sm:w-[180px]">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>

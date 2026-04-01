@@ -1,4 +1,4 @@
-﻿
+
 "use client";
 
 import { useState, useTransition } from "react";
@@ -172,9 +172,9 @@ type DashboardData = {
 function overallBadge(overall: string | null) {
   if (!overall) return null;
   const map: Record<string, { label: string; color: string }> = {
-    PASS: { label: "Pass", color: "bg-green-100 text-green-800" },
-    FAIL: { label: "Fail", color: "bg-red-100 text-red-800" },
-    CONDITIONAL: { label: "Conditional", color: "bg-amber-100 text-amber-800" },
+    PASS: { label: "Conforme", color: "bg-green-100 text-green-800" },
+    FAIL: { label: "Non conforme", color: "bg-red-100 text-red-800" },
+    CONDITIONAL: { label: "Sous reserve", color: "bg-amber-100 text-amber-800" },
   };
   const s = map[overall] ?? { label: overall, color: "bg-gray-100 text-gray-700" };
   return (
@@ -190,10 +190,10 @@ function statusBadge(status: string) {
     CANCELLED: "bg-gray-100 text-gray-600",
   };
   const labels: Record<string, string> = {
-    SCHEDULED: "Scheduled",
-    IN_PROGRESS: "In progress",
-    COMPLETED: "Completed",
-    CANCELLED: "Cancelled",
+    SCHEDULED: "Planifie",
+    IN_PROGRESS: "En cours",
+    COMPLETED: "Termine",
+    CANCELLED: "Annule",
   };
   return (
     <span className={`rounded px-2 py-0.5 text-xs font-semibold ${map[status] ?? "bg-gray-100 text-gray-700"}`}>
@@ -204,38 +204,38 @@ function statusBadge(status: string) {
 
 const QC_TYPES = ["INCOMING", "IN_PROCESS", "FINAL", "AUDIT"];
 const QC_TYPE_LABELS: Record<string, string> = {
-  INCOMING: "Incoming",
-  IN_PROCESS: "In process",
+  INCOMING: "Reception",
+  IN_PROCESS: "En production",
   FINAL: "Final",
-  AUDIT: "Supplier audit",
+  AUDIT: "Audit fournisseur",
 };
 
 const QC_LEVELS = [
-  { value: "VIRTUAL", label: "QC Virtual", description: "Photos/videos and visual check" },
-  { value: "PHYSICAL", label: "QC Physical", description: "Physical inspection before shipment" },
-  { value: "EXTREME", label: "QC Extreme", description: "Advanced testing and certification" },
+  { value: "VIRTUAL", label: "QC virtuelle", description: "Photos, videos et controle visuel" },
+  { value: "PHYSICAL", label: "QC physique", description: "Inspection physique avant expedition" },
+  { value: "EXTREME", label: "QC approfondie", description: "Tests avances et certification" },
 ];
 
 const QC_LEVEL_LABELS: Record<string, string> = {
-  VIRTUAL: "QC Virtual",
-  PHYSICAL: "QC Physical",
-  EXTREME: "QC Extreme",
+  VIRTUAL: "QC virtuelle",
+  PHYSICAL: "QC physique",
+  EXTREME: "QC approfondie",
 };
 
 const QC_REQUEST_TYPES = [
-  { value: "DURING_PRODUCTION", label: "During production" },
-  { value: "PRE_SHIPMENT", label: "Pre-shipment" },
-  { value: "CONTAINER_LOADING", label: "Container loading" },
+  { value: "DURING_PRODUCTION", label: "Pendant la production" },
+  { value: "PRE_SHIPMENT", label: "Avant expedition" },
+  { value: "CONTAINER_LOADING", label: "Chargement conteneur" },
 ];
 
 const QC_REQUEST_STATUS_LABELS: Record<string, string> = {
-  PENDING: "Pending",
-  SCHEDULED: "Scheduled",
-  IN_PROGRESS: "In progress",
-  PASSED: "Passed",
-  FAILED: "Failed",
-  CONDITIONAL: "Conditional",
-  CANCELLED: "Cancelled",
+  PENDING: "En attente",
+  SCHEDULED: "Planifie",
+  IN_PROGRESS: "En cours",
+  PASSED: "Valide",
+  FAILED: "Echoue",
+  CONDITIONAL: "Sous reserve",
+  CANCELLED: "Annule",
 };
 
 const QC_REQUEST_STATUS_STYLES: Record<string, string> = {
@@ -283,7 +283,7 @@ function CreatePlanDialog({ onCreated }: { onCreated: (p: QcPlanRow) => void }) 
   const [type, setType] = useState("INCOMING");
   const [category, setCategory] = useState("");
   const [description, setDescription] = useState("");
-  const [criteria, setCriteria] = useState<string[]>(["Visual conformity", "Dimensions", "Weight"]);
+  const [criteria, setCriteria] = useState<string[]>(["Conformité visuelle", "Dimensions", "Poids"]);
   const [newCriterion, setNewCriterion] = useState("");
 
   function addCriterion() {
@@ -304,36 +304,36 @@ function CreatePlanDialog({ onCreated }: { onCreated: (p: QcPlanRow) => void }) 
         checklist: criteria.map((c, i) => ({ criterion: c, weight: 1, required: true, id: String(i) })),
       });
       if (res.error) { toast.error(res.error); return; }
-      toast.success("QC plan created");
+      toast.success("Plan QC cree");
       onCreated(res.data as unknown as QcPlanRow);
       setOpen(false);
       setName("");
       setType("INCOMING");
       setCategory("");
       setDescription("");
-      setCriteria(["Visual conformity", "Dimensions", "Weight"]);
+      setCriteria(["Conformité visuelle", "Dimensions", "Poids"]);
     });
   }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm"><Plus className="mr-1 h-4 w-4" />New plan</Button>
+        <Button size="sm"><Plus className="mr-1 h-4 w-4" />Nouveau plan</Button>
       </DialogTrigger>
       <DialogContent className="max-w-lg">
-        <DialogHeader><DialogTitle>Create QC plan</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Creer un plan QC</DialogTitle></DialogHeader>
         <div className="space-y-4">
-          <div><Label>Plan name *</Label><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Incoming textile check" /></div>
+          <div><Label>Nom du plan *</Label><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex : controle textile a reception" /></div>
           <div><Label>Type</Label>
             <Select value={type} onValueChange={setType}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>{QC_TYPES.map((t) => <SelectItem key={t} value={t}>{QC_TYPE_LABELS[t]}</SelectItem>)}</SelectContent>
             </Select>
           </div>
-          <div><Label>Product category</Label><Input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Ex: Textile, Electronics" /></div>
+          <div><Label>Categorie produit</Label><Input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Ex : textile, electronique" /></div>
           <div><Label>Description</Label><Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} /></div>
           <div>
-            <Label>Checklist criteria ({criteria.length})</Label>
+            <Label>Criteres de controle ({criteria.length})</Label>
             <div className="mt-1 space-y-1 max-h-32 overflow-y-auto border rounded p-2">
               {criteria.map((c, i) => (
                 <div key={i} className="flex items-center justify-between text-sm">
@@ -343,12 +343,12 @@ function CreatePlanDialog({ onCreated }: { onCreated: (p: QcPlanRow) => void }) 
               ))}
             </div>
             <div className="mt-2 flex gap-2">
-              <Input value={newCriterion} onChange={(e) => setNewCriterion(e.target.value)} placeholder="Add criterion" onKeyDown={(e) => e.key === "Enter" && addCriterion()} className="flex-1" />
+              <Input value={newCriterion} onChange={(e) => setNewCriterion(e.target.value)} placeholder="Ajouter un critere" onKeyDown={(e) => e.key === "Enter" && addCriterion()} className="flex-1" />
               <Button variant="outline" size="sm" onClick={addCriterion}>+</Button>
             </div>
           </div>
           <Button onClick={handleSubmit} disabled={pending || !name.trim()} className="w-full">
-            {pending ? "Creating..." : "Create plan"}
+            {pending ? "Creation..." : "Creer le plan"}
           </Button>
         </div>
       </DialogContent>
@@ -380,7 +380,7 @@ function CreateInspectionDialog({
         notes: notes || undefined,
       });
       if (res.error) { toast.error(res.error); return; }
-      toast.success("Inspection created");
+      toast.success("Inspection creee");
       onCreated(res.data as unknown as QcInspectionRow);
       setOpen(false);
     });
@@ -389,22 +389,22 @@ function CreateInspectionDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm"><Plus className="mr-1 h-4 w-4" />New inspection</Button>
+        <Button size="sm"><Plus className="mr-1 h-4 w-4" />Nouvelle inspection</Button>
       </DialogTrigger>
       <DialogContent className="max-w-md">
-        <DialogHeader><DialogTitle>Schedule inspection</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Planifier une inspection</DialogTitle></DialogHeader>
         <div className="space-y-4">
           <div><Label>QC plan *</Label>
             <Select value={planId} onValueChange={setPlanId}>
-              <SelectTrigger><SelectValue placeholder="Select plan" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="Choisir un plan" /></SelectTrigger>
               <SelectContent>{plans.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
             </Select>
           </div>
-          <div><Label>Scheduled at *</Label><Input type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} /></div>
-          <div><Label>Sample size</Label><Input type="number" value={sampleSize} onChange={(e) => setSampleSize(e.target.value)} placeholder="30" /></div>
+          <div><Label>Planifiee le *</Label><Input type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} /></div>
+          <div><Label>Taille echantillon</Label><Input type="number" value={sampleSize} onChange={(e) => setSampleSize(e.target.value)} placeholder="30" /></div>
           <div><Label>Notes</Label><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} /></div>
           <Button onClick={handleSubmit} disabled={pending || !planId} className="w-full">
-            {pending ? "Creating..." : "Create inspection"}
+            {pending ? "Creation..." : "Creer l'inspection"}
           </Button>
         </div>
       </DialogContent>
@@ -437,7 +437,7 @@ function SubmitReportDialog({
         items: inspection.items.map((it) => ({ id: it.id, result: itemResults[it.id] ?? "NA" })),
       });
       if (res.error) { toast.error(res.error); return; }
-      toast.success("Report submitted");
+      toast.success("Rapport soumis");
       onSubmitted();
       setOpen(false);
     });
@@ -446,26 +446,26 @@ function SubmitReportDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm" variant="outline"><ClipboardCheck className="mr-1 h-4 w-4" />Submit report</Button>
+        <Button size="sm" variant="outline"><ClipboardCheck className="mr-1 h-4 w-4" />Soumettre le rapport</Button>
       </DialogTrigger>
       <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
         <DialogHeader><DialogTitle>QC report - {inspection.plan.name}</DialogTitle></DialogHeader>
         <div className="space-y-4">
-          <div><Label>Overall result *</Label>
+          <div><Label>Resultat global *</Label>
             <Select value={overall} onValueChange={(v) => setOverall(v as typeof overall)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="PASS">Pass</SelectItem>
-                <SelectItem value="FAIL">Fail</SelectItem>
-                <SelectItem value="CONDITIONAL">Conditional</SelectItem>
+                <SelectItem value="PASS">Conforme</SelectItem>
+                <SelectItem value="FAIL">Non conforme</SelectItem>
+                <SelectItem value="CONDITIONAL">Sous reserve</SelectItem>
               </SelectContent>
             </Select>
           </div>
-          <div><Label>Defect rate (%)</Label><Input type="number" value={defectRate} onChange={(e) => setDefectRate(e.target.value)} step="0.1" min="0" max="100" /></div>
+          <div><Label>Taux de defaut (%)</Label><Input type="number" value={defectRate} onChange={(e) => setDefectRate(e.target.value)} step="0.1" min="0" max="100" /></div>
 
           {inspection.items.length > 0 && (
             <div>
-              <Label>Checklist items ({inspection.items.length})</Label>
+              <Label>Points de controle ({inspection.items.length})</Label>
               <div className="mt-2 space-y-2 max-h-40 overflow-y-auto">
                 {inspection.items.map((item) => (
                   <div key={item.id} className="flex items-center justify-between gap-2 text-sm">
@@ -476,8 +476,8 @@ function SubmitReportDialog({
                     >
                       <SelectTrigger className="w-28 h-7 text-xs"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="PASS">Pass</SelectItem>
-                        <SelectItem value="FAIL">Fail</SelectItem>
+                        <SelectItem value="PASS">Conforme</SelectItem>
+                        <SelectItem value="FAIL">Non conforme</SelectItem>
                         <SelectItem value="NA">N/A</SelectItem>
                       </SelectContent>
                     </Select>
@@ -489,7 +489,7 @@ function SubmitReportDialog({
 
           <div><Label>Notes</Label><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} /></div>
           <Button onClick={handleSubmit} disabled={pending} className="w-full">
-            {pending ? "Submitting..." : "Submit report"}
+            {pending ? "Soumission..." : "Soumettre le rapport"}
           </Button>
         </div>
       </DialogContent>
@@ -573,15 +573,15 @@ function CreateRequestDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm"><Plus className="mr-1 h-4 w-4" />New QC request</Button>
+        <Button size="sm"><Plus className="mr-1 h-4 w-4" />Nouvelle demande QC</Button>
       </DialogTrigger>
       <DialogContent className="max-w-2xl">
-        <DialogHeader><DialogTitle>Create QC request</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Creer une demande QC</DialogTitle></DialogHeader>
         <div className="grid gap-4 md:grid-cols-2">
           <div className="md:col-span-2">
             <Label>Order *</Label>
             <Select value={orderId} onValueChange={setOrderId}>
-              <SelectTrigger><SelectValue placeholder="Select order" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="Choisir une commande" /></SelectTrigger>
               <SelectContent>
                 {options.orders.map((o) => (
                   <SelectItem key={o.id} value={o.id}>
@@ -592,7 +592,7 @@ function CreateRequestDialog({
             </Select>
           </div>
           <div>
-            <Label>QC type</Label>
+            <Label>Type de QC</Label>
             <Select value={type} onValueChange={setType}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -603,7 +603,7 @@ function CreateRequestDialog({
             </Select>
           </div>
           <div>
-            <Label>QC level</Label>
+            <Label>Niveau QC</Label>
             <Select value={level} onValueChange={setLevel}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -614,9 +614,9 @@ function CreateRequestDialog({
             </Select>
           </div>
           <div>
-            <Label>Partner</Label>
+            <Label>Partenaire</Label>
             <Select value={partnerId} onValueChange={setPartnerId}>
-              <SelectTrigger><SelectValue placeholder="Optional" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="Optionnel" /></SelectTrigger>
               <SelectContent>
                 {options.partners.map((p) => (
                   <SelectItem key={p.id} value={p.id}>
@@ -627,9 +627,9 @@ function CreateRequestDialog({
             </Select>
           </div>
           <div>
-            <Label>Supplier</Label>
+            <Label>Fournisseur</Label>
             <Select value={supplierId} onValueChange={setSupplierId}>
-              <SelectTrigger><SelectValue placeholder="Optional" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="Optionnel" /></SelectTrigger>
               <SelectContent>
                 {options.suppliers.map((s) => (
                   <SelectItem key={s.id} value={s.id}>
@@ -640,9 +640,9 @@ function CreateRequestDialog({
             </Select>
           </div>
           <div>
-            <Label>Product</Label>
+            <Label>Produit</Label>
             <Select value={productId} onValueChange={setProductId}>
-              <SelectTrigger><SelectValue placeholder="Optional" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="Optionnel" /></SelectTrigger>
               <SelectContent>
                 {options.products.map((p) => (
                   <SelectItem key={p.id} value={p.id}>
@@ -653,16 +653,16 @@ function CreateRequestDialog({
             </Select>
           </div>
           <div>
-            <Label>Scheduled at</Label>
+            <Label>Planifiee le</Label>
             <Input type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} />
           </div>
           <div className="grid grid-cols-3 gap-2">
             <div className="col-span-2">
-              <Label>Cost</Label>
+              <Label>Cout</Label>
               <Input value={cost} onChange={(e) => setCost(e.target.value)} placeholder="0.00" />
             </div>
             <div>
-              <Label>Currency</Label>
+              <Label>Devise</Label>
               <Input value={currency} onChange={(e) => setCurrency(e.target.value)} />
             </div>
           </div>
@@ -676,7 +676,7 @@ function CreateRequestDialog({
           </div>
         </div>
         <Button onClick={handleSubmit} disabled={pending || !orderId} className="w-full mt-4">
-          {pending ? "Creating..." : "Create QC request"}
+          {pending ? "Creation..." : "Creer une demande QC"}
         </Button>
       </DialogContent>
     </Dialog>
@@ -752,13 +752,13 @@ function CreatePartnerDialog({ onCreated }: { onCreated: (p: QcPartnerRow) => vo
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm"><Plus className="mr-1 h-4 w-4" />New partner</Button>
+        <Button size="sm"><Plus className="mr-1 h-4 w-4" />Nouveau partenaire</Button>
       </DialogTrigger>
       <DialogContent className="max-w-2xl">
-        <DialogHeader><DialogTitle>Create QC partner</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Creer un partenaire QC</DialogTitle></DialogHeader>
         <div className="grid gap-4 md:grid-cols-2">
           <div className="md:col-span-2">
-            <Label>Partner name *</Label>
+            <Label>Nom du partenaire *</Label>
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Company or inspector" />
           </div>
           <div><Label>City</Label><Input value={city} onChange={(e) => setCity(e.target.value)} /></div>
@@ -766,19 +766,19 @@ function CreatePartnerDialog({ onCreated }: { onCreated: (p: QcPartnerRow) => vo
           <div><Label>Phone</Label><Input value={phone} onChange={(e) => setPhone(e.target.value)} /></div>
           <div><Label>Email</Label><Input value={email} onChange={(e) => setEmail(e.target.value)} /></div>
           <div className="md:col-span-2">
-            <Label>Specialties (comma separated)</Label>
+            <Label>Specialites (separees par des virgules)</Label>
             <Input value={specialties} onChange={(e) => setSpecialties(e.target.value)} placeholder="Electronics, Textile" />
           </div>
-          <div><Label>Lead time (days)</Label><Input value={leadTimeDays} onChange={(e) => setLeadTimeDays(e.target.value)} /></div>
-          <div><Label>Base price (USD)</Label><Input value={basePrice} onChange={(e) => setBasePrice(e.target.value)} /></div>
-          <div><Label>Rating (0-100)</Label><Input value={rating} onChange={(e) => setRating(e.target.value)} /></div>
+          <div><Label>Delai (jours)</Label><Input value={leadTimeDays} onChange={(e) => setLeadTimeDays(e.target.value)} /></div>
+          <div><Label>Prix de base (USD)</Label><Input value={basePrice} onChange={(e) => setBasePrice(e.target.value)} /></div>
+          <div><Label>Note (0-100)</Label><Input value={rating} onChange={(e) => setRating(e.target.value)} /></div>
           <div className="md:col-span-2">
-            <Label>Price grid (JSON)</Label>
+            <Label>Grille tarifaire (JSON)</Label>
             <Textarea value={priceGrid} onChange={(e) => setPriceGrid(e.target.value)} rows={3} placeholder='{"electronics": 120, "textile": 80}' />
           </div>
         </div>
         <Button onClick={handleSubmit} disabled={pending || !name.trim()} className="w-full mt-4">
-          {pending ? "Creating..." : "Create partner"}
+          {pending ? "Creation..." : "Creer le partenaire"}
         </Button>
       </DialogContent>
     </Dialog>
@@ -841,7 +841,7 @@ function AddReportDialog({
         sharedWithClient: report.sharedWithClient ?? false,
       };
       onAdded(newReport);
-      toast.success("QC report added");
+      toast.success("Rapport QC ajoute");
       setOpen(false);
       setOverall("PASS");
       setDefectRate("");
@@ -866,38 +866,38 @@ function AddReportDialog({
         <DialogHeader><DialogTitle>QC report - {request.order.orderNumber}</DialogTitle></DialogHeader>
         <div className="grid gap-4 md:grid-cols-2">
           <div>
-            <Label>Overall result *</Label>
+            <Label>Resultat global *</Label>
             <Select value={overall} onValueChange={(v) => setOverall(v as typeof overall)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="PASS">Pass</SelectItem>
-                <SelectItem value="FAIL">Fail</SelectItem>
-                <SelectItem value="CONDITIONAL">Conditional</SelectItem>
+                <SelectItem value="PASS">Conforme</SelectItem>
+                <SelectItem value="FAIL">Non conforme</SelectItem>
+                <SelectItem value="CONDITIONAL">Sous reserve</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div>
-            <Label>Defect rate (%)</Label>
+            <Label>Taux de defaut (%)</Label>
             <Input value={defectRate} onChange={(e) => setDefectRate(e.target.value)} />
           </div>
           <div className="md:col-span-2">
-            <Label>Summary</Label>
+            <Label>Resume</Label>
             <Textarea value={summary} onChange={(e) => setSummary(e.target.value)} rows={3} />
           </div>
           <div className="md:col-span-2">
-            <Label>Recommendation</Label>
+            <Label>Recommandation</Label>
             <Textarea value={recommendation} onChange={(e) => setRecommendation(e.target.value)} rows={2} />
           </div>
           <div>
-            <Label>Photos (one URL per line)</Label>
+            <Label>Photos (une URL par ligne)</Label>
             <Textarea value={photos} onChange={(e) => setPhotos(e.target.value)} rows={3} />
           </div>
           <div>
-            <Label>Videos (one URL per line)</Label>
+            <Label>Videos (une URL par ligne)</Label>
             <Textarea value={videos} onChange={(e) => setVideos(e.target.value)} rows={3} />
           </div>
           <div className="md:col-span-2">
-            <Label>Packaging video URL</Label>
+            <Label>URL video emballage</Label>
             <Input value={packagingVideo} onChange={(e) => setPackagingVideo(e.target.value)} />
           </div>
           <div className="md:col-span-2 flex flex-wrap gap-4">
@@ -1063,7 +1063,7 @@ export function QcClient({
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Pass rate</CardTitle>
+            <CardTitle className="text-sm font-medium">Taux de conformite</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent><div className="text-2xl font-bold">{dashboard.passRate}%</div></CardContent>
@@ -1077,7 +1077,7 @@ export function QcClient({
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">QC reports</CardTitle>
+            <CardTitle className="text-sm font-medium">Rapports QC</CardTitle>
             <MessageSquare className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent><div className="text-2xl font-bold">{reports.length}</div></CardContent>
@@ -1091,7 +1091,7 @@ export function QcClient({
           <TabsTrigger value="reports">Reports</TabsTrigger>
           <TabsTrigger value="decision">Decision</TabsTrigger>
           <TabsTrigger value="client">Client</TabsTrigger>
-          <TabsTrigger value="labs" className="flex items-center gap-1"><FlaskConical className="h-3.5 w-3.5" />Labs</TabsTrigger>
+          <TabsTrigger value="labs" className="flex items-center gap-1"><FlaskConical className="h-3.5 w-3.5" />Laboratoires</TabsTrigger>
           <TabsTrigger value="spc" className="flex items-center gap-1"><Activity className="h-3.5 w-3.5" />SPC</TabsTrigger>
           <TabsTrigger value="tracabilite" className="flex items-center gap-1"><Package className="h-3.5 w-3.5" />Lots</TabsTrigger>
         </TabsList>
@@ -1100,18 +1100,18 @@ export function QcClient({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap gap-2">
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-48"><SelectValue placeholder="Status" /></SelectTrigger>
+                <SelectTrigger className="w-48"><SelectValue placeholder="Statut" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ALL">All statuses</SelectItem>
+                  <SelectItem value="ALL">Tous les statuts</SelectItem>
                   {Object.keys(QC_REQUEST_STATUS_LABELS).map((s) => (
                     <SelectItem key={s} value={s}>{QC_REQUEST_STATUS_LABELS[s]}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               <Select value={levelFilter} onValueChange={setLevelFilter}>
-                <SelectTrigger className="w-40"><SelectValue placeholder="Level" /></SelectTrigger>
+                <SelectTrigger className="w-40"><SelectValue placeholder="Niveau" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ALL">All levels</SelectItem>
+                  <SelectItem value="ALL">Tous les niveaux</SelectItem>
                   {QC_LEVELS.map((l) => (
                     <SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>
                   ))}
@@ -1129,7 +1129,7 @@ export function QcClient({
               <CardContent className="py-8">
                 <EmptyState
                   title="Aucune demande QC"
-                  description="Créez une demande de contrôle qualité pour planifier une inspection, un rapport ou un envoi vers un laboratoire."
+                  description="Cr�ez une demande de contr�le qualit� pour planifier une inspection, un rapport ou un envoi vers un laboratoire."
                 />
               </CardContent>
             </Card>
@@ -1143,12 +1143,12 @@ export function QcClient({
                       <div className="space-y-1">
                         <CardTitle className="text-base">{req.order.orderNumber}</CardTitle>
                         <div className="text-sm text-muted-foreground">
-                          {req.order.contact?.name ?? "Unknown client"}
-                          {req.supplier ? ` • Supplier: ${req.supplier.name}` : ""}
-                          {req.product ? ` • Product: ${req.product.name}` : ""}
+                          {req.order.contact?.name ?? "Client inconnu"}
+                          {req.supplier ? ` � Fournisseur : ${req.supplier.name}` : ""}
+                          {req.product ? ` � Produit : ${req.product.name}` : ""}
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          Level: {QC_LEVEL_LABELS[req.level] ?? req.level} • Type: {req.type}
+                          Niveau : {QC_LEVEL_LABELS[req.level] ?? req.level} � Type : {req.type}
                         </div>
                       </div>
                       <div className="flex flex-col items-end gap-2">
@@ -1164,7 +1164,7 @@ export function QcClient({
                             <span className="font-medium">Latest report</span>
                             {overallBadge(latestReport.overallResult)}
                           </div>
-                          <p className="text-muted-foreground mt-1">{latestReport.summary ?? "No summary"}</p>
+                          <p className="text-muted-foreground mt-1">{latestReport.summary ?? "Aucun resume"}</p>
                         </div>
                       ) : (
                         <div className="text-sm text-muted-foreground">No report yet.</div>
@@ -1184,7 +1184,7 @@ export function QcClient({
                           onClick={() => handleRequestUpdate(req.id, { status: "PASSED" })}
                           disabled={pending}
                         >
-                          <CheckCircle className="mr-1 h-4 w-4" /> Pass
+                          <CheckCircle className="mr-1 h-4 w-4" /> Valider
                         </Button>
                         <Button
                           size="sm"
@@ -1192,7 +1192,7 @@ export function QcClient({
                           onClick={() => handleRequestUpdate(req.id, { status: "CONDITIONAL" })}
                           disabled={pending}
                         >
-                          <AlertTriangle className="mr-1 h-4 w-4" /> Conditional
+                          <AlertTriangle className="mr-1 h-4 w-4" /> Sous reserve
                         </Button>
                         <Button
                           size="sm"
@@ -1200,7 +1200,7 @@ export function QcClient({
                           onClick={() => handleRequestUpdate(req.id, { status: "FAILED" })}
                           disabled={pending}
                         >
-                          <XCircle className="mr-1 h-4 w-4" /> Fail
+                          <XCircle className="mr-1 h-4 w-4" /> Echec
                         </Button>
                         <AddReportDialog
                           request={req}
@@ -1263,7 +1263,7 @@ export function QcClient({
                                 });
                               }}
                             >
-                              <FlaskConical className="mr-1 h-4 w-4" /> Soumettre au lab
+                              <FlaskConical className="mr-1 h-4 w-4" /> Soumettre au laboratoire
                             </Button>
                           </>
                         )}
@@ -1293,8 +1293,8 @@ export function QcClient({
                   <CardHeader className="flex flex-row items-start justify-between">
                     <div>
                       <CardTitle className="text-base">{p.name}</CardTitle>
-                      <p className="text-sm text-muted-foreground">{p.city ?? "Unknown city"} {p.country ? `• ${p.country}` : ""}</p>
-                      <p className="text-xs text-muted-foreground">{p.email ?? ""} {p.phone ? `• ${p.phone}` : ""}</p>
+                      <p className="text-sm text-muted-foreground">{p.city ?? "Unknown city"} {p.country ? `� ${p.country}` : ""}</p>
+                      <p className="text-xs text-muted-foreground">{p.email ?? ""} {p.phone ? `� ${p.phone}` : ""}</p>
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge variant="outline">{p.qcPartnerProfile?.rating ?? 0}/100</Badge>
@@ -1358,7 +1358,7 @@ export function QcClient({
                           </Button>
                         )}
                         {(i.status === "IN_PROGRESS" || i.status === "COMPLETED") && (
-                          <SubmitReportDialog inspection={i} onSubmitted={() => toast.success("Report submitted")} />
+                          <SubmitReportDialog inspection={i} onSubmitted={() => toast.success("Rapport soumis")} />
                         )}
                       </div>
                     </div>
@@ -1368,7 +1368,7 @@ export function QcClient({
             </Card>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-base">QC plans</CardTitle>
+                <CardTitle className="text-base">Plans QC</CardTitle>
                 <CreatePlanDialog onCreated={(p) => setPlans((prev) => [p, ...prev])} />
               </CardHeader>
               <CardContent className="space-y-2">
@@ -1380,7 +1380,7 @@ export function QcClient({
                       <div>
                         <p className="text-sm font-medium">{p.name}</p>
                         <p className="text-xs text-muted-foreground">{QC_TYPE_LABELS[p.type] ?? p.type}</p>
-                        <p className="text-xs text-muted-foreground">Category: {p.productCategory ?? "-"}</p>
+                        <p className="text-xs text-muted-foreground">Categorie : {p.productCategory ?? "-"}</p>
                       </div>
                       <div className="flex items-center gap-2">
                         <Badge variant="outline">{p._count.inspections} inspections</Badge>
@@ -1397,14 +1397,14 @@ export function QcClient({
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-base">QC reports</CardTitle>
+              <CardTitle className="text-base">Rapports QC</CardTitle>
               <ShieldCheck className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent className="space-y-3">
               {reports.length === 0 ? (
                 <EmptyState
                   title="Aucun rapport QC"
-                  description="Les rapports d'inspection, les photos et les non-conformités apparaîtront ici dès leur création."
+                  description="Les rapports d'inspection, les photos et les non-conformit�s appara�tront ici d�s leur cr�ation."
                 />
               ) : (
                 reports.map((r) => (
@@ -1412,7 +1412,7 @@ export function QcClient({
                     <div className="flex-1">
                       <p className="text-sm font-medium">Order {r.qcRequest.order.orderNumber}</p>
                       <p className="text-xs text-muted-foreground">{r.qcRequest.order.contact?.name ?? "Client unknown"}</p>
-                      <p className="text-xs text-muted-foreground">Summary: {r.summary ?? "No summary"}</p>
+                      <p className="text-xs text-muted-foreground">Resume : {r.summary ?? "Aucun resume"}</p>
                       {getReportPhotos(r).length > 0 && (
                         <div className="mt-3 space-y-2">
                           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Analyse photo IA</p>
@@ -1451,7 +1451,7 @@ export function QcClient({
                                             ...prev,
                                             [photoUrl]: res.data,
                                           }));
-                                          toast.success("Analyse IA terminée");
+                                          toast.success("Analyse IA termin�e");
                                         });
                                       }}
                                     >
@@ -1502,18 +1502,18 @@ export function QcClient({
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Decision engine</CardTitle>
-              <p className="text-sm text-muted-foreground">Validate QC outcomes and add decision notes.</p>
+              <p className="text-sm text-muted-foreground">Validez le resultat QC et ajoutez des notes de decision.</p>
             </CardHeader>
             <CardContent className="space-y-4">
               {requests.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No QC requests.</p>
+                <p className="text-sm text-muted-foreground">Aucune demande QC.</p>
               ) : (
                 requests.map((req) => (
                   <div key={req.id} className="rounded border p-4 space-y-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div>
                         <p className="font-medium">{req.order.orderNumber}</p>
-                        <p className="text-xs text-muted-foreground">Level: {QC_LEVEL_LABELS[req.level] ?? req.level}</p>
+                        <p className="text-xs text-muted-foreground">Niveau : {QC_LEVEL_LABELS[req.level] ?? req.level}</p>
                       </div>
                       {requestStatusBadge(req.status)}
                     </div>
@@ -1521,7 +1521,7 @@ export function QcClient({
                       value={decisionNotes[req.id] ?? req.decisionNotes ?? ""}
                       onChange={(e) => setDecisionNotes((prev) => ({ ...prev, [req.id]: e.target.value }))}
                       rows={2}
-                      placeholder="Decision notes for client, supplier, logistics"
+                      placeholder="Notes de decision pour le client, le fournisseur et la logistique"
                     />
                     <div className="flex flex-wrap gap-2">
                       <Button size="sm" variant="outline" onClick={() => handleRequestUpdate(req.id, { status: "PASSED", decisionNotes: decisionNotes[req.id] })}>
@@ -1545,7 +1545,7 @@ export function QcClient({
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Client communication</CardTitle>
-              <p className="text-sm text-muted-foreground">Share QC reports and confirmations with the client.</p>
+              <p className="text-sm text-muted-foreground">Partagez les rapports QC et les confirmations avec le client.</p>
             </CardHeader>
             <CardContent className="space-y-3">
               {pendingReports.length === 0 ? (
@@ -1556,7 +1556,7 @@ export function QcClient({
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="font-medium">Order {r.qcRequest.order.orderNumber}</p>
-                        <p className="text-xs text-muted-foreground">{r.qcRequest.order.contact?.name ?? "Client unknown"} {r.qcRequest.order.contact?.email ? `• ${r.qcRequest.order.contact?.email}` : ""}</p>
+                        <p className="text-xs text-muted-foreground">{r.qcRequest.order.contact?.name ?? "Client unknown"} {r.qcRequest.order.contact?.email ? `� ${r.qcRequest.order.contact?.email}` : ""}</p>
                       </div>
                       {overallBadge(r.overallResult)}
                     </div>
@@ -1586,7 +1586,7 @@ export function QcClient({
           </Card>
         </TabsContent>
 
-        {/* ── Tab Laboratoires ─────────────────────────────────────────── */}
+        {/* -- Tab Laboratoires ------------------------------------------- */}
         <TabsContent value="labs" className="space-y-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
@@ -1605,7 +1605,7 @@ export function QcClient({
                         const res = await createLabConnection(fd);
                         if (res.error) { toast.error(res.error); return; }
                         setLabConnections(prev => [res.data as any, ...prev]);
-                        toast.success("Connexion créée");
+                        toast.success("Connexion cr��e");
                       });
                     }}
                     className="space-y-3 pt-2"
@@ -1615,15 +1615,15 @@ export function QcClient({
                       <select name="provider" className="mt-1 h-9 w-full rounded-md border bg-transparent px-3 text-sm">
                         <option value="SGS">SGS</option>
                         <option value="BUREAU_VERITAS">Bureau Veritas</option>
-                        <option value="TUV">TÜV</option>
+                        <option value="TUV">T�V</option>
                         <option value="INTERTEK">Intertek</option>
-                        <option value="CUSTOM">Personnalisé</option>
+                        <option value="CUSTOM">Personnalis�</option>
                       </select>
                     </div>
                     <div><Label>Nom</Label><Input name="name" placeholder="Ex: SGS Guangzhou" required className="mt-1" /></div>
                     <div><Label>URL API</Label><Input name="apiEndpoint" placeholder="https://api.lab.com/v1" required className="mt-1" /></div>
-                    <div><Label>Clé API</Label><Input name="apiKey" type="password" required className="mt-1" /></div>
-                    <Button type="submit" className="w-full">Créer</Button>
+                    <div><Label>Cl� API</Label><Input name="apiKey" type="password" required className="mt-1" /></div>
+                    <Button type="submit" className="w-full">Cr�er</Button>
                   </form>
                 </DialogContent>
               </Dialog>
@@ -1632,7 +1632,7 @@ export function QcClient({
               {labConnections.length === 0 ? (
                 <EmptyState
                   title="Aucune connexion laboratoire"
-                  description="Ajoutez une connexion SGS, Bureau Veritas, TUV, Intertek ou un endpoint custom pour envoyer des tests."
+                  description="Ajoutez une connexion SGS, Bureau Veritas, TUV, Intertek ou un endpoint personnalise pour envoyer des tests."
                 />
               ) : (
                 <div className="space-y-2">
@@ -1655,7 +1655,7 @@ export function QcClient({
                             const res = await deleteLabConnection(conn.id);
                             if (res.error) { toast.error(res.error); return; }
                             setLabConnections(prev => prev.filter(c => c.id !== conn.id));
-                            toast.success("Connexion supprimée");
+                            toast.success("Connexion supprim�e");
                           });
                         }}>
                           <Trash2 className="h-4 w-4" />
@@ -1674,7 +1674,7 @@ export function QcClient({
               {labTests.length === 0 ? (
                 <EmptyState
                   title="Aucun test laboratoire"
-                  description='Utilisez "Soumettre au lab" depuis une demande QC pour créer un test externe.'
+                  description='Utilisez "Soumettre au laboratoire" depuis une demande QC pour cr�er un test externe.'
                 />
               ) : (
                 <div className="space-y-2">
@@ -1682,7 +1682,7 @@ export function QcClient({
                     <div key={t.id} className="flex items-center justify-between rounded border p-3 text-sm">
                       <div>
                         <p className="font-medium">{t.connection?.name}</p>
-                        <p className="text-xs text-muted-foreground">Request: {t.qcRequestId.slice(0, 8)}…</p>
+                        <p className="text-xs text-muted-foreground">Request: {t.qcRequestId.slice(0, 8)}�</p>
                       </div>
                       <div className="flex items-center gap-2">
                         <Badge variant={
@@ -1724,10 +1724,10 @@ export function QcClient({
           </Card>
         </TabsContent>
 
-        {/* ── Tab SPC ─────────────────────────────────────────────────── */}
+        {/* -- Tab SPC --------------------------------------------------- */}
         <TabsContent value="spc" className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold">Contrôle Statistique des Procédés</h3>
+            <h3 className="text-lg font-semibold">Contr�le Statistique des Proc�d�s</h3>
             <Dialog>
               <DialogTrigger asChild>
                 <Button size="sm"><Plus className="mr-1 h-4 w-4" />Nouveau graphique</Button>
@@ -1740,22 +1740,22 @@ export function QcClient({
                       const res = await createSpcChart(fd);
                       if (res.error) { toast.error(res.error); return; }
                       setSpcCharts(prev => [res.data as any, ...prev]);
-                      toast.success("Graphique créé");
+                      toast.success("Graphique cr��");
                     });
                   }}
                   className="space-y-3 pt-2"
                 >
-                  <div><Label>Nom</Label><Input name="name" placeholder="Ex: Taux de défauts - Produit A" required className="mt-1" /></div>
+                  <div><Label>Nom</Label><Input name="name" placeholder="Ex: Taux de d�fauts - Produit A" required className="mt-1" /></div>
                   <div>
-                    <Label>Métrique</Label>
+                    <Label>M�trique</Label>
                     <select name="metric" className="mt-1 h-9 w-full rounded-md border bg-transparent px-3 text-sm">
-                      <option value="defect_rate">Taux de défauts</option>
+                      <option value="defect_rate">Taux de d�fauts</option>
                       <option value="dimension">Dimension</option>
                       <option value="weight">Poids</option>
-                      <option value="custom">Personnalisé</option>
+                      <option value="custom">Personnalis�</option>
                     </select>
                   </div>
-                  <Button type="submit" className="w-full">Créer</Button>
+                  <Button type="submit" className="w-full">Cr�er</Button>
                 </form>
               </DialogContent>
             </Dialog>
@@ -1785,11 +1785,11 @@ export function QcClient({
                   <CardHeader className="flex flex-row items-center justify-between pb-2">
                     <div>
                       <CardTitle className="text-base">{chart.name}</CardTitle>
-                      <p className="text-xs text-muted-foreground">{chart.metric} · {pts.length} points</p>
+                      <p className="text-xs text-muted-foreground">{chart.metric} � {pts.length} points</p>
                     </div>
                     <div className="flex items-center gap-2">
                       {outOfControl > 0 && (
-                        <Badge variant="destructive">{outOfControl} hors contrôle</Badge>
+                        <Badge variant="destructive">{outOfControl} hors contr�le</Badge>
                       )}
                     </div>
                   </CardHeader>
@@ -1803,7 +1803,7 @@ export function QcClient({
                           <Tooltip />
                           {chart.ucl != null && <ReferenceLine y={Number(chart.ucl)} stroke="red" strokeDasharray="4 2" label={{ value: "UCL", position: "right", fontSize: 11 }} />}
                           {chart.lcl != null && <ReferenceLine y={Number(chart.lcl)} stroke="red" strokeDasharray="4 2" label={{ value: "LCL", position: "right", fontSize: 11 }} />}
-                          {chart.mean != null && <ReferenceLine y={Number(chart.mean)} stroke="green" strokeDasharray="4 2" label={{ value: "μ", position: "right", fontSize: 11 }} />}
+                          {chart.mean != null && <ReferenceLine y={Number(chart.mean)} stroke="green" strokeDasharray="4 2" label={{ value: "�", position: "right", fontSize: 11 }} />}
                           <Line type="monotone" dataKey="value" stroke="#2563eb" dot={(dotProps: any) => {
                             const pt = pts[dotProps.index];
                             return <circle key={dotProps.index} cx={dotProps.cx} cy={dotProps.cy} r={4} fill={pt?.isOutOfControl ? "#ef4444" : "#22c55e"} />;
@@ -1811,13 +1811,13 @@ export function QcClient({
                         </LineChart>
                       </StableResponsiveChart>
                     ) : (
-                      <p className="text-sm text-muted-foreground text-center py-4">Aucun point de données. Ajoutez en-dessous.</p>
+                      <p className="text-sm text-muted-foreground text-center py-4">Aucun point de donn�es. Ajoutez en-dessous.</p>
                     )}
                     <div className="flex items-center gap-2">
                       <Input
                         type="number"
                         step="0.01"
-                        placeholder="Valeur mesurée"
+                        placeholder="Valeur mesur�e"
                         value={selectedSpcChart === chart.id ? spcPointValue : ""}
                         onChange={(e) => { setSelectedSpcChart(chart.id); setSpcPointValue(e.target.value); }}
                         className="h-8 w-40"
@@ -1833,7 +1833,7 @@ export function QcClient({
                           }
                           setSpcPointValue("");
                           setSelectedSpcChart("");
-                          toast.success("Point ajouté");
+                          toast.success("Point ajout�");
                         });
                       }}>
                         <Plus className="mr-1 h-3.5 w-3.5" />Ajouter mesure
@@ -1846,7 +1846,7 @@ export function QcClient({
           )}
         </TabsContent>
 
-        {/* ── Tab Traçabilité Lots ──────────────────────────────────────── */}
+        {/* -- Tab Tra�abilit� Lots ---------------------------------------- */}
         <TabsContent value="tracabilite" className="space-y-4">
           <Card>
             <CardHeader><CardTitle className="flex items-center gap-2"><Package className="h-5 w-5" />Recherche de lot</CardTitle></CardHeader>
@@ -1971,7 +1971,7 @@ export function QcClient({
                 <div className="rounded-lg border p-3 space-y-3">
                   <div>
                     <p className="text-sm font-medium">Lier une demande QC</p>
-                    <p className="text-xs text-muted-foreground">Rattachez la demande QC concernee au meme lot pour la traçabilite.</p>
+                    <p className="text-xs text-muted-foreground">Rattachez la demande QC concernee au meme lot pour la tra�abilite.</p>
                   </div>
                   <Select value={lotRequestId || "none"} onValueChange={(value) => setLotRequestId(value === "none" ? "" : value)}>
                     <SelectTrigger className="h-9">
@@ -2012,7 +2012,7 @@ export function QcClient({
 
               <div className="flex items-center gap-2">
                 <Input
-                  placeholder="Numéro de lot (ex: LOT-2026-001)"
+                  placeholder="Num�ro de lot (ex: LOT-2026-001)"
                   value={lotSearch}
                   onChange={(e) => setLotSearch(e.target.value)}
                   className="max-w-xs"
@@ -2042,7 +2042,7 @@ export function QcClient({
               ) : lotHistory === undefined || !lotHistory.lot ? (
                 <EmptyState
                   title="Lot introuvable"
-                  description="Ce numero de lot n'existe pas encore. Creez-le ci-dessus pour commencer la traçabilite."
+                  description="Ce numero de lot n'existe pas encore. Creez-le ci-dessus pour commencer la tra�abilite."
                 />
               ) : (
                 <div className="space-y-4">
@@ -2050,7 +2050,7 @@ export function QcClient({
                     <Package className="h-5 w-5 text-muted-foreground" />
                     <div className="flex-1">
                       <p className="font-medium">{lotHistory.lot.lotNumber}</p>
-                      <p className="text-xs text-muted-foreground">Créé le {new Date(lotHistory.lot.createdAt).toLocaleDateString("fr-FR")}</p>
+                      <p className="text-xs text-muted-foreground">Cr�� le {new Date(lotHistory.lot.createdAt).toLocaleDateString("fr-FR")}</p>
                     </div>
                     <Badge variant={
                       lotHistory.lot.status === "RECALLED" ? "destructive" :
@@ -2078,7 +2078,7 @@ export function QcClient({
 
                   <div className="grid gap-3 md:grid-cols-2">
                     <div>
-                      <h4 className="text-sm font-medium mb-2">Commandes liées ({lotHistory.orders?.length ?? 0})</h4>
+                      <h4 className="text-sm font-medium mb-2">Commandes li�es ({lotHistory.orders?.length ?? 0})</h4>
                       {(lotHistory.orders ?? []).length === 0 ? (
                         <p className="text-xs text-muted-foreground">Aucune commande</p>
                       ) : (
@@ -2093,7 +2093,7 @@ export function QcClient({
                       )}
                     </div>
                     <div>
-                      <h4 className="text-sm font-medium mb-2">QC Requests liées ({lotHistory.qcRequests?.length ?? 0})</h4>
+                      <h4 className="text-sm font-medium mb-2">Demandes QC liees ({lotHistory.qcRequests?.length ?? 0})</h4>
                       {(lotHistory.qcRequests ?? []).length === 0 ? (
                         <p className="text-xs text-muted-foreground">Aucune demande QC</p>
                       ) : (
@@ -2119,7 +2119,7 @@ export function QcClient({
               {lotTraces.length === 0 ? (
                 <EmptyState
                   title="Aucun lot enregistre"
-                  description="Les lots actifs, recalls et quarantaines apparaîtront ici une fois crees."
+                  description="Les lots actifs, recalls et quarantaines appara�tront ici une fois crees."
                 />
               ) : (
                 <div className="space-y-2">
@@ -2153,7 +2153,7 @@ export function QcClient({
               </DialogHeader>
               <div className="space-y-3">
                 <p className="text-sm text-muted-foreground">
-                  Cette action bascule le lot en statut RECALLED et doit être motivée.
+                  Cette action bascule le lot en statut RECALLED et doit �tre motiv�e.
                 </p>
                 <Textarea
                   value={recallReason}
@@ -2200,3 +2200,8 @@ export function QcClient({
     </div>
   );
 }
+
+
+
+
+

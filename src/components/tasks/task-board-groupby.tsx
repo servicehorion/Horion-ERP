@@ -23,10 +23,10 @@ export function TaskBoardGroupBy({ tasks, module }: TaskBoardGroupByProps) {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm text-muted-foreground">Grouper par</span>
         <Select value={groupBy} onValueChange={(value) => setGroupBy(value as TaskGroupBy)}>
-          <SelectTrigger className="w-[180px] h-8 text-xs">
+          <SelectTrigger className="h-8 w-full text-xs sm:w-[180px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
