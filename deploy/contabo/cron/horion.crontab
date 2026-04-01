@@ -1,0 +1,22 @@
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+HORION_DOMAIN=https://app.horion.tech
+CRON_SECRET=CHANGE_ME_CRON_SECRET
+
+# Horion ERP cron jobs
+
+*/15 * * * * /usr/bin/curl -fsS -X POST -H "x-horion-secret: ${CRON_SECRET}" "${HORION_DOMAIN}/api/cron/sla-check" >> /var/log/horion-crons/sla-check.log 2>&1
+*/15 * * * * /usr/bin/curl -fsS -X POST -H "x-horion-secret: ${CRON_SECRET}" "${HORION_DOMAIN}/api/cron/pawapay-status" >> /var/log/horion-crons/pawapay-status.log 2>&1
+*/30 * * * * /usr/bin/curl -fsS -X POST -H "x-horion-secret: ${CRON_SECRET}" "${HORION_DOMAIN}/api/cron/strategic-risk" >> /var/log/horion-crons/strategic-risk.log 2>&1
+*/30 * * * * /usr/bin/curl -fsS -X POST -H "x-horion-secret: ${CRON_SECRET}" "${HORION_DOMAIN}/api/cron/strategic-decisions" >> /var/log/horion-crons/strategic-decisions.log 2>&1
+*/30 * * * * /usr/bin/curl -fsS -X POST -H "x-horion-secret: ${CRON_SECRET}" "${HORION_DOMAIN}/api/cron/nurturing-step" >> /var/log/horion-crons/nurturing-step.log 2>&1
+*/30 * * * * /usr/bin/curl -fsS -X POST -H "x-horion-secret: ${CRON_SECRET}" "${HORION_DOMAIN}/api/cron/finance-approval-escalation" >> /var/log/horion-crons/finance-approval-escalation.log 2>&1
+*/30 * * * * /usr/bin/curl -fsS -X POST -H "x-horion-secret: ${CRON_SECRET}" "${HORION_DOMAIN}/api/cron/sourcing-sla-check" >> /var/log/horion-crons/sourcing-sla-check.log 2>&1
+0 * * * * /usr/bin/curl -fsS -X POST -H "x-horion-secret: ${CRON_SECRET}" "${HORION_DOMAIN}/api/cron/lead-scoring" >> /var/log/horion-crons/lead-scoring.log 2>&1
+0 * * * * /usr/bin/curl -fsS -X POST -H "x-horion-secret: ${CRON_SECRET}" "${HORION_DOMAIN}/api/cron/expire-payments" >> /var/log/horion-crons/expire-payments.log 2>&1
+0 * * * * /usr/bin/curl -fsS -X POST -H "x-horion-secret: ${CRON_SECRET}" "${HORION_DOMAIN}/api/cron/recurring-tasks" >> /var/log/horion-crons/recurring-tasks.log 2>&1
+0 */4 * * * /usr/bin/curl -fsS -X POST -H "x-horion-secret: ${CRON_SECRET}" "${HORION_DOMAIN}/api/cron/treasury-balance-alerts" >> /var/log/horion-crons/treasury-balance-alerts.log 2>&1
+0 */6 * * * /usr/bin/curl -fsS -X POST -H "x-horion-secret: ${CRON_SECRET}" "${HORION_DOMAIN}/api/cron/fx-rates" >> /var/log/horion-crons/fx-rates.log 2>&1
+0 2 * * * /usr/bin/curl -fsS -X POST -H "x-horion-secret: ${CRON_SECRET}" "${HORION_DOMAIN}/api/cron/intelligence-refresh" >> /var/log/horion-crons/intelligence-refresh.log 2>&1
+0 3 * * * /usr/bin/curl -fsS -X POST -H "x-horion-secret: ${CRON_SECRET}" "${HORION_DOMAIN}/api/cron/assistant-knowledge-sync" >> /var/log/horion-crons/assistant-knowledge-sync.log 2>&1
