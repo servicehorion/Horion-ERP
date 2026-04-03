@@ -81,9 +81,18 @@ function buildPriorityActions(input: {
   return actions;
 }
 
+async function safeProjectionRead<T>(label: string, run: () => Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await run();
+  } catch (error) {
+    console.error(`[sourcing-projection] ${label}`, error);
+    return fallback;
+  }
+}
+
 export class SourcingCommandCenterProjectionService {
   static async get(tenantId: string): Promise<SourcingCommandCenterProjection> {
-    const [demands, tickets, cases, workflowTasks] = await Promise.all([
+    const demands = await safeProjectionRead("demands", () =>
       prisma.demandIntake.findMany({
         where: { tenantId },
         select: {
@@ -95,11 +104,24 @@ export class SourcingCommandCenterProjectionService {
         orderBy: { receivedAt: "desc" },
         take: 500,
       }),
+      [] as Array<{
+        id: string;
+        status: string;
+        assignedToId: string | null;
+        sourcingTickets: Array<{ id: string }>;
+      }>
+    );
+
+    const tickets = await safeProjectionRead("tickets", () =>
       prisma.sourcingTicket.findMany({
         where: { tenantId },
         select: { id: true, status: true },
         take: 500,
       }),
+      [] as Array<{ id: string; status: string }>
+    );
+
+    const cases = await safeProjectionRead("cases", () =>
       prisma.sourcingCase.findMany({
         where: { order: { tenantId } },
         select: {
@@ -121,6 +143,25 @@ export class SourcingCommandCenterProjectionService {
         orderBy: { updatedAt: "desc" },
         take: 500,
       }),
+      [] as Array<{
+        id: string;
+        status: string;
+        stageEnteredAt: Date | null;
+        createdAt: Date;
+        updatedAt: Date;
+        level: string | null;
+        pipelineType: string | null;
+        category: string | null;
+        platform: string | null;
+        sensitiveProduct: boolean | null;
+        contractId: string | null;
+        marginPct: unknown | null;
+        marginApprovedByCeo: boolean | null;
+        contract: { status: string; endAt: Date | null } | null;
+      }>
+    );
+
+    const workflowTasks = await safeProjectionRead("workflow-tasks", () =>
       prisma.task.findMany({
         where: {
           tenantId,
@@ -134,7 +175,8 @@ export class SourcingCommandCenterProjectionService {
         },
         take: 500,
       }),
-    ]);
+      [] as Array<{ id: string; dueDate: Date | null; slaDeadline: Date | null }>
+    );
 
     const rawDemands = demands.filter((item) => item.status === "RAW").length;
     const qualifiedDemands = demands.filter((item) => ["QUALIFIED", "INDICATIF_PENDING"].includes(item.status)).length;

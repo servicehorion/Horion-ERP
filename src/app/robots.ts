@@ -7,7 +7,7 @@ export default function robots(): MetadataRoute.Robots {
     rules: [
       {
         userAgent: "*",
-        allow: ["/", "/comment-ca-marche", "/services", "/pourquoi-horion", "/faq", "/a-propos", "/contact", "/pay", "/verification"],
+        allow: ["/pay", "/verification", "/quote", "/portal"],
         disallow: ["/dashboard", "/settings", "/api"],
       },
     ],

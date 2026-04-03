@@ -18,29 +18,34 @@ import { getSession } from "@/lib/session";
 
 export const metadata = { title: "Sourcing Command Center | Horion ERP" };
 
+async function safeSourcingRead<T>(label: string, run: () => Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await run();
+  } catch (error) {
+    console.error(`[sourcing-page] ${label}`, error);
+    return fallback;
+  }
+}
+
 export default async function SourcingPage() {
   const session = await getSession();
-  const [
-    projection,
-    demandsRes,
-    pipelineRes,
-    suppliersRes,
-    marketRes,
-    auditRes,
-    performanceRes,
-    groupageRes,
-    assigneesRes,
-  ] = await Promise.all([
-    SourcingCommandCenterProjectionService.get(session.tenantId),
-    getDemandIntakes(),
-    getSourcingPipelineAdvanced(),
-    getSuppliersForSourcing(),
-    getMarketInsights(),
-    getSourcingAuditLogs(),
-    getSourcingPerformance(),
-    getGroupageBatches(),
-    getSourcingAssignees(),
-  ]);
+  const projection = await safeSourcingRead(
+    "projection",
+    () => SourcingCommandCenterProjectionService.get(session.tenantId),
+    { overview: { demandInbox: 0, qualifiedDemandQueue: 0, activeCases: 0, confirmedCases: 0, breachedCases: 0, warningCases: 0, conversionRate: 0, canonicalJourney: [] }, priorityActions: [] }
+  );
+  const demandsRes = await safeSourcingRead("demands", () => getDemandIntakes(), { success: false, data: [] });
+  const pipelineRes = await safeSourcingRead("pipeline", () => getSourcingPipelineAdvanced(), { success: false, data: [] });
+  const suppliersRes = await safeSourcingRead("suppliers", () => getSuppliersForSourcing(), { success: false, data: [] });
+  const marketRes = await safeSourcingRead("market", () => getMarketInsights(), { success: false, data: [] });
+  const auditRes = await safeSourcingRead("audit", () => getSourcingAuditLogs(), { success: false, data: [] });
+  const performanceRes = await safeSourcingRead(
+    "performance",
+    () => getSourcingPerformance(),
+    { success: false, data: { dependency: [], categoryConcentration: [], heatmap: [] } }
+  );
+  const groupageRes = await safeSourcingRead("groupage", () => getGroupageBatches(), { success: false, data: [] });
+  const assigneesRes = await safeSourcingRead("assignees", () => getSourcingAssignees(), { success: false, data: [] });
 
   return (
     <div className="space-y-6">

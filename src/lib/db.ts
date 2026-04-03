@@ -8,6 +8,26 @@ const globalForPrisma = globalThis as unknown as {
   pgPool: Pool | undefined;
 };
 
+function buildPgPoolOptions(connectionString: string) {
+  const parsed = new URL(connectionString);
+  const sslMode = parsed.searchParams.get("sslmode");
+  const needsSsl =
+    sslMode !== "disable" &&
+    (parsed.hostname.endsWith(".supabase.co") ||
+      parsed.hostname.endsWith(".pooler.supabase.com") ||
+      sslMode === "require" ||
+      sslMode === "verify-full");
+
+  return {
+    host: parsed.hostname,
+    port: Number(parsed.port || 5432),
+    database: parsed.pathname.replace(/^\//, "") || "postgres",
+    user: decodeURIComponent(parsed.username),
+    password: decodeURIComponent(parsed.password),
+    ssl: needsSsl ? { rejectUnauthorized: false } : undefined,
+  };
+}
+
 function getPgPool() {
   if (globalForPrisma.pgPool) return globalForPrisma.pgPool;
 
@@ -22,7 +42,7 @@ function getPgPool() {
   );
 
   const pool = new Pool({
-    connectionString,
+    ...buildPgPoolOptions(connectionString),
     max,
     keepAlive: true,
     idleTimeoutMillis: 30000,

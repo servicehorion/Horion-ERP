@@ -13,6 +13,15 @@ export const metadata = {
   description: "Cockpit quotidien par role pour piloter l'activite Horion",
 };
 
+async function safeDashboardRead<T>(label: string, run: () => Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await run();
+  } catch (error) {
+    console.error(`[dashboard] ${label}`, error);
+    return fallback;
+  }
+}
+
 export default async function DashboardPage() {
   const session = await auth();
 
@@ -28,35 +37,42 @@ export default async function DashboardPage() {
   const dataFrom = new Date(now);
   dataFrom.setDate(dataFrom.getDate() - 180);
 
-  const [
-    deliveredOrders,
-    topClientOrders,
-    ordersByStatus,
-    slaTasks,
-    delayedShipments,
-    cashflowSeries,
-    agingReport,
-    leadScope,
-    cashPositionRaw,
-    tenantMeta,
-  ] = await Promise.all([
+  // Keep dashboard reads intentionally low-concurrency.
+  // This page sits behind auth + layout badges and was exhausting the DB pool in dev/staging.
+  const deliveredOrders = await safeDashboardRead("delivered-orders", () =>
     prisma.order.findMany({
       where: { tenantId, status: "LIVRE", createdAt: { gte: dataFrom } },
       select: { totalClient: true, createdAt: true, actualDelivery: true },
     }),
+    [] as Array<{ totalClient: unknown; createdAt: Date; actualDelivery: Date | null }>
+  );
+
+  const topClientOrders = await safeDashboardRead("top-client-orders", () =>
     prisma.order.findMany({
       where: { tenantId, createdAt: { gte: dataFrom } },
       select: { totalClient: true, contact: { select: { name: true } } },
     }),
+    [] as Array<{ totalClient: unknown; contact: { name: string } | null }>
+  );
+
+  const ordersByStatus = await safeDashboardRead("orders-by-status", () =>
     prisma.order.groupBy({
       by: ["status"],
       where: { tenantId, status: { notIn: ["ANNULE"] } },
       _count: { status: true },
     }),
+    [] as Array<{ status: string; _count: { status: number } }>
+  );
+
+  const slaTasks = await safeDashboardRead("sla-tasks", () =>
     prisma.task.findMany({
       where: { tenantId, slaBreach: true, createdAt: { gte: dataFrom } },
       select: { createdAt: true },
     }),
+    [] as Array<{ createdAt: Date }>
+  );
+
+  const delayedShipments = await safeDashboardRead("delayed-shipments", () =>
     prisma.shipment.findMany({
       where: {
         order: { tenantId },
@@ -73,16 +89,47 @@ export default async function DashboardPage() {
       take: 8,
       orderBy: { estimatedArrival: "asc" },
     }),
+    [] as Array<{
+      id: string;
+      origin: string;
+      destination: string;
+      estimatedArrival: Date | null;
+      order: { orderNumber: string } | null;
+    }>
+  );
+
+  const cashflowSeries = await safeDashboardRead("cashflow-series", () =>
     FinanceAnalyticsService.getCashflowSeries(tenantId, 6),
+    [] as Array<{ month: string; inbound: number; outbound: number; net: number; balance: number }>
+  );
+
+  const agingReport = await safeDashboardRead("aging-report", () =>
     FinanceIntelligenceService.getAgingReport(tenantId),
+    {
+      aging: { current: [], days30: [], days60: [], days90: [], over90: [] },
+      totals: { current: 0, days30: 0, days60: 0, days90: 0, over90: 0 },
+      totalOutstanding: 0,
+    }
+  );
+
+  const leadScope = await safeDashboardRead("lead-scope", () =>
     getCrmLeadScopeWithDelegation({ id: session.user.id, tenantId, role }),
+    null
+  );
+
+  const cashPositionRaw = await safeDashboardRead("cash-position", () =>
     prisma.payment.groupBy({
       by: ["direction"],
       where: { status: "CONFIRMED", order: { tenantId } },
       _sum: { amountXAF: true },
     }),
+    [] as Array<{ direction: string; _sum: { amountXAF: unknown | null } }>
+  );
+
+  const tenantMeta = await safeDashboardRead("tenant-meta", () =>
     prisma.tenant.findUnique({ where: { id: tenantId }, select: { currency: true } }),
-  ]);
+    { currency: "XAF" }
+  );
 
   const revenueBuckets = new Map<string, number>();
   for (const order of deliveredOrders) {
@@ -137,12 +184,15 @@ export default async function DashboardPage() {
   }, 0);
 
   const leadWhere = leadScope ? { ...leadScope, isArchived: false } : { id: "none" };
-  const leadGroups = await prisma.lead.groupBy({
-    by: ["status"],
-    where: leadWhere,
-    _count: { status: true },
-    _sum: { estimatedValue: true },
-  });
+  const leadGroups = await safeDashboardRead("lead-groups", () =>
+    prisma.lead.groupBy({
+      by: ["status"],
+      where: leadWhere,
+      _count: { status: true },
+      _sum: { estimatedValue: true },
+    }),
+    [] as Array<{ status: string; _count: { status: number }; _sum: { estimatedValue: unknown | null } }>
+  );
 
   const leadLabels: Record<string, string> = {
     NEW: "Nouveau",
