@@ -163,37 +163,37 @@ const PLATFORM_OPTIONS = [
     value: "1688",
     label: "1688 (Alibaba local)",
     badge: "LOCAL",
-    hint: "Plateforme domestique chinoise � prix réels, marge pleine",
+    hint: "Plateforme domestique chinoise → prix réels, marge pleine",
   },
   {
     value: "TAOBAO",
     label: "Taobao",
     badge: "LOCAL",
-    hint: "Plateforme domestique � prix compétitifs",
+    hint: "Plateforme domestique → prix compétitifs",
   },
   {
     value: "PINDUODUO",
     label: "Pinduoduo",
     badge: "LOCAL",
-    hint: "Prix très bas � vérifier la qualité",
+    hint: "Prix très bas → vérifier la qualité",
   },
   {
     value: "ALIBABA",
     label: "Alibaba (international)",
     badge: "INTL",
-    hint: "Prix majorés 30-60% vs 1688 � marge réduite automatiquement",
+    hint: "Prix majorés 30-60% vs 1688 → marge réduite automatiquement",
   },
   {
     value: "ALIEXPRESS",
     label: "AliExpress",
     badge: "INTL",
-    hint: "Prix retail internationaux � prix élevés",
+    hint: "Prix retail internationaux → prix élevés",
   },
   {
     value: "AMAZON",
     label: "Amazon",
     badge: "INTL",
-    hint: "Prix occidentaux � utiliser uniquement si hors Chine",
+    hint: "Prix occidentaux → utiliser uniquement si hors Chine",
   },
   { value: "WEB", label: "Recherche Web", badge: "INTL", hint: "Autre source" },
 ];
@@ -221,9 +221,9 @@ const RISK_LEVEL_OPTIONS: Array<{
   },
   {
     value: "HIGH",
-    label: "�0levé",
+    label: "Élevé",
     desc: "Certifications export requises, transport spécial",
-    examples: "�0lectronique avec batterie, cosmétiques, poudres, médical",
+    examples: "Électronique avec batterie, cosmétiques, poudres, médical",
     color: "text-rose-700 bg-rose-50 border-rose-200",
   },
 ];
@@ -231,7 +231,7 @@ const RISK_LEVEL_OPTIONS: Array<{
 const PRICE_CURRENCY_OPTIONS: Array<{ value: PriceCurrency; label: string; symbol: string }> = [
   { value: "RMB", label: "RMB (¥)", symbol: "¥" },
   { value: "USD", label: "USD ($)", symbol: "$" },
-  { value: "EUR", label: "EUR (��)", symbol: "��" },
+  { value: "EUR", label: "EUR (€)", symbol: "€" },
 ];
 
 function n(value: string) {
@@ -304,6 +304,7 @@ export default function SourcingIndicatifPage() {
   const [catalogImagePreview, setCatalogImagePreview] = useState<string>("");
   const [catalogImageFilename, setCatalogImageFilename] = useState<string>("");
   const [densityBlocked, setDensityBlocked] = useState(false);
+  const [includeDdpEstimate, setIncludeDdpEstimate] = useState(false);
   const [transportRateProfiles, setTransportRateProfiles] = useState<
     Partial<Record<string, NegotiatedTransportRateProfile>>
   >({});
@@ -766,7 +767,7 @@ export default function SourcingIndicatifPage() {
       if (response.data.requiresApproval) {
         setLandingUrl(null);
         toast.success(
-          `Devis cr�� en attente de validation interne par ${response.data.approvalLabel ?? "le valideur requis"}.`
+          `Devis créé en attente de validation interne par ${response.data.approvalLabel ?? "le valideur requis"}.`
         );
         setLineItems([]);
         return;
@@ -784,7 +785,7 @@ export default function SourcingIndicatifPage() {
       }
 
       setLandingUrl(response.data.landingUrl ?? null);
-      toast.success("Devis valid� en interne et envoy� au client.");
+      toast.success("Devis validé en interne et envoyé au client.");
       setLineItems([]);
     });
   }
@@ -820,21 +821,21 @@ export default function SourcingIndicatifPage() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold">Sourcing Indicatif</h1>
           <p className="text-muted-foreground mt-1">
-            Devis avant sourcing profond � moteur de prix dynamique (buffer � risque � plateforme).
+            Devis avant sourcing profond → moteur de prix dynamique (buffer · risque · plateforme).
           </p>
         </div>
         <div className="flex flex-col items-end gap-2">
           <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">
-            Moteur v2 � Buffer risque + Marge dynamique + 10% service
+            Moteur v2 → Buffer risque + Marge dynamique + 10% service
           </Badge>
           <span className="text-xs text-muted-foreground">
             {isInternationalPlatform
-              ? `Marge réduite (15%) � prix ${form.platform} déjà élevé`
-              : `Marge pleine (30%) � prix local ${form.platform}`}
+              ? `Marge réduite (15%) → prix ${form.platform} déjà élevé`
+              : `Marge pleine (30%) → prix local ${form.platform}`}
           </span>
         </div>
       </div>
@@ -846,7 +847,7 @@ export default function SourcingIndicatifPage() {
             <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5 text-amber-600" />
             <div>
               <p className="font-semibold">
-                Attention � Sourcing basé sur {form.platform} (plateforme internationale)
+                Attention → Sourcing basé sur {form.platform} (plateforme internationale)
               </p>
               <p className="mt-1">
                 Le prix {form.platform} est majoré de 30 à 60% par rapport à 1688/Taobao. Le moteur
@@ -854,7 +855,7 @@ export default function SourcingIndicatifPage() {
                 sourcez finalement sur 1688, la différence de prix constitue un bénéfice supplémentaire.
               </p>
               <p className="mt-1 font-medium">
-                �  Recommandation : vérifiez d{"'"}abord sur 1688 ou Taobao pour optimiser le taux de
+                → Recommandation : vérifiez d{"'"}abord sur 1688 ou Taobao pour optimiser le taux de
                 conversion du devis.
               </p>
             </div>
@@ -868,15 +869,15 @@ export default function SourcingIndicatifPage() {
             <AlertTriangle className="h-4 w-4" />
             Rappels transport
           </div>
-          <p>� DDP prévisible : droits de douane non intégrés dans l{"'"}estimatif standard.</p>
-          <p>� Téléphones et ordinateurs interdits par voie maritime.</p>
-          <p>� Batteries pures interdites en avion. Drones interdits air/mer.</p>
-          <p>� Colis non déclaré : majoration de 60% appliquée aux frais transport.</p>
+          <p>→ DDP prévisible : droits de douane non intégrés dans l{"'"}estimatif standard.</p>
+          <p>→ Téléphones et ordinateurs interdits par voie maritime.</p>
+          <p>→ Batteries pures interdites en avion. Drones interdits air/mer.</p>
+          <p>→ Colis non déclaré : majoration de 60% appliquée aux frais transport.</p>
         </CardContent>
       </Card>
 
       <div className="grid gap-6 xl:grid-cols-[1.1fr_1.4fr]">
-        {/* ���� LEFT: Parameters form ������������������������������������������������������������������������������ */}
+        {/* ═══ LEFT: Parameters form ═══════════════════════════════════════════════════ */}
         <Card>
           <CardHeader>
             <CardTitle>Paramètres devis</CardTitle>
@@ -899,7 +900,7 @@ export default function SourcingIndicatifPage() {
                   <SelectContent>
                     {contacts.map((contact) => (
                       <SelectItem key={contact.id} value={contact.id}>
-                        {contact.name}{contact.company ? ` � ${contact.company}` : ""}
+                        {contact.name}{contact.company ? ` → ${contact.company}` : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -908,9 +909,9 @@ export default function SourcingIndicatifPage() {
                   <p className="text-xs text-muted-foreground">
                     {selectedContact.type === "PROSPECT" ? "Prospect" : "Client"}
                     {selectedContact.whatsapp
-                      ? ` � WhatsApp ${selectedContact.whatsapp}`
+                      ? ` → WhatsApp ${selectedContact.whatsapp}`
                       : selectedContact.phone
-                        ? ` � Tél ${selectedContact.phone}`
+                        ? ` → Tél ${selectedContact.phone}`
                         : ""}
                   </p>
                 )}
@@ -1022,7 +1023,7 @@ export default function SourcingIndicatifPage() {
                       </p>
                     </div>
                     <div className="rounded-lg border border-amber-200 bg-white px-3 py-2">
-                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">�0chantillon</p>
+                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Échantillon</p>
                       <p className="font-semibold text-slate-950">
                         {categoryMemoryHint.historicalSampleCount || 0} historique(s)
                       </p>
@@ -1040,9 +1041,9 @@ export default function SourcingIndicatifPage() {
               <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-sm font-semibold text-emerald-900">Memoire catalogue</p>
+                    <p className="text-sm font-semibold text-emerald-900">Mémoire catalogue</p>
                     <p className="text-xs text-emerald-800/80">
-                      On verifie d'abord si Horion connait deja ce produit avant de repartir en sourcing.
+                      On vérifie d'abord si Horion connaît déjà ce produit avant de repartir en sourcing.
                     </p>
                   </div>
                   {catalogLoading && (
@@ -1065,7 +1066,7 @@ export default function SourcingIndicatifPage() {
                         </p>
                       </div>
                       <Badge className="bg-emerald-100 text-emerald-800">
-                        {selectedCatalogMatch.isCertified ? "Certifie" : "Historique connu"}
+                        {selectedCatalogMatch.isCertified ? "Certifié" : "Historique connu"}
                       </Badge>
                     </div>
                   </div>
@@ -1084,11 +1085,11 @@ export default function SourcingIndicatifPage() {
                               <p className="font-medium text-slate-950">{match.name}</p>
                               <Badge variant="outline">{match.score}% match</Badge>
                               {match.isCertified && (
-                                <Badge className="bg-emerald-100 text-emerald-800">Certifie</Badge>
+                                <Badge className="bg-emerald-100 text-emerald-800">Certifié</Badge>
                               )}
                             </div>
                             <p className="text-xs text-muted-foreground">
-                              {match.categoryName || "Sans categorie"} - {match.historicalOrderCount} commandes
+                              {match.categoryName || "Sans catégorie"} - {match.historicalOrderCount} commandes
                               - Cout moyen{" "}
                               {match.weightedAverageCost != null
                                 ? `${match.weightedAverageCost.toLocaleString("fr-FR")} ${match.priceCurrency}`
@@ -1166,7 +1167,7 @@ export default function SourcingIndicatifPage() {
                   <SelectContent>
                     {RISK_LEVEL_OPTIONS.map((r) => (
                       <SelectItem key={r.value} value={r.value}>
-                        {r.label} � {r.desc}
+                        {r.label} → {r.desc}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1183,14 +1184,14 @@ export default function SourcingIndicatifPage() {
                 <Zap className="h-3.5 w-3.5" />
                 Paramètres pricing auto-calculés
               </div>
-              <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="grid grid-cols-1 gap-2 text-center sm:grid-cols-3">
                 <div className="rounded-lg border bg-muted/40 px-2 py-2">
                   <p className="text-xs text-muted-foreground">Buffer risque</p>
                   <p className="font-bold text-slate-950">
                     {(derivedPricing.bufferPct * 100).toFixed(0)}%
                   </p>
                   <p className="text-[10px] text-muted-foreground">
-                    {form.riskLevel} � {LOCAL_PLATFORMS.has(form.platform) ? "local" : "intl"}
+                    {form.riskLevel} · {LOCAL_PLATFORMS.has(form.platform) ? "local" : "intl"}
                   </p>
                 </div>
                 <div className="rounded-lg border bg-muted/40 px-2 py-2">
@@ -1199,7 +1200,7 @@ export default function SourcingIndicatifPage() {
                     {(derivedPricing.invisibleMarginPct * 100).toFixed(0)}%
                   </p>
                   <p className="text-[10px] text-muted-foreground">
-                    {LOCAL_PLATFORMS.has(form.platform) ? "locale �  pleine" : "intl �  réduite"}
+                    {LOCAL_PLATFORMS.has(form.platform) ? "locale → pleine" : "intl → réduite"}
                   </p>
                 </div>
                 <div className="rounded-lg border bg-muted/40 px-2 py-2">
@@ -1233,7 +1234,7 @@ export default function SourcingIndicatifPage() {
               </p>
             </div>
 
-            {/* Price input � multi-currency */}
+            {/* Price input → multi-currency */}
             <div className="space-y-2">
               <Label>Prix plateforme</Label>
               <div className="flex gap-2">
@@ -1272,7 +1273,7 @@ export default function SourcingIndicatifPage() {
                 <div className="rounded-lg bg-muted/60 px-3 py-2 text-xs text-muted-foreground space-y-0.5">
                   {form.priceCurrency !== "RMB" && (
                     <p>
-                      �0� {formatCurrency(effectivePriceRmb, "RMB")} (converti en RMB)
+                      → {formatCurrency(effectivePriceRmb, "RMB")} (converti en RMB)
                     </p>
                   )}
                   <p className="font-medium text-slate-900">
@@ -1298,6 +1299,12 @@ export default function SourcingIndicatifPage() {
                   value={form.quantity}
                   onChange={(e) => setForm((prev) => ({ ...prev, quantity: e.target.value }))}
                 />
+                {n(form.quantity) >= 10 && (
+                  <p className="text-xs text-emerald-700 flex items-center gap-1">
+                    <TrendingUp className="h-3 w-3" />
+                    Volume ≥ 10 unités — négociez -5 à -15% sur 1688 (prix unitaire plus bas).
+                  </p>
+                )}
               </div>
               <div className="space-y-1.5">
                 <Label>Poids total (kg)</Label>
@@ -1311,7 +1318,7 @@ export default function SourcingIndicatifPage() {
               </div>
             </div>
 
-            <div className="grid gap-3 md:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
               {[
                 { label: "L (cm)", field: "lengthCm" },
                 { label: "l (cm)", field: "widthCm" },
@@ -1363,7 +1370,7 @@ export default function SourcingIndicatifPage() {
 
             {/* Exchange rate */}
             <div className="space-y-1.5">
-              <Label>Taux de change RMB �  FCFA</Label>
+              <Label>Taux de change RMB → FCFA</Label>
               <Input
                 type="number"
                 min="1"
@@ -1373,6 +1380,9 @@ export default function SourcingIndicatifPage() {
               />
               <p className="text-xs text-muted-foreground">
                 Taux actuel estimé : {n(form.exchangeRate)} FCFA / RMB. Ajustez selon le marché du jour.
+              </p>
+              <p className="text-xs text-amber-700">
+                Si le devis est valable plus de 3 jours, ajoutez ~2% de buffer FX (soit +{(n(form.exchangeRate) * 0.02).toFixed(1)} FCFA/RMB).
               </p>
             </div>
 
@@ -1442,7 +1452,7 @@ export default function SourcingIndicatifPage() {
           </CardContent>
         </Card>
 
-        {/* ���� RIGHT: Results �������������������������������������������������������������������������������������������� */}
+        {/* ═══ RIGHT: Results ════════════════════════════════════════════════════════════ */}
         <div className="space-y-4">
           {!result ? (
             <Card className="h-full">
@@ -1452,7 +1462,7 @@ export default function SourcingIndicatifPage() {
             </Card>
           ) : (
             <>
-              {/* Pricing Rationale � internal tool */}
+              {/* Pricing Rationale → internal tool */}
               {result.pricingRationale && (
                 <Card className={`border ${result.pricingRationale.isLocalPlatform ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"}`}>
                   <CardHeader className="pb-2">
@@ -1465,7 +1475,7 @@ export default function SourcingIndicatifPage() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3 text-sm">
-                    <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                    <div className="grid grid-cols-1 gap-2 text-center text-xs sm:grid-cols-3">
                       <div className="rounded-lg border bg-white/80 px-2 py-2">
                         <p className="text-muted-foreground">Buffer risque</p>
                         <p className="text-lg font-bold">
@@ -1508,12 +1518,36 @@ export default function SourcingIndicatifPage() {
                       <div className="flex justify-between mt-1">
                         <span className="text-muted-foreground">Marge globale</span>
                         <span className={`font-semibold ${result.margin.marginAlert === "OK" ? "text-emerald-700" : result.margin.marginAlert === "WARNING" ? "text-amber-700" : "text-rose-700"}`}>
-                          {result.margin.marginPct.toFixed(1)}% � {result.margin.marginAlertLabel}
+                          {result.margin.marginPct.toFixed(1)}% → {result.margin.marginAlertLabel}
                         </span>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
+              )}
+
+              {/* Margin floor alert */}
+              {result.margin.marginAlert !== "OK" && (
+                <div className={`flex items-start gap-3 rounded-xl border p-4 text-sm ${
+                  result.margin.marginAlert === "DANGER"
+                    ? "border-rose-300 bg-rose-50 text-rose-900"
+                    : "border-amber-300 bg-amber-50 text-amber-900"
+                }`}>
+                  <AlertTriangle className={`h-5 w-5 shrink-0 mt-0.5 ${result.margin.marginAlert === "DANGER" ? "text-rose-600" : "text-amber-600"}`} />
+                  <div>
+                    <p className="font-semibold">
+                      {result.margin.marginAlert === "DANGER"
+                        ? "Marge dangereusement basse — risque de perte"
+                        : "Marge sous le seuil recommandé (20%)"}
+                    </p>
+                    <p className="mt-1 text-xs">
+                      Marge actuelle : <strong>{result.margin.marginPct.toFixed(1)}%</strong>.{" "}
+                      {result.margin.marginAlert === "DANGER"
+                        ? "Augmentez le prix ou réduisez le transport avant d'envoyer ce devis."
+                        : "Vérifiez le prix plateforme ou proposez le transport standard plutôt qu'express."}
+                    </p>
+                  </div>
+                </div>
               )}
 
               <Card>
@@ -1561,6 +1595,7 @@ export default function SourcingIndicatifPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
+                  <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -1620,6 +1655,7 @@ export default function SourcingIndicatifPage() {
                       })}
                     </TableBody>
                   </Table>
+                  </div>
                 </CardContent>
               </Card>
 
@@ -1653,7 +1689,7 @@ export default function SourcingIndicatifPage() {
                                 {item.productBufferPct !== undefined && (
                                   <p className="text-muted-foreground">
                                     Buffer {(item.productBufferPct * 100).toFixed(0)}% ·
-                                    Marge {item.invisibleMarginPct != null ? `${(item.invisibleMarginPct * 100).toFixed(0)}%` : "�"}
+                                    Marge {item.invisibleMarginPct != null ? `${(item.invisibleMarginPct * 100).toFixed(0)}%` : "→"}
                                   </p>
                                 )}
                               </div>
@@ -1702,12 +1738,28 @@ export default function SourcingIndicatifPage() {
                     </div>
                   </div>
 
-                  <div className="rounded-lg border p-3 text-sm">
-                    <p className="font-medium mb-1">Règle DDP</p>
+                  <div className="rounded-lg border p-3 text-sm space-y-2">
+                    <p className="font-medium">Règle DDP</p>
                     <p className="text-muted-foreground">
                       Douane standard non facturée dans l{"'"}estimation indicatif.
                       Cas spéciaux de dédouanement exceptionnel restent à la charge du propriétaire.
                     </p>
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                      <Checkbox
+                        checked={includeDdpEstimate}
+                        onCheckedChange={(v) => setIncludeDdpEstimate(Boolean(v))}
+                      />
+                      <span>Simuler droits de douane DDP (+25% sur marchandise)</span>
+                    </label>
+                    {includeDdpEstimate && (
+                      <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                        <span className="font-semibold">Estimation DDP : </span>
+                        {fmtXaf(quoteTotals.productSellXAF * 0.25)} supplémentaires.{" "}
+                        Total estimé avec douane :{" "}
+                        <strong>{fmtXaf(quoteTotals.totalXAF + quoteTotals.productSellXAF * 0.25)}</strong>
+                        <span className="block mt-0.5 text-amber-700">Non facturable directement — à titre indicatif uniquement.</span>
+                      </div>
+                    )}
                   </div>
 
                   {result.transport.eligibility.warnings.length > 0 && (
