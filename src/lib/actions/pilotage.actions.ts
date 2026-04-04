@@ -255,6 +255,9 @@ export async function executeStrategicDecision(decisionId: string) {
     if (decision.status === "EXECUTING") {
       return { error: "Decision deja en cours d'execution" };
     }
+    if (decision.executedAt) {
+      return { error: "Decision deja lancee" };
+    }
 
     let executionPlan = (decision.executionPlan as ExecutionPlan) || {};
 
@@ -397,7 +400,7 @@ export async function executeStrategicDecision(decisionId: string) {
 
       await tx.strategicDecision.update({
         where: { id: decisionId },
-        data: { status: "COMPLETED", completedAt: new Date() },
+        data: { status: "ACTIVE" },
       });
 
       return { projectId: initialExecution.projectId, taskIds };

@@ -278,6 +278,22 @@ export class AccountingService {
       throw new Error("Paiement introuvable");
     }
 
+    const existingEntryLine = await prisma.journalLine.findFirst({
+      where: { paymentId: params.paymentId },
+      orderBy: { createdAt: "asc" },
+      include: {
+        entry: {
+          include: { lines: true },
+        },
+      },
+    });
+    if (existingEntryLine) {
+      if (existingEntryLine.entry.tenantId !== params.tenantId) {
+        throw new Error("Paiement introuvable");
+      }
+      return existingEntryLine.entry;
+    }
+
     const journal = await this.getOrCreateJournal({
       tenantId: params.tenantId,
       code: "BANK",

@@ -34,18 +34,18 @@ export default async function SourcingPage() {
     () => SourcingCommandCenterProjectionService.get(session.tenantId),
     { overview: { demandInbox: 0, qualifiedDemandQueue: 0, activeCases: 0, confirmedCases: 0, breachedCases: 0, warningCases: 0, conversionRate: 0, canonicalJourney: [] }, priorityActions: [] }
   );
-  const demandsRes = await safeSourcingRead("demands", () => getDemandIntakes(), { success: false, data: [] });
-  const pipelineRes = await safeSourcingRead("pipeline", () => getSourcingPipelineAdvanced(), { success: false, data: [] });
-  const suppliersRes = await safeSourcingRead("suppliers", () => getSuppliersForSourcing(), { success: false, data: [] });
-  const marketRes = await safeSourcingRead("market", () => getMarketInsights(), { success: false, data: [] });
-  const auditRes = await safeSourcingRead("audit", () => getSourcingAuditLogs(), { success: false, data: [] });
+  const demandsRes = await safeSourcingRead("demands", () => getDemandIntakes(), { data: [] });
+  const pipelineRes = await safeSourcingRead("pipeline", () => getSourcingPipelineAdvanced(), { data: [] });
+  const suppliersRes = await safeSourcingRead("suppliers", () => getSuppliersForSourcing(), { data: [] });
+  const marketRes = await safeSourcingRead("market", () => getMarketInsights(), { data: [] });
+  const auditRes = await safeSourcingRead("audit", () => getSourcingAuditLogs(), { data: [] });
   const performanceRes = await safeSourcingRead(
     "performance",
     () => getSourcingPerformance(),
-    { success: false, data: { dependency: [], categoryConcentration: [], heatmap: [] } }
+    { data: { dependency: [], categoryConcentration: [], heatmap: [] } }
   );
-  const groupageRes = await safeSourcingRead("groupage", () => getGroupageBatches(), { success: false, data: [] });
-  const assigneesRes = await safeSourcingRead("assignees", () => getSourcingAssignees(), { success: false, data: [] });
+  const groupageRes = await safeSourcingRead("groupage", () => getGroupageBatches(), { data: [] });
+  const assigneesRes = await safeSourcingRead("assignees", () => getSourcingAssignees(), { data: [] });
 
   return (
     <div className="space-y-6">

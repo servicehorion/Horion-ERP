@@ -8,7 +8,7 @@ type UploadResult = {
   publicUrl?: string;
 };
 
-type UploadKind = "document" | "image" | "any";
+type UploadKind = "document" | "image" | "video" | "any";
 
 const DEFAULT_DOC_TYPES = [
   "application/pdf",
@@ -23,6 +23,7 @@ const DEFAULT_DOC_TYPES = [
 ];
 
 const DEFAULT_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/svg+xml"];
+const DEFAULT_VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime"];
 
 function encodePath(path: string) {
   return path
@@ -61,8 +62,10 @@ export class StorageService {
     const maxMbEnv =
       kind === "image"
         ? process.env.UPLOAD_MAX_MB_IMAGE || process.env.UPLOAD_MAX_MB
+        : kind === "video"
+          ? process.env.UPLOAD_MAX_MB_VIDEO || process.env.UPLOAD_MAX_MB
         : process.env.UPLOAD_MAX_MB;
-    const maxMb = Number(maxMbEnv || (kind === "image" ? 5 : 20));
+    const maxMb = Number(maxMbEnv || (kind === "image" ? 5 : kind === "video" ? 50 : 20));
     const maxBytes = maxMb * 1024 * 1024;
 
     if (!params.filename || params.filename.trim().length === 0) {
@@ -76,8 +79,10 @@ export class StorageService {
     const allowedTypes =
       kind === "image"
         ? DEFAULT_IMAGE_TYPES
+        : kind === "video"
+          ? DEFAULT_VIDEO_TYPES
         : kind === "any"
-          ? [...DEFAULT_DOC_TYPES, ...DEFAULT_IMAGE_TYPES]
+          ? [...DEFAULT_DOC_TYPES, ...DEFAULT_IMAGE_TYPES, ...DEFAULT_VIDEO_TYPES]
           : DEFAULT_DOC_TYPES;
 
     if (!allowedTypes.includes(mimeType)) {

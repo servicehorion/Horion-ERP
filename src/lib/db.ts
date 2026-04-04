@@ -32,9 +32,9 @@ function getPgPool() {
   if (globalForPrisma.pgPool) return globalForPrisma.pgPool;
 
   const connectionString =
-    process.env.NODE_ENV === "production" && process.env.DATABASE_URL_POOLING
+    (process.env.NODE_ENV === "production" && process.env.DATABASE_URL_POOLING
       ? process.env.DATABASE_URL_POOLING
-      : process.env.DATABASE_URL;
+      : process.env.DATABASE_URL) ?? "";
 
   const max = Number(
     process.env.PG_POOL_MAX ??

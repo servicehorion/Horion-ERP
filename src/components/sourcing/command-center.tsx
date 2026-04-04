@@ -684,6 +684,7 @@ export function SourcingCommandCenter({
     startTransition(async () => {
       const result = await approveSourcingDecision(decisionCaseId, {
         supplierId: offer.supplierId,
+        offerId: offer.offerId,
         note: decisionNote || undefined,
         marginImpact: offer.marginPct ?? undefined,
       });

@@ -54,7 +54,7 @@ export function ContactForm({ contact, teamMembers = [], currentUserId }: Contac
     resolver: zodResolver(createContactSchema) as any,
     defaultValues: {
       name: contact?.name || "",
-      type: (contact?.type as any) || "CLIENT",
+      type: (contact?.type as any) || "PROSPECT",
       company: contact?.company || "",
       phone: contact?.phone || "",
       email: contact?.email || "",

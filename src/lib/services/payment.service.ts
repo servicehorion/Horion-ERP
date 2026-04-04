@@ -105,7 +105,11 @@ export class PaymentService {
     return { payments, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
-  static async confirm(paymentId: string, tenantId?: string) {
+  static async confirm(
+    paymentId: string,
+    tenantId?: string,
+    eventMeta?: Record<string, unknown>
+  ) {
     // Verify tenant ownership if provided
     if (tenantId) {
       const existing = await prisma.payment.findFirst({
@@ -129,6 +133,7 @@ export class PaymentService {
     });
 
     await emitEvent("payment.confirmed", "payment", payment.id, {
+      ...(eventMeta ?? {}),
       orderId: payment.orderId,
       amount: Number(payment.amount),
     });

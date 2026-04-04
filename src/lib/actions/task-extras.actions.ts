@@ -22,6 +22,7 @@ import { canAccessTaskModule, getTaskAllowedModules } from "@/lib/access-control
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import type { TaskStatus, Priority } from "@prisma/client";
+import { TaskTemplateService } from "@/lib/services/task-template.service";
 
 function revalidateTask(taskId?: string) {
   revalidatePath("/tasks");
@@ -465,6 +466,7 @@ export async function createRecurringTask(data: {
         templateId: data.templateId,
         cronExpression: data.cronExpression,
         timezone: data.timezone || "Africa/Brazzaville",
+        nextRunAt: TaskTemplateService.getNextCronRun(data.cronExpression),
         isActive: true,
       },
       include: { template: { select: { id: true, name: true, module: true } } },
@@ -494,7 +496,12 @@ export async function updateRecurringTask(
     const updated = await prisma.recurringTask.update({
       where: { id: recurringId },
       data: {
-        ...(data.cronExpression ? { cronExpression: data.cronExpression } : {}),
+        ...(data.cronExpression
+          ? {
+              cronExpression: data.cronExpression,
+              nextRunAt: TaskTemplateService.getNextCronRun(data.cronExpression),
+            }
+          : {}),
         ...(data.timezone ? { timezone: data.timezone } : {}),
         ...(data.isActive !== undefined ? { isActive: data.isActive } : {}),
       },

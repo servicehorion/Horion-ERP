@@ -290,7 +290,7 @@ export class TaskTemplateService {
    * For production, use a library like `cron-parser`.
    * This is a simplified version supporting: daily, weekly, monthly patterns.
    */
-  private static getNextCronRun(cronExpression: string): Date {
+  static getNextCronRun(cronExpression: string): Date {
     const now = new Date();
     const parts = cronExpression.split(" ");
 

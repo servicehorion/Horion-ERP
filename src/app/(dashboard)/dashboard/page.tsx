@@ -153,7 +153,7 @@ export default async function DashboardPage() {
     .slice(0, 10);
 
   const ordersPipeline = ordersByStatus.map((item) => ({
-    label: ORDER_STATUS_LABELS[item.status] || item.status,
+    label: ORDER_STATUS_LABELS[item.status as keyof typeof ORDER_STATUS_LABELS] || item.status,
     value: item._count.status,
   }));
 

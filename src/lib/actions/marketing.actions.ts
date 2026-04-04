@@ -7,6 +7,7 @@ import { prisma } from "@/lib/db";
 
 const DEFAULT_TENANT_ID = "horion-congo";
 const MARKETING_PATH = "/marketing";
+const NATIVE_CONTENT_CHANNELS = new Set(["FACEBOOK", "INSTAGRAM"]);
 
 type JsonObject = Record<string, unknown>;
 type SessionContext = {
@@ -1700,8 +1701,12 @@ export async function publishContentPost(
         continue;
       }
 
-      // Stub for channels without native API wiring yet.
-      published.push(channel);
+      if (!NATIVE_CONTENT_CHANNELS.has(channel)) {
+        errors.push(`${channel}: canal non integre`);
+        continue;
+      }
+
+      errors.push(`${channel}: integration non disponible`);
     }
 
     if (published.length > 0) {

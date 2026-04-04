@@ -1922,13 +1922,26 @@ export async function getSourcingDecisionData(caseId: string) {
   }
 }
 
-export async function approveSourcingDecision(caseId: string, data: { supplierId: string; note?: string; marginImpact?: number }) {
+export async function approveSourcingDecision(
+  caseId: string,
+  data: { supplierId: string; offerId?: string; note?: string; marginImpact?: number }
+) {
   try {
     const user = await getSession();
     checkPermission(user.role, "sourcing.manage");
 
     const sc = await SourcingCaseService.getById(caseId);
     if (!sc || sc.order.tenantId !== user.tenantId) return { error: "Cas introuvable" };
+
+    const candidateOffer =
+      (data.offerId
+        ? sc.offers.find((offer) => offer.id === data.offerId && offer.supplierId === data.supplierId)
+        : null) ??
+      sc.offers.find((offer) => offer.supplierId === data.supplierId);
+
+    if (!candidateOffer) {
+      return { error: "Selection fournisseur impossible sans offre rattachee." };
+    }
 
     const decision = await prisma.sourcingDecision.create({
       data: {
@@ -1941,10 +1954,7 @@ export async function approveSourcingDecision(caseId: string, data: { supplierId
       },
     });
 
-    await prisma.sourcingCase.update({
-      where: { id: caseId },
-      data: { supplierId: data.supplierId, status: "SELECTED", stageEnteredAt: new Date() },
-    });
+    await SourcingCaseService.selectSupplier(caseId, data.supplierId, candidateOffer.id);
     await SourcingTaskOrchestratorService.syncCaseWorkflow(caseId);
 
     await AuditService.log({
@@ -1953,7 +1963,7 @@ export async function approveSourcingDecision(caseId: string, data: { supplierId
       action: "sourcing.decision.approved",
       entityType: "sourcing_case",
       entityId: caseId,
-      newValue: { supplierId: data.supplierId },
+      newValue: { supplierId: data.supplierId, offerId: candidateOffer.id },
     });
 
     revalidatePath(`/sourcing/cases/${caseId}`);

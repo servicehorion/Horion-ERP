@@ -84,6 +84,9 @@ export function ProductForm({ categories }: ProductFormProps) {
         return;
       }
 
+      if (result.warning) {
+        toast.warning(result.warning);
+      }
       toast.success("Produit créé avec succès");
       router.push("/catalog/products");
     } catch (error) {

@@ -21,6 +21,7 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { prisma } from "@/lib/db";
 import { getTenantCacheTags } from "@/lib/server-cache";
 import { TaskDashboardSnapshotService } from "@/lib/services/task-dashboard-snapshot.service";
+import { StorageService } from "@/lib/services/storage.service";
 import type { TaskStatus, Priority, DependencyType } from "@prisma/client";
 import * as taskExtrasActions from "./task-extras.actions";
 
@@ -1507,7 +1508,13 @@ export async function getTaskAttachments(taskId: string) {
       include: { user: { select: { name: true } } },
       orderBy: { createdAt: "desc" },
     });
-    return { data: attachments };
+    const data = await Promise.all(
+      attachments.map(async (attachment) => ({
+        ...attachment,
+        downloadUrl: await StorageService.createDownloadUrl(attachment.url),
+      }))
+    );
+    return { data };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur" };
   }

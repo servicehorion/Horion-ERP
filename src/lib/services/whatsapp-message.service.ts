@@ -6,6 +6,13 @@ function normalizeWhatsappPhone(value?: string | null) {
   return (value || "").replace(/\D/g, "");
 }
 
+function hasRealWhatsappProvider(conversation?: { account?: { phoneNumberId?: string | null } | null }) {
+  if (process.env.WAHA_BASE_URL?.trim()) return true;
+  const phoneNumberId = conversation?.account?.phoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID;
+  const accessToken = process.env.WHATSAPP_ACCESS_TOKEN?.trim();
+  return Boolean(phoneNumberId && accessToken);
+}
+
 export class WhatsappMessageService {
   static async listMessages(conversationId: string, limit = 60) {
     return prisma.whatsappMessage.findMany({
@@ -30,6 +37,7 @@ export class WhatsappMessageService {
     rawJson?: Record<string, unknown>;
     media?: Array<{ url: string; mimeType?: string; size?: number; caption?: string }>;
   }) {
+    const resolvedStatus = params.status ?? (params.direction === "OUT" ? "PENDING" : "DELIVERED");
     const message = await prisma.whatsappMessage.create({
       data: {
         conversationId: params.conversationId,
@@ -37,8 +45,12 @@ export class WhatsappMessageService {
         type: (params.type ?? "TEXT") as any,
         body: params.body ?? null,
         externalId: params.externalId ?? null,
-        status: params.status ?? (params.direction === "OUT" ? "SENT" : "DELIVERED"),
-        sentAt: params.sentAt ?? new Date(),
+        status: resolvedStatus,
+        sentAt:
+          params.sentAt ??
+          (resolvedStatus === "SENT" || resolvedStatus === "DELIVERED" || resolvedStatus === "READ"
+            ? new Date()
+            : null),
         deliveredAt: params.deliveredAt ?? null,
         readAt: params.readAt ?? null,
         rawJson: (params.rawJson ?? {}) as any,
@@ -136,15 +148,15 @@ export class WhatsappMessageService {
 
     const phoneNumberId = conversation.account?.phoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID;
     const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
-    if (!phoneNumberId || !accessToken) {
-      console.warn("[WhatsApp] No WAHA or Meta provider configured - storing outbound message only");
+    if (!hasRealWhatsappProvider(conversation)) {
+      console.warn("[WhatsApp] No WAHA or Meta provider configured - storing outbound message as pending");
       return this.createMessage({
         tenantId: params.tenantId,
         conversationId: params.conversationId,
         direction: "OUT",
         type: "TEXT",
         body: params.body,
-        status: "SENT",
+        status: "PENDING",
         rawJson: { localOnly: true, provider: "none" },
       });
     }
@@ -198,7 +210,7 @@ export class WhatsappMessageService {
     const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
 
     let externalId: string | undefined;
-    let status: "SENT" | "FAILED" = "SENT";
+    let status: "PENDING" | "SENT" | "FAILED" = "PENDING";
     let rawJson: Record<string, unknown> = {};
 
     if (wahaBase) {

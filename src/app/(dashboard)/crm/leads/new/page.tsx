@@ -12,8 +12,15 @@ export const metadata = {
   description: "Creer un nouveau lead",
 };
 
-export default async function NewLeadPage() {
+interface NewLeadPageProps {
+  searchParams?: Promise<{
+    contactId?: string;
+  }>;
+}
+
+export default async function NewLeadPage({ searchParams }: NewLeadPageProps) {
   const session = await auth();
+  const params = searchParams ? await searchParams : undefined;
 
   if (!session?.user?.tenantId) {
     redirect("/login");
@@ -63,6 +70,7 @@ export default async function NewLeadPage() {
           salesTeams={salesTeams}
           territories={territories}
           currentUserId={session.user.id}
+          initialContactId={params?.contactId}
         />
       </div>
     </div>

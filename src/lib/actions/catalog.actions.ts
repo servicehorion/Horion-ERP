@@ -8,6 +8,7 @@ import { CatalogMediaService } from "@/lib/services/catalog-media.service";
 import { CatalogIntelligenceService } from "@/lib/services/catalog-intelligence.service";
 import { CatalogDashboardProjectionService } from "@/lib/services/catalog-dashboard-projection.service";
 import { AuditService } from "@/lib/services/audit.service";
+import { StorageService } from "@/lib/services/storage.service";
 import { checkPermission } from "@/lib/permissions";
 import {
   createProductSchema,
@@ -35,6 +36,54 @@ function revalidateCatalogCaches(tenantId: string) {
   }
 }
 
+const PRODUCT_STATUS_MEDIA_GATES = new Set<ProductStatus>(["TESTED", "CURATED"]);
+
+async function countProductImageMedia(tenantId: string, productId: string) {
+  return prisma.catalogMedia.count({
+    where: { tenantId, productId, type: "image" },
+  });
+}
+
+function normalizeProductCreateStatus(status?: ProductStatus): { status: ProductStatus; warning?: string } {
+  if (!status || !PRODUCT_STATUS_MEDIA_GATES.has(status)) {
+    return { status: (status ?? "TESTING") as ProductStatus, warning: undefined };
+  }
+
+    return {
+    status: "TESTING" as ProductStatus,
+    warning:
+      `Le statut ${status} demande au moins 3 photos liees. ` +
+      "Le produit a ete cree en TESTING et pourra etre promu apres ajout des medias.",
+  };
+}
+
+async function ensureProductStatusGate(params: {
+  tenantId: string;
+  productId: string;
+  targetStatus: ProductStatus;
+  currentStatus?: ProductStatus | null;
+}) {
+  if (!PRODUCT_STATUS_MEDIA_GATES.has(params.targetStatus)) {
+    return { ok: true as const };
+  }
+
+  if (params.currentStatus === params.targetStatus) {
+    return { ok: true as const };
+  }
+
+  const imageCount = await countProductImageMedia(params.tenantId, params.productId);
+  if (imageCount < 3) {
+    return {
+      ok: false as const,
+      error:
+        `Le produit doit avoir au moins 3 photos liees avant de passer au statut ${params.targetStatus}. ` +
+        `Photos disponibles: ${imageCount}.`,
+    };
+  }
+
+  return { ok: true as const };
+}
+
 // ============================================================
 // PRODUCTS
 // ============================================================
@@ -45,7 +94,11 @@ export async function createProduct(formData: Record<string, unknown>) {
     checkPermission(user.role, "catalog.manage");
 
     const validated = createProductSchema.parse(formData);
-    const product = await CatalogProductService.create(user.tenantId, validated);
+    const statusPolicy = normalizeProductCreateStatus(validated.status as ProductStatus | undefined);
+    const product = await CatalogProductService.create(user.tenantId, {
+      ...validated,
+      status: statusPolicy.status,
+    });
 
     await AuditService.log({
       tenantId: user.tenantId,
@@ -59,10 +112,10 @@ export async function createProduct(formData: Record<string, unknown>) {
     revalidatePath("/catalog/products");
     revalidatePath("/catalog");
     revalidateCatalogCaches(user.tenantId);
-    return { data: product };
+    return { data: product, warning: statusPolicy.warning };
   } catch (error) {
     console.error("Error creating product:", error);
-    return { error: error instanceof Error ? error.message : "Erreur lors de la création du produit" };
+    return { error: error instanceof Error ? error.message : "Erreur lors de la creation du produit" };
   }
 }
 
@@ -77,6 +130,17 @@ export async function updateProduct(productId: string, formData: Record<string, 
     }
 
     const validated = updateProductSchema.parse(formData);
+    if (validated.status && validated.status !== existing.status) {
+      const gate = await ensureProductStatusGate({
+        tenantId: user.tenantId,
+        productId,
+        targetStatus: validated.status as ProductStatus,
+        currentStatus: existing.status as ProductStatus,
+      });
+      if (!gate.ok) {
+        return { error: gate.error };
+      }
+    }
     const product = await CatalogProductService.update(productId, validated);
 
     revalidatePath(`/catalog/products/${productId}`);
@@ -86,7 +150,7 @@ export async function updateProduct(productId: string, formData: Record<string, 
     return { data: product };
   } catch (error) {
     console.error("Error updating product:", error);
-    return { error: error instanceof Error ? error.message : "Erreur lors de la mise à jour" };
+    return { error: error instanceof Error ? error.message : "Erreur lors de la mise a jour" };
   }
 }
 
@@ -109,7 +173,7 @@ export async function getProducts(options?: {
     });
     return { data: result.products };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Erreur lors de la récupération" };
+    return { error: error instanceof Error ? error.message : "Erreur lors de la recuperation" };
   }
 }
 
@@ -121,7 +185,17 @@ export async function getProductById(productId: string) {
     if (!product || product.tenantId !== user.tenantId) {
       return { error: "Produit introuvable" };
     }
-    return { data: product };
+    return {
+      data: {
+        ...product,
+        media: await Promise.all(
+          (product.media ?? []).map(async (media: any) => ({
+            ...media,
+            downloadUrl: await StorageService.createDownloadUrl(media.url),
+          }))
+        ),
+      },
+    };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur lors de la récupération" };
   }
@@ -173,7 +247,7 @@ export async function createCatalogSupplier(formData: Record<string, unknown>) {
     revalidateCatalogCaches(user.tenantId);
     return { data: supplier };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Erreur lors de la création du fournisseur" };
+    return { error: error instanceof Error ? error.message : "Erreur lors de la creation du fournisseur" };
   }
 }
 
@@ -190,7 +264,7 @@ export async function updateCatalogSupplier(supplierId: string, formData: Record
     revalidateCatalogCaches(user.tenantId);
     return { data: supplier };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Erreur lors de la mise à jour" };
+    return { error: error instanceof Error ? error.message : "Erreur lors de la mise a jour" };
   }
 }
 
@@ -213,7 +287,7 @@ export async function getSuppliers(options?: {
     });
     return { data: result.suppliers };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Erreur lors de la récupération" };
+    return { error: error instanceof Error ? error.message : "Erreur lors de la recuperation" };
   }
 }
 
@@ -225,7 +299,7 @@ export async function getSupplierById(supplierId: string) {
     if (!supplier) return { error: "Fournisseur introuvable" };
     return { data: supplier };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Erreur lors de la récupération" };
+    return { error: error instanceof Error ? error.message : "Erreur lors de la recuperation" };
   }
 }
 
@@ -293,7 +367,7 @@ export async function createOffer(formData: Record<string, unknown>) {
     revalidateCatalogCaches(user.tenantId);
     return { data: offer };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Erreur lors de la création de l'offre" };
+    return { error: error instanceof Error ? error.message : "Erreur lors de la creation de l'offre" };
   }
 }
 
@@ -384,8 +458,22 @@ export async function deleteMedia(mediaId: string) {
   try {
     const user = await getSession();
     checkPermission(user.role, "catalog.manage");
-    const media = await CatalogMediaService.delete(mediaId);
-    if (media?.productId) revalidatePath(`/catalog/products/${media.productId}`);
+
+    const media = await prisma.catalogMedia.findFirst({
+      where: { id: mediaId, tenantId: user.tenantId },
+      select: { id: true, productId: true, url: true },
+    });
+    if (!media) {
+      return { error: "Média introuvable" };
+    }
+
+    const storageRef = StorageService.parseStorageRef(media.url);
+    if (storageRef) {
+      await StorageService.deleteObject(storageRef);
+    }
+
+    await CatalogMediaService.delete(mediaId);
+    if (media.productId) revalidatePath(`/catalog/products/${media.productId}`);
     revalidatePath("/catalog/vault");
     revalidateCatalogCaches(user.tenantId);
     return { data: true };
@@ -406,15 +494,19 @@ export async function getMediaList(options?: {
   try {
     const user = await getSession();
     checkPermission(user.role, "catalog.view");
-    return { data: (await CatalogMediaService.list(user.tenantId, options)).media };
+    const result = await CatalogMediaService.list(user.tenantId, options);
+    return {
+      data: await Promise.all(
+        result.media.map(async (media) => ({
+          ...media,
+          downloadUrl: await StorageService.createDownloadUrl(media.url),
+        }))
+      ),
+    };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur" };
   }
 }
-
-// ============================================================
-// CATEGORIES
-// ============================================================
 
 export async function createCategory(formData: Record<string, unknown>) {
   try {
@@ -435,7 +527,7 @@ export async function createCategory(formData: Record<string, unknown>) {
     revalidateCatalogCaches(user.tenantId);
     return { data: category };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Erreur lors de la création" };
+    return { error: error instanceof Error ? error.message : "Erreur lors de la creation" };
   }
 }
 
@@ -464,7 +556,20 @@ export async function updateProductStatus(productId: string, status: string) {
       return { error: "Produit introuvable" };
     }
 
-    const product = await CatalogProductService.update(productId, { status: status as ProductStatus });
+    const targetStatus = status as ProductStatus;
+    if (targetStatus !== existing.status) {
+      const gate = await ensureProductStatusGate({
+        tenantId: user.tenantId,
+        productId,
+        targetStatus,
+        currentStatus: existing.status as ProductStatus,
+      });
+      if (!gate.ok) {
+        return { error: gate.error };
+      }
+    }
+
+    const product = await CatalogProductService.update(productId, { status: targetStatus });
 
     await AuditService.log({
       tenantId: user.tenantId,
@@ -473,7 +578,7 @@ export async function updateProductStatus(productId: string, status: string) {
       entityType: "product",
       entityId: productId,
       oldValue: { status: existing.status },
-      newValue: { status },
+      newValue: { status: targetStatus },
     });
 
     revalidatePath(`/catalog/products/${productId}`);
@@ -485,14 +590,13 @@ export async function updateProductStatus(productId: string, status: string) {
     return { error: error instanceof Error ? error.message : "Erreur lors de la mise à jour du statut" };
   }
 }
-
 export async function exportProductsCSV() {
   try {
     const user = await getSession();
     checkPermission(user.role, "catalog.manage");
     const result = await CatalogProductService.list(user.tenantId, { limit: 1000 });
 
-    const headers = ["Nom", "Catégorie", "Statut", "MOQ Min", "Prix Min", "Prix Max", "Devise", "Score Demande", "Fournisseurs", "Commandes", "QC", "Créé le"];
+    const headers = ["Nom", "Categorie", "Statut", "MOQ Min", "Prix Min", "Prix Max", "Devise", "Score Demande", "Fournisseurs", "Commandes", "QC", "Cree le"];
     const rows = result.products.map((p: any) => [
       p.name,
       p.category?.name || "",
@@ -627,12 +731,12 @@ export async function getCatalogCategoryMemoryHint(input: {
     });
     return { data: toPlainData(hint) };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Erreur mémoire catégorie" };
+    return { error: error instanceof Error ? error.message : "Erreur memoire categorie" };
   }
 }
 
 // ============================================================
-// CATALOG INTELLIGENCE (Analytics OS — SHEIN/TEMU/ALIBABA level)
+// CATALOG INTELLIGENCE (Analytics OS - SHEIN/TEMU/ALIBABA level)
 // ============================================================
 
 export async function getCatalogAnalytics() {
@@ -702,6 +806,7 @@ export async function bulkUpdateProductStatus(productIds: string[], status: stri
   try {
     const user = await getSession();
     checkPermission(user.role, "catalog.manage");
+    const targetStatus = status as ProductStatus;
 
     const products = await prisma.catalogProduct.findMany({
       where: { id: { in: productIds }, tenantId: user.tenantId },
@@ -709,12 +814,39 @@ export async function bulkUpdateProductStatus(productIds: string[], status: stri
     });
 
     if (products.length === 0) {
-      return { error: "Aucun produit trouvé" };
+      return { error: "Aucun produit trouve" };
+    }
+
+    if (PRODUCT_STATUS_MEDIA_GATES.has(targetStatus)) {
+      const imageCounts = await prisma.catalogMedia.groupBy({
+        by: ["productId"],
+        where: {
+          tenantId: user.tenantId,
+          type: "image",
+          productId: { in: products.map((product) => product.id) },
+        },
+        _count: { id: true },
+      });
+
+      const countMap = new Map(
+        imageCounts
+          .filter((item) => item.productId)
+          .map((item) => [item.productId as string, item._count.id])
+      );
+
+      const blocked = products.filter((product) => (countMap.get(product.id) ?? 0) < 3);
+      if (blocked.length > 0) {
+        return {
+          error:
+            `Impossible de passer ${blocked.length} produit(s) au statut ${targetStatus}. ` +
+            "Chaque produit doit avoir au moins 3 photos liees.",
+        };
+      }
     }
 
     await prisma.catalogProduct.updateMany({
       where: { id: { in: products.map((p) => p.id) }, tenantId: user.tenantId },
-      data: { status: status as ProductStatus },
+      data: { status: targetStatus },
     });
 
     await AuditService.log({
@@ -723,7 +855,7 @@ export async function bulkUpdateProductStatus(productIds: string[], status: stri
       action: "catalog.product.bulk_status_changed",
       entityType: "product",
       entityId: products[0].id,
-      newValue: { count: products.length, status },
+      newValue: { count: products.length, status: targetStatus },
     });
 
     revalidatePath("/catalog/products");
@@ -731,7 +863,7 @@ export async function bulkUpdateProductStatus(productIds: string[], status: stri
     revalidateCatalogCaches(user.tenantId);
     return { data: { updated: products.length } };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Erreur lors de la mise à jour" };
+    return { error: error instanceof Error ? error.message : "Erreur lors de la mise a jour" };
   }
 }
 

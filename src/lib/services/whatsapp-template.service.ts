@@ -3,6 +3,13 @@ import { WhatsappAuditService } from "@/lib/services/whatsapp-audit.service";
 
 const prismaAny = prisma as any;
 
+function hasRealWhatsappProvider() {
+  if (process.env.WAHA_BASE_URL?.trim()) return true;
+  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID?.trim();
+  const accessToken = process.env.WHATSAPP_ACCESS_TOKEN?.trim();
+  return Boolean(phoneNumberId && accessToken);
+}
+
 export class WhatsappTemplateService {
   static async createTemplate(tenantId: string, data: { name: string; category?: string; language?: string }) {
     if (!prismaAny.whatsappTemplate) return null;
@@ -40,6 +47,9 @@ export class WhatsappTemplateService {
 
   static async approveVersion(versionId: string) {
     if (!prismaAny.whatsappTemplateVersion) return null;
+    if (!hasRealWhatsappProvider()) {
+      throw new Error("Aucun provider WhatsApp reel configure; approbation refusee");
+    }
     const version = await prismaAny.whatsappTemplateVersion.update({
       where: { id: versionId },
       data: { status: "APPROVED", approvedAt: new Date() },

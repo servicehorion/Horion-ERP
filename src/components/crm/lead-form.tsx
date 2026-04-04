@@ -54,6 +54,7 @@ interface LeadFormProps {
   territories: { id: string; name: string }[];
   demoMode?: boolean;
   currentUserId?: string;
+  initialContactId?: string;
 }
 
 export function LeadForm({
@@ -64,15 +65,21 @@ export function LeadForm({
   territories,
   demoMode,
   currentUserId,
+  initialContactId,
 }: LeadFormProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isEditing = !!lead;
+  const resolvedContactId =
+    lead?.contactId ||
+    (initialContactId && contacts.some((contact) => contact.id === initialContactId)
+      ? initialContactId
+      : contacts[0]?.id ?? "");
 
   const form = useForm<CreateLeadInput>({
     resolver: zodResolver(createLeadSchema) as any,
     defaultValues: {
-      contactId: lead?.contactId || (contacts[0]?.id ?? ""),
+      contactId: resolvedContactId,
       source: lead?.source || "",
       description: lead?.description || "",
       estimatedValue: lead?.estimatedValue ?? undefined,

@@ -1,7 +1,8 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/lib/db";
 import { emitEvent } from "@/lib/events";
+import { AccountingService } from "@/lib/services/accounting.service";
 import { PaymentService } from "@/lib/services/payment.service";
 
 const CALLBACK_TOKEN = process.env.PAWAPAY_CALLBACK_TOKEN ?? "";
@@ -16,6 +17,11 @@ function verifyOptionalToken(req: NextRequest) {
   return token === CALLBACK_TOKEN
     ? ({ ok: true } as const)
     : ({ ok: false, status: 401, error: "Callback token invalide" } as const);
+}
+
+function appendUniqueNote(existing: string | null | undefined, note: string) {
+  if (existing?.includes(note)) return existing;
+  return [existing, note].filter(Boolean).join(" ");
 }
 
 export async function POST(req: NextRequest) {
@@ -54,6 +60,12 @@ export async function POST(req: NextRequest) {
       status: true,
       amountXAF: true,
       notes: true,
+      order: {
+        select: {
+          tenantId: true,
+          status: true,
+        },
+      },
     },
   });
 
@@ -61,34 +73,55 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, skipped: true, reason: "payment_not_found" });
   }
 
-  if (isTerminalStatus(payment.status) && parsed.transactionStatus !== "PROCESSING" && parsed.transactionStatus !== "PENDING") {
+  const isDepositConfirmation = !isRefund && parsed.transactionStatus === "CONFIRMED";
+  const isRefundConfirmation = isRefund && parsed.transactionStatus === "CONFIRMED";
+
+  if (
+    !isDepositConfirmation &&
+    !isRefundConfirmation &&
+    isTerminalStatus(payment.status) &&
+    parsed.transactionStatus !== "PROCESSING" &&
+    parsed.transactionStatus !== "PENDING"
+  ) {
     return NextResponse.json({ ok: true, skipped: true, reason: "already_terminal", paymentId: payment.id });
   }
 
   if (isRefund) {
     if (parsed.transactionStatus === "CONFIRMED") {
+      await AccountingService.recordPayment({
+        paymentId: payment.id,
+        tenantId: payment.order.tenantId,
+      });
+
+      const refundNote = `Remboursement pawaPay confirme. Reference: ${parsed.providerReference}.`;
       await prisma.payment.update({
         where: { id: payment.id },
         data: {
           status: "REFUNDED",
           confirmedAt: new Date(),
           paidAt: new Date(),
-          notes: [payment.notes, `Remboursement pawaPay confirme. Reference: ${parsed.providerReference}.`]
-            .filter(Boolean)
-            .join(" "),
+          notes: appendUniqueNote(payment.notes, refundNote),
         },
       });
       return NextResponse.json({ ok: true, processed: payment.id, operation: "refund" });
     }
 
-    const nextStatus = parsed.transactionStatus === "FAILED" ? "FAILED" : parsed.transactionStatus === "CANCELLED" ? "CANCELLED" : parsed.transactionStatus === "PROCESSING" ? "PROCESSING" : "PENDING";
+    const nextStatus =
+      parsed.transactionStatus === "FAILED"
+        ? "FAILED"
+        : parsed.transactionStatus === "CANCELLED"
+          ? "CANCELLED"
+          : parsed.transactionStatus === "PROCESSING"
+            ? "PROCESSING"
+            : "PENDING";
     await prisma.payment.update({
       where: { id: payment.id },
       data: {
         status: nextStatus,
-        notes: [payment.notes, `Callback remboursement pawaPay (${parsed.transactionStatus}). Reference: ${parsed.providerReference}.`]
-          .filter(Boolean)
-          .join(" "),
+        notes: appendUniqueNote(
+          payment.notes,
+          `Callback remboursement pawaPay (${parsed.transactionStatus}). Reference: ${parsed.providerReference}.`
+        ),
       },
     });
 
@@ -96,16 +129,15 @@ export async function POST(req: NextRequest) {
   }
 
   if (parsed.transactionStatus === "CONFIRMED") {
-    await prisma.payment.update({
-      where: { id: payment.id },
-      data: {
-        status: "CONFIRMED",
-        confirmedAt: new Date(),
-        paidAt: new Date(),
-        notes: [payment.notes, `Paiement pawaPay confirme. Reference: ${parsed.providerReference}.`]
-          .filter(Boolean)
-          .join(" "),
-      },
+    await PaymentService.confirm(payment.id, payment.order.tenantId, {
+      method: "pawapay_webhook",
+      providerReference: parsed.providerReference,
+      rawPayload: parsed.raw ? JSON.parse(JSON.stringify(parsed.raw)) : null,
+    });
+
+    await AccountingService.recordPayment({
+      paymentId: payment.id,
+      tenantId: payment.order.tenantId,
     });
 
     await prisma.order.updateMany({
@@ -113,13 +145,15 @@ export async function POST(req: NextRequest) {
       data: { status: "SOURCING" },
     });
 
-    await emitEvent("payment.confirmed", "payment", payment.id, {
-      orderId: payment.orderId,
-      amountXAF: Number(payment.amountXAF),
-      method: "pawapay_webhook",
-      providerReference: parsed.providerReference,
-      rawPayload: parsed.raw ? JSON.parse(JSON.stringify(parsed.raw)) : null,
-    });
+    const confirmationNote = `Paiement pawaPay confirme. Reference: ${parsed.providerReference}.`;
+    if (!payment.notes?.includes(confirmationNote)) {
+      await prisma.payment.update({
+        where: { id: payment.id },
+        data: {
+          notes: appendUniqueNote(payment.notes, confirmationNote),
+        },
+      });
+    }
 
     return NextResponse.json({ ok: true, processed: payment.id, operation: "deposit" });
   }
@@ -129,9 +163,10 @@ export async function POST(req: NextRequest) {
       where: { id: payment.id },
       data: {
         status: parsed.transactionStatus === "FAILED" ? "FAILED" : "CANCELLED",
-        notes: [payment.notes, `Paiement pawaPay ${parsed.transactionStatus.toLowerCase()}. Reference: ${parsed.providerReference}.`]
-          .filter(Boolean)
-          .join(" "),
+        notes: appendUniqueNote(
+          payment.notes,
+          `Paiement pawaPay ${parsed.transactionStatus.toLowerCase()}. Reference: ${parsed.providerReference}.`
+        ),
       },
     });
 
@@ -149,9 +184,10 @@ export async function POST(req: NextRequest) {
     where: { id: payment.id },
     data: {
       status: parsed.transactionStatus === "PROCESSING" ? "PROCESSING" : "PENDING",
-      notes: [payment.notes, `Callback pawaPay recu (${parsed.transactionStatus}). Reference: ${parsed.providerReference}.`]
-        .filter(Boolean)
-        .join(" "),
+      notes: appendUniqueNote(
+        payment.notes,
+        `Callback pawaPay recu (${parsed.transactionStatus}). Reference: ${parsed.providerReference}.`
+      ),
     },
   });
 
