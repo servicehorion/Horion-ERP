@@ -240,8 +240,8 @@ export function TeamManager({ members }: { members: TeamMember[] }) {
                 <TableHead>Email</TableHead>
                 <TableHead>Rôle</TableHead>
                 <TableHead>Statut</TableHead>
-                <TableHead>Derniere connexion</TableHead>
-                <TableHead>Active</TableHead>
+                <TableHead>Dernière connexion</TableHead>
+                <TableHead>Actif</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

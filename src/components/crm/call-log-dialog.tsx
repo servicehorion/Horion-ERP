@@ -42,7 +42,7 @@ export function CallLogDialog({
         toast.error(result.error);
         return;
       }
-      toast.success("Appel enregistre");
+      toast.success("Appel enregistré");
       router.refresh();
       setSummary("");
       setDuration("");

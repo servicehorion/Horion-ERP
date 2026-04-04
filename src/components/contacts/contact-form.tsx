@@ -35,6 +35,7 @@ interface ContactFormProps {
     tags?: string[] | null;
     ownerId?: string | null;
     collaboratorIds?: string[] | null;
+    customFields?: Record<string, unknown> | null;
   };
   teamMembers?: { id: string; name: string | null; email: string; role: string }[];
   currentUserId?: string;
@@ -45,6 +46,9 @@ export function ContactForm({ contact, teamMembers = [], currentUserId }: Contac
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isEditing = !!contact;
   const [tagsInput, setTagsInput] = useState((contact?.tags || []).join(", "));
+  const existingCustomFields = (contact?.customFields ?? {}) as Record<string, string>;
+  const [rccm, setRccm] = useState(existingCustomFields.rccm ?? "");
+  const [nif, setNif] = useState(existingCustomFields.nif ?? "");
 
   const form = useForm<CreateContactInput>({
     resolver: zodResolver(createContactSchema) as any,
@@ -67,9 +71,13 @@ export function ContactForm({ contact, teamMembers = [], currentUserId }: Contac
   async function onSubmit(data: CreateContactInput) {
     setIsSubmitting(true);
     try {
+      const customFields: Record<string, string> = {};
+      if (rccm.trim()) customFields.rccm = rccm.trim();
+      if (nif.trim()) customFields.nif = nif.trim();
+      const payload = { ...data, ...(Object.keys(customFields).length > 0 ? { customFields } : {}) };
       const result = isEditing
-        ? await updateContact(contact.id, data as any)
-        : await createContact(data as any);
+        ? await updateContact(contact.id, payload as any)
+        : await createContact(payload as any);
 
       if (result.error) {
         toast.error(result.error);
@@ -189,6 +197,26 @@ export function ContactForm({ contact, teamMembers = [], currentUserId }: Contac
               </FormItem>
             )}
           />
+
+          {/* RCCM — Registre de Commerce et du Crédit Mobilier (Congo) */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">RCCM <span className="text-muted-foreground font-normal">(optionnel)</span></label>
+            <Input
+              value={rccm}
+              onChange={(e) => setRccm(e.target.value)}
+              placeholder="ex : CG-BZV-01-2024-B12-00001"
+            />
+          </div>
+
+          {/* NIF — Numéro d'Identification Fiscale (Congo) */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">NIF <span className="text-muted-foreground font-normal">(optionnel)</span></label>
+            <Input
+              value={nif}
+              onChange={(e) => setNif(e.target.value)}
+              placeholder="ex : M 24-5678-N"
+            />
+          </div>
 
           <FormField control={form.control} name="city"
             render={({ field }) => (

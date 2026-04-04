@@ -50,7 +50,7 @@ export default async function FinanceStatementsPage() {
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
             <div className="flex items-center justify-between">
-              <span>Cash bloque</span>
+              <span>Cash bloqué</span>
               <span className="font-medium">{formatCurrency(snapshot.cash.lockedCash, "XAF")}</span>
             </div>
             <div className="flex items-center justify-between">

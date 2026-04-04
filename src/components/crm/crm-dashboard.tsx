@@ -757,7 +757,7 @@ export function CrmDashboard({
   const handleCopy = async (text: string, label: string) => {
     const success = await copyToClipboard(text);
     if (success) {
-      toast.success(`${label} copied to clipboard`);
+      toast.success(`${label} copié dans le presse-papier`);
     } else {
       toast.error(`Failed to copy ${label}. Please try again.`);
     }
@@ -840,7 +840,7 @@ export function CrmDashboard({
   // Assign Lead to Agent
   const handleAssignLead = (leadId: string, agent: string) => {
     setLeads(leads.map(l => l.id === leadId ? { ...l, assignedAgent: agent } : l));
-    toast.success(`Lead assigned to ${agent}`);
+    toast.success(`Lead assigné à ${agent}`);
   };
 
   const handleSaveLeadDetails = () => {

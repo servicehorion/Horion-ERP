@@ -32,10 +32,10 @@ export type LeadTableRow = {
 
 const LEAD_STATUS_LABELS: Record<string, string> = {
   NEW: "Nouveau",
-  CONTACTED: "ContactÃ©",
-  QUALIFIED: "QualifiÃ©",
-  QUOTED: "Devis envoyÃ©",
-  WON: "GagnÃ©",
+  CONTACTED: "Contacté",
+  QUALIFIED: "Qualifié",
+  QUOTED: "Devis envoyé",
+  WON: "Gagné",
   LOST: "Perdu",
 };
 
@@ -83,20 +83,20 @@ export const leadColumns: ColumnDef<LeadTableRow>[] = [
     header: "Valeur",
     cell: ({ row }) => {
       const value = row.original.estimatedValue;
-      if (!value || value <= 0) return "â€”";
+      if (!value || value <= 0) return "�";
       return formatCurrency(value, row.original.currency);
     },
   },
   {
     accessorKey: "assigneeName",
-    header: "AssignÃ©",
-    cell: ({ row }) => row.original.assigneeName || "â€”",
+    header: "Assigné",
+    cell: ({ row }) => row.original.assigneeName || "�",
   },
   {
     accessorKey: "createdAt",
     header: ({ column }) => (
       <Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
-        CrÃ©Ã© le
+        Créé le
         <ArrowUpDown className="ml-2 h-4 w-4" />
       </Button>
     ),
@@ -122,7 +122,7 @@ export const leadColumns: ColumnDef<LeadTableRow>[] = [
               <Link href={`/crm/leads/${lead.id}/edit`}>Modifier</Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
-              <Link href={`/orders/new?contactId=${lead.contactId}`}>CrÃ©er commande</Link>
+              <Link href={`/orders/new?contactId=${lead.contactId}`}>Créer commande</Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
               <Link href={`/contacts/${lead.contactId}`}>Voir contact</Link>

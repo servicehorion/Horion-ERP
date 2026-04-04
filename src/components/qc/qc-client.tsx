@@ -380,7 +380,7 @@ function CreateInspectionDialog({
         notes: notes || undefined,
       });
       if (res.error) { toast.error(res.error); return; }
-      toast.success("Inspection creee");
+      toast.success("Inspection créée");
       onCreated(res.data as unknown as QcInspectionRow);
       setOpen(false);
     });
@@ -841,7 +841,7 @@ function AddReportDialog({
         sharedWithClient: report.sharedWithClient ?? false,
       };
       onAdded(newReport);
-      toast.success("Rapport QC ajoute");
+      toast.success("Rapport QC ajouté");
       setOpen(false);
       setOverall("PASS");
       setDefectRate("");
@@ -1919,7 +1919,7 @@ export function QcClient({
                           return [res.data, ...prev];
                         });
                         setLotSearch(lotDraft.lotNumber.trim());
-                        toast.success("Lot enregistre");
+                        toast.success("Lot enregistré");
                       });
                     }}
                   >
@@ -2042,7 +2042,7 @@ export function QcClient({
               ) : lotHistory === undefined || !lotHistory.lot ? (
                 <EmptyState
                   title="Lot introuvable"
-                  description="Ce numero de lot n'existe pas encore. Creez-le ci-dessus pour commencer la tra�abilite."
+                  description="Ce numéro de lot n'existe pas encore. Créez-le ci-dessus pour commencer la traçabilité."
                 />
               ) : (
                 <div className="space-y-4">

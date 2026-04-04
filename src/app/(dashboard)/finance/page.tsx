@@ -90,11 +90,11 @@ export default async function FinanceDashboardPage() {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Cash bloque</CardTitle>
+            <CardTitle className="text-sm font-medium">Cash bloqué</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-semibold">{formatCurrency(snapshot.cash.lockedCash, "XAF")}</div>
-            <p className="mt-1 text-xs text-muted-foreground">Encaissements confirms pas encore rapproches banque.</p>
+            <p className="mt-1 text-xs text-muted-foreground">Encaissements confirmés, pas encore rapprochés en banque.</p>
           </CardContent>
         </Card>
 
@@ -227,7 +227,7 @@ export default async function FinanceDashboardPage() {
               <Badge>{snapshot.approvals.pendingCount}</Badge>
             </div>
             <div className="flex items-center justify-between">
-              <span>Cash-out a valider</span>
+              <span>Cash-out à valider</span>
               <span className="font-medium">{formatCurrency(snapshot.approvals.pendingCashOutXAF, "XAF")}</span>
             </div>
             <div className="rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground">

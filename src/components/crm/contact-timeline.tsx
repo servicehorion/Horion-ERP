@@ -275,7 +275,7 @@ export function ContactTimeline({
 
       {items.length === 0 ? (
         <div className="text-center text-sm text-muted-foreground py-8">
-          Aucun Ã©vÃ©nement pour le moment
+          Aucun événement pour le moment
         </div>
       ) : (
         <div className="space-y-3">

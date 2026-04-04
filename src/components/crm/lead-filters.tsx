@@ -20,10 +20,10 @@ interface LeadFiltersProps {
 const LEAD_STATUSES = [
   { value: "all", label: "Tous" },
   { value: "NEW", label: "Nouveau" },
-  { value: "CONTACTED", label: "ContactÃ©" },
-  { value: "QUALIFIED", label: "QualifiÃ©" },
-  { value: "QUOTED", label: "Devis envoyÃ©" },
-  { value: "WON", label: "GagnÃ©" },
+  { value: "CONTACTED", label: "Contacté" },
+  { value: "QUALIFIED", label: "Qualifié" },
+  { value: "QUOTED", label: "Devis envoyé" },
+  { value: "WON", label: "Gagné" },
   { value: "LOST", label: "Perdu" },
 ];
 
@@ -100,7 +100,7 @@ export function LeadFilters({ teamMembers }: LeadFiltersProps) {
         }}
       >
         <SelectTrigger className="w-full sm:w-[200px]">
-          <SelectValue placeholder="AssignÃ©" />
+          <SelectValue placeholder="Assigné" />
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">Tous</SelectItem>

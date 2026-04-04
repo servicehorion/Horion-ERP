@@ -1,4 +1,4 @@
-﻿"use server";
+"use server";
 
 import { revalidatePath } from "next/cache";
 
@@ -9,7 +9,7 @@ import { AuditService } from "@/lib/services/audit.service";
 import { NotificationService } from "@/lib/services/notification.service";
 import { EmailNotificationChannel } from "@/lib/services/notification-channels.service";
 
-// â”€â”€ Dashboard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ���� Dashboard ������������������������������������������������������������������������������������������������������������������������������
 
 export async function getQcDashboard() {
   try {
@@ -79,7 +79,7 @@ export async function getQcDashboard() {
   }
 }
 
-// â”€â”€ Plans â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ���� Plans ����������������������������������������������������������������������������������������������������������������������������������������
 
 export async function getQcPlans() {
   try {
@@ -127,7 +127,7 @@ export async function createQcPlan(data: {
     revalidatePath("/qc");
     return { data: plan };
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Erreur crÃ©ation plan QC" };
+    return { error: err instanceof Error ? err.message : "Erreur création plan QC" };
   }
 }
 
@@ -149,7 +149,7 @@ export async function updateQcPlan(
     revalidatePath("/qc");
     return { data: plan };
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Erreur mise Ã  jour plan QC" };
+    return { error: err instanceof Error ? err.message : "Erreur mise à jour plan QC" };
   }
 }
 
@@ -165,7 +165,7 @@ export async function deleteQcPlan(id: string) {
   }
 }
 
-// â”€â”€ Inspections â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ���� Inspections ����������������������������������������������������������������������������������������������������������������������������
 
 export async function getQcInspections(filters?: {
   status?: string;
@@ -248,7 +248,7 @@ export async function createQcInspection(data: {
     revalidatePath("/qc");
     return { data: inspection };
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Erreur crÃ©ation inspection" };
+    return { error: err instanceof Error ? err.message : "Erreur création inspection" };
   }
 }
 
@@ -266,7 +266,7 @@ export async function submitQcReport(
     checkPermission(user.role, "qc.manage");
     const inspection = await prisma.qcInspection.findUnique({
       where: { id: inspectionId },
-      select: { tenantId: true },
+      select: { tenantId: true, orderId: true },
     });
     if (!inspection || inspection.tenantId !== user.tenantId) {
       return { error: "Inspection introuvable" };
@@ -289,6 +289,25 @@ export async function submitQcReport(
           data: { result: item.result, notes: item.notes, defectCount: item.defectCount },
         });
       }
+
+      // Auto-bloquer les expéditions liées à la commande si le résultat est FAIL
+      if (report.overall === "FAIL" && inspection.orderId) {
+        const shipments = await tx.shipment.findMany({
+          where: { orderId: inspection.orderId },
+          select: { id: true },
+        });
+        for (const shipment of shipments) {
+          await tx.shipmentIncident.create({
+            data: {
+              shipmentId: shipment.id,
+              type: "QC_FAIL",
+              severity: "HIGH",
+              status: "OPEN",
+              description: `Inspection QC échouée (taux de défauts : ${report.defectRate ?? "N/A"}%). Expédition bloquée en attente de décision. Notes : ${report.notes ?? "—"}`,
+            },
+          });
+        }
+      }
     });
 
     await AuditService.log({
@@ -300,7 +319,20 @@ export async function submitQcReport(
       newValue: { overall: report.overall, defectRate: report.defectRate },
     });
 
+    if (report.overall === "FAIL") {
+      await NotificationService.notify({
+        tenantId: user.tenantId,
+        userId: user.id,
+        type: "TASK_ASSIGNED",
+        title: "Inspection QC échouée — Expédition bloquée",
+        message: `Le rapport QC est FAIL${report.defectRate ? ` (${report.defectRate}% défauts)` : ""}. Les expéditions liées ont été bloquées automatiquement.`,
+        entityType: "qcInspection",
+        entityId: inspectionId,
+      });
+    }
+
     revalidatePath("/qc");
+    revalidatePath("/logistics");
     return { data: true };
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Erreur soumission rapport QC" };
@@ -851,7 +883,7 @@ export async function deleteQcPartner(contactId: string) {
   }
 }
 
-// ── Lab Connections ──────────────────────────────────────────────────────────
+//    Lab Connections                                                           
 
 export async function getLabConnections() {
   try {
@@ -885,7 +917,7 @@ export async function createLabConnection(formData: FormData) {
     revalidatePath("/qc");
     return { data };
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Erreur création connexion lab" };
+    return { error: err instanceof Error ? err.message : "Erreur cr�ation connexion lab" };
   }
 }
 
@@ -920,7 +952,7 @@ export async function submitTestToLab(qcRequestId: string, connectionId: string)
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Api-Key": conn.apiKey },
         body: JSON.stringify({ horionTestId: labTest.id, qcRequestId }),
-      }).catch(() => {/* ignore — external API may be unavailable */});
+      }).catch(() => {/* ignore  external API may be unavailable */});
     }
 
     revalidatePath("/qc");
@@ -952,7 +984,7 @@ export async function fetchLabResults(labTestId: string) {
     revalidatePath("/qc");
     return { data: updated };
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Erreur récupération résultats" };
+    return { error: err instanceof Error ? err.message : "Erreur r�cup�ration r�sultats" };
   }
 }
 
@@ -974,7 +1006,7 @@ export async function listLabTests(qcRequestId?: string) {
   }
 }
 
-// ── AI Vision ────────────────────────────────────────────────────────────────
+//    AI Vision                                                                 
 
 export async function analyzeQcPhotoWithAI(photoUrl: string, nonConformityId?: string) {
   try {
@@ -982,7 +1014,7 @@ export async function analyzeQcPhotoWithAI(photoUrl: string, nonConformityId?: s
     checkPermission(user.role, "qc.manage");
 
     const anthropicKey = process.env.ANTHROPIC_API_KEY;
-    if (!anthropicKey) return { error: "ANTHROPIC_API_KEY non configuré" };
+    if (!anthropicKey) return { error: "ANTHROPIC_API_KEY non configur�" };
 
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -1004,8 +1036,8 @@ export async function analyzeQcPhotoWithAI(photoUrl: string, nonConformityId?: s
               },
               {
                 type: "text",
-                text: `Tu es un expert en contrôle qualité industriel. Analyse cette image et identifie les défauts visuels.
-Réponds UNIQUEMENT en JSON avec ce format exact:
+                text: `Tu es un expert en contr�le qualit� industriel. Analyse cette image et identifie les d�fauts visuels.
+R�ponds UNIQUEMENT en JSON avec ce format exact:
 {
   "defects": [{"type": "string", "severity": "LOW|MEDIUM|HIGH|CRITICAL", "location": "string", "confidence": 0.0-1.0}],
   "overallSeverity": "PASS|MINOR|MAJOR|CRITICAL",
@@ -1042,7 +1074,7 @@ Réponds UNIQUEMENT en JSON avec ce format exact:
   }
 }
 
-// ── SPC Charts ───────────────────────────────────────────────────────────────
+//    SPC Charts                                                                
 
 export async function createSpcChart(formData: FormData) {
   try {
@@ -1059,7 +1091,7 @@ export async function createSpcChart(formData: FormData) {
     revalidatePath("/qc");
     return { data };
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Erreur création graphique SPC" };
+    return { error: err instanceof Error ? err.message : "Erreur cr�ation graphique SPC" };
   }
 }
 
@@ -1134,7 +1166,7 @@ export async function addSpcDataPoint(chartId: string, value: number, inspection
   }
 }
 
-// ── Lot Traceability ─────────────────────────────────────────────────────────
+//    Lot Traceability                                                          
 
 export async function createOrUpdateLotTrace(lotNumber: string, input: {
   productId?: string;

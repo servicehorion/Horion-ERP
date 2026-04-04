@@ -180,7 +180,7 @@ export function OrderPayments({
         toast.error(res.error);
         return;
       }
-      toast.success("Paiement ajoute");
+      toast.success("Paiement ajouté");
       setOpen(false);
       form.reset();
       router.refresh();

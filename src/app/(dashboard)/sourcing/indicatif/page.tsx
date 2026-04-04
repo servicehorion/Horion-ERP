@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -151,11 +151,11 @@ type CategoryMemoryHint = {
 type PriceCurrency = "RMB" | "USD" | "EUR";
 
 const CARGO_CATEGORY_OPTIONS: Array<{ value: HorionCargoCategory; label: string; desc: string }> = [
-  { value: "STANDARD", label: "Articles normaux", desc: "9 500 FCFA/kg â€¢ 7-21j" },
-  { value: "SPECIAL", label: "Articles spÃ©ciaux", desc: "15 000 FCFA/kg â€¢ 7-30j" },
-  { value: "MEDICAL", label: "Articles mÃ©dicaux", desc: "15 000 FCFA/kg â€¢ 7-30j" },
-  { value: "LAPTOP", label: "Ordinateurs", desc: "25 000 FCFA/kg â€¢ 30j" },
-  { value: "SMARTPHONE", label: "Smartphones/Tablettes", desc: "15 000 FCFA/kg â€¢ 7-30j" },
+  { value: "STANDARD", label: "Articles normaux", desc: "9 500 FCFA/kg ⬢ 7-21j" },
+  { value: "SPECIAL", label: "Articles spéciaux", desc: "15 000 FCFA/kg ⬢ 7-30j" },
+  { value: "MEDICAL", label: "Articles médicaux", desc: "15 000 FCFA/kg ⬢ 7-30j" },
+  { value: "LAPTOP", label: "Ordinateurs", desc: "25 000 FCFA/kg ⬢ 30j" },
+  { value: "SMARTPHONE", label: "Smartphones/Tablettes", desc: "15 000 FCFA/kg ⬢ 7-30j" },
 ];
 
 const PLATFORM_OPTIONS = [
@@ -163,37 +163,37 @@ const PLATFORM_OPTIONS = [
     value: "1688",
     label: "1688 (Alibaba local)",
     badge: "LOCAL",
-    hint: "Plateforme domestique chinoise â€” prix rÃ©els, marge pleine",
+    hint: "Plateforme domestique chinoise � prix réels, marge pleine",
   },
   {
     value: "TAOBAO",
     label: "Taobao",
     badge: "LOCAL",
-    hint: "Plateforme domestique â€” prix compÃ©titifs",
+    hint: "Plateforme domestique � prix compétitifs",
   },
   {
     value: "PINDUODUO",
     label: "Pinduoduo",
     badge: "LOCAL",
-    hint: "Prix trÃ¨s bas â€” vÃ©rifier la qualitÃ©",
+    hint: "Prix très bas � vérifier la qualité",
   },
   {
     value: "ALIBABA",
     label: "Alibaba (international)",
     badge: "INTL",
-    hint: "Prix majorÃ©s 30-60% vs 1688 â€” marge rÃ©duite automatiquement",
+    hint: "Prix majorés 30-60% vs 1688 � marge réduite automatiquement",
   },
   {
     value: "ALIEXPRESS",
     label: "AliExpress",
     badge: "INTL",
-    hint: "Prix retail internationaux â€” prix Ã©levÃ©s",
+    hint: "Prix retail internationaux � prix élevés",
   },
   {
     value: "AMAZON",
     label: "Amazon",
     badge: "INTL",
-    hint: "Prix occidentaux â€” utiliser uniquement si hors Chine",
+    hint: "Prix occidentaux � utiliser uniquement si hors Chine",
   },
   { value: "WEB", label: "Recherche Web", badge: "INTL", hint: "Autre source" },
 ];
@@ -208,30 +208,30 @@ const RISK_LEVEL_OPTIONS: Array<{
   {
     value: "LOW",
     label: "Faible",
-    desc: "Produit standard, facile Ã  trouver sur 1688",
+    desc: "Produit standard, facile à trouver sur 1688",
     examples: "Textile, papeterie, accessoires simples, quincaillerie",
     color: "text-emerald-700 bg-emerald-50 border-emerald-200",
   },
   {
     value: "MEDIUM",
-    label: "ModÃ©rÃ©",
-    desc: "Risque douanier ou contrÃ´le qualitÃ© nÃ©cessaire",
-    examples: "CÃ¢bles, jouets, articles alimentaires, bois",
+    label: "Modéré",
+    desc: "Risque douanier ou contrôle qualité nécessaire",
+    examples: "Câbles, jouets, articles alimentaires, bois",
     color: "text-amber-700 bg-amber-50 border-amber-200",
   },
   {
     value: "HIGH",
-    label: "Ã‰levÃ©",
-    desc: "Certifications export requises, transport spÃ©cial",
-    examples: "Ã‰lectronique avec batterie, cosmÃ©tiques, poudres, mÃ©dical",
+    label: "�0levé",
+    desc: "Certifications export requises, transport spécial",
+    examples: "�0lectronique avec batterie, cosmétiques, poudres, médical",
     color: "text-rose-700 bg-rose-50 border-rose-200",
   },
 ];
 
 const PRICE_CURRENCY_OPTIONS: Array<{ value: PriceCurrency; label: string; symbol: string }> = [
-  { value: "RMB", label: "RMB (Â¥)", symbol: "Â¥" },
+  { value: "RMB", label: "RMB (¥)", symbol: "¥" },
   { value: "USD", label: "USD ($)", symbol: "$" },
-  { value: "EUR", label: "EUR (â‚¬)", symbol: "â‚¬" },
+  { value: "EUR", label: "EUR (��)", symbol: "��" },
 ];
 
 function n(value: string) {
@@ -433,7 +433,7 @@ export default function SourcingIndicatifPage() {
       weightKg: match.weightEstimate != null ? String(match.weightEstimate) : prev.weightKg,
     }));
     setLandingUrl("");
-    toast.success(`DonnÃ©es catalogue importÃ©es pour ${match.name}.`);
+    toast.success(`Données catalogue importées pour ${match.name}.`);
   }
 
   function applyCategoryWeightHint() {
@@ -443,7 +443,7 @@ export default function SourcingIndicatifPage() {
       weightKg: String(categoryMemoryHint.averageBufferedWeightKg),
     }));
     setDensityBlocked(false);
-    toast.success("Poids mÃ©moire de catÃ©gorie appliquÃ©.");
+    toast.success("Poids mémoire de catégorie appliqué.");
   }
 
   async function handleCatalogImageSelected(file?: File | null) {
@@ -485,9 +485,9 @@ export default function SourcingIndicatifPage() {
       }
       if (Array.isArray(data.matches) && data.matches.length > 0) {
         setCatalogMatches(data.matches as CatalogMemoryMatch[]);
-        toast.success("Produits similaires trouvÃ©s depuis l'image.");
+        toast.success("Produits similaires trouvés depuis l'image.");
       } else {
-        toast.message("Aucun produit catalogue fiable n'a Ã©tÃ© trouvÃ© Ã  partir de l'image.");
+        toast.message("Aucun produit catalogue fiable n'a été trouvé à partir de l'image.");
       }
     } catch {
       toast.error("Impossible d'analyser cette image pour le moment.");
@@ -564,7 +564,7 @@ export default function SourcingIndicatifPage() {
         toast.error(densityHint.message);
       } else if (categoryWeightHint != null && categoryWeightHint > 0 && weightDeviation > 0.3) {
         toast.error(
-          `Le poids saisi s'Ã©carte fortement de la mÃ©moire catÃ©gorie (${categoryWeightHint.toFixed(1)} kg).`
+          `Le poids saisi s'écarte fortement de la mémoire catégorie (${categoryWeightHint.toFixed(1)} kg).`
         );
       }
     } catch (error) {
@@ -667,7 +667,7 @@ export default function SourcingIndicatifPage() {
     if (!line) { toast.error("Calculez d'abord un produit valide."); return; }
     setLineItems((prev) => [...prev, line]);
     setLandingUrl("");
-    toast.success("Produit ajoutÃ© au devis multi-produits.");
+    toast.success("Produit ajouté au devis multi-produits.");
   }
 
   const quoteTotals = useMemo(() => {
@@ -697,14 +697,14 @@ export default function SourcingIndicatifPage() {
 
   async function handleSendQuote() {
     if (!result) { toast.error("Calculez d'abord le devis indicatif."); return; }
-    if (!form.contactId) { toast.error("SÃ©lectionnez un contact ou prospect."); return; }
+    if (!form.contactId) { toast.error("Sélectionnez un contact ou prospect."); return; }
     if (densityBlocked) {
       toast.error("Corrigez d'abord le poids / volume avant d'envoyer le devis.");
       return;
     }
     const currentLine = buildCurrentLineItem();
     const itemsForQuote = lineItems.length > 0 ? lineItems : currentLine ? [currentLine] : [];
-    if (itemsForQuote.length === 0) { toast.error("Ajoutez au moins un produit calculÃ©."); return; }
+    if (itemsForQuote.length === 0) { toast.error("Ajoutez au moins un produit calculé."); return; }
 
     startTransition(async () => {
       const activeOption = selectedOption;
@@ -766,7 +766,7 @@ export default function SourcingIndicatifPage() {
       if (response.data.requiresApproval) {
         setLandingUrl(null);
         toast.success(
-          `Devis créé en attente de validation interne par ${response.data.approvalLabel ?? "le valideur requis"}.`
+          `Devis cr�� en attente de validation interne par ${response.data.approvalLabel ?? "le valideur requis"}.`
         );
         setLineItems([]);
         return;
@@ -784,7 +784,7 @@ export default function SourcingIndicatifPage() {
       }
 
       setLandingUrl(response.data.landingUrl ?? null);
-      toast.success("Devis validé en interne et envoyé au client.");
+      toast.success("Devis valid� en interne et envoy� au client.");
       setLineItems([]);
     });
   }
@@ -797,7 +797,7 @@ export default function SourcingIndicatifPage() {
       <div className="space-y-0.5">
         <div className="font-semibold">{fmtXaf(amountXaf)}</div>
         <div className="text-xs text-muted-foreground">
-          {formatCurrency(usd, "USD")} â€¢ {formatCurrency(eur, "EUR")} â€¢ {formatCurrency(rmb, "RMB")}
+          {formatCurrency(usd, "USD")} ⬢ {formatCurrency(eur, "EUR")} ⬢ {formatCurrency(rmb, "RMB")}
         </div>
       </div>
     );
@@ -809,9 +809,9 @@ export default function SourcingIndicatifPage() {
     ["Liquide (interdit mer)", form.isLiquid],
     ["Produit inflammable/explosif", form.isFlammable || form.isExplosive],
     ["Spray", form.isSpray],
-    ["Marchandise illÃ©gale/rÃ©glementÃ©e", form.isIllegal],
+    ["Marchandise illégale/réglementée", form.isIllegal],
     ["Chimique toxique", form.isToxicChemical],
-    ["Arme/rÃ©plique", form.isWeaponReplica],
+    ["Arme/réplique", form.isWeaponReplica],
   ];
 
   const selectedRiskOption = RISK_LEVEL_OPTIONS.find((r) => r.value === form.riskLevel);
@@ -824,17 +824,17 @@ export default function SourcingIndicatifPage() {
         <div>
           <h1 className="text-3xl font-bold">Sourcing Indicatif</h1>
           <p className="text-muted-foreground mt-1">
-            Devis avant sourcing profond â€” moteur de prix dynamique (buffer Ã— risque Ã— plateforme).
+            Devis avant sourcing profond � moteur de prix dynamique (buffer � risque � plateforme).
           </p>
         </div>
         <div className="flex flex-col items-end gap-2">
           <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">
-            Moteur v2 â€” Buffer risque + Marge dynamique + 10% service
+            Moteur v2 � Buffer risque + Marge dynamique + 10% service
           </Badge>
           <span className="text-xs text-muted-foreground">
             {isInternationalPlatform
-              ? `Marge rÃ©duite (15%) â€” prix ${form.platform} dÃ©jÃ  Ã©levÃ©`
-              : `Marge pleine (30%) â€” prix local ${form.platform}`}
+              ? `Marge réduite (15%) � prix ${form.platform} déjà élevé`
+              : `Marge pleine (30%) � prix local ${form.platform}`}
           </span>
         </div>
       </div>
@@ -846,15 +846,15 @@ export default function SourcingIndicatifPage() {
             <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5 text-amber-600" />
             <div>
               <p className="font-semibold">
-                Attention â€” Sourcing basÃ© sur {form.platform} (plateforme internationale)
+                Attention � Sourcing basé sur {form.platform} (plateforme internationale)
               </p>
               <p className="mt-1">
-                Le prix {form.platform} est majorÃ© de 30 Ã  60% par rapport Ã  1688/Taobao. Le moteur
-                applique automatiquement une marge rÃ©duite (15%) pour rester compÃ©titif. Si vous
-                sourcez finalement sur 1688, la diffÃ©rence de prix constitue un bÃ©nÃ©fice supplÃ©mentaire.
+                Le prix {form.platform} est majoré de 30 à 60% par rapport à 1688/Taobao. Le moteur
+                applique automatiquement une marge réduite (15%) pour rester compétitif. Si vous
+                sourcez finalement sur 1688, la différence de prix constitue un bénéfice supplémentaire.
               </p>
               <p className="mt-1 font-medium">
-                â†’ Recommandation : vÃ©rifiez d{"'"}abord sur 1688 ou Taobao pour optimiser le taux de
+                �  Recommandation : vérifiez d{"'"}abord sur 1688 ou Taobao pour optimiser le taux de
                 conversion du devis.
               </p>
             </div>
@@ -868,18 +868,18 @@ export default function SourcingIndicatifPage() {
             <AlertTriangle className="h-4 w-4" />
             Rappels transport
           </div>
-          <p>â€” DDP prÃ©visible : droits de douane non intÃ©grÃ©s dans l{"'"}estimatif standard.</p>
-          <p>â€” TÃ©lÃ©phones et ordinateurs interdits par voie maritime.</p>
-          <p>â€” Batteries pures interdites en avion. Drones interdits air/mer.</p>
-          <p>â€” Colis non dÃ©clarÃ© : majoration de 60% appliquÃ©e aux frais transport.</p>
+          <p>� DDP prévisible : droits de douane non intégrés dans l{"'"}estimatif standard.</p>
+          <p>� Téléphones et ordinateurs interdits par voie maritime.</p>
+          <p>� Batteries pures interdites en avion. Drones interdits air/mer.</p>
+          <p>� Colis non déclaré : majoration de 60% appliquée aux frais transport.</p>
         </CardContent>
       </Card>
 
       <div className="grid gap-6 xl:grid-cols-[1.1fr_1.4fr]">
-        {/* â”€â”€ LEFT: Parameters form â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {/* ���� LEFT: Parameters form ������������������������������������������������������������������������������ */}
         <Card>
           <CardHeader>
-            <CardTitle>ParamÃ¨tres devis</CardTitle>
+            <CardTitle>Paramètres devis</CardTitle>
             <CardDescription>
               Client, produit, plateforme de sourcing et niveau de risque.
             </CardDescription>
@@ -894,12 +894,12 @@ export default function SourcingIndicatifPage() {
                   onValueChange={(value) => setForm((prev) => ({ ...prev, contactId: value }))}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder={loadingContacts ? "Chargement..." : "SÃ©lectionnez"} />
+                    <SelectValue placeholder={loadingContacts ? "Chargement..." : "Sélectionnez"} />
                   </SelectTrigger>
                   <SelectContent>
                     {contacts.map((contact) => (
                       <SelectItem key={contact.id} value={contact.id}>
-                        {contact.name}{contact.company ? ` â€” ${contact.company}` : ""}
+                        {contact.name}{contact.company ? ` � ${contact.company}` : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -908,9 +908,9 @@ export default function SourcingIndicatifPage() {
                   <p className="text-xs text-muted-foreground">
                     {selectedContact.type === "PROSPECT" ? "Prospect" : "Client"}
                     {selectedContact.whatsapp
-                      ? ` â€” WhatsApp ${selectedContact.whatsapp}`
+                      ? ` � WhatsApp ${selectedContact.whatsapp}`
                       : selectedContact.phone
-                        ? ` â€” TÃ©l ${selectedContact.phone}`
+                        ? ` � Tél ${selectedContact.phone}`
                         : ""}
                   </p>
                 )}
@@ -934,19 +934,19 @@ export default function SourcingIndicatifPage() {
                   setSelectedCatalogMatch(null);
                   setForm((prev) => ({ ...prev, description: e.target.value }));
                 }}
-                placeholder="Ex : lot smartphones 256GB, 50 unitÃ©s"
+                placeholder="Ex : lot smartphones 256GB, 50 unités"
               />
             </div>
 
             <div className="space-y-1.5">
-              <Label>CatÃ©gorie produit / mÃ©moire</Label>
+              <Label>Catégorie produit / mémoire</Label>
               <Input
                 value={form.memoryCategory}
                 onChange={(e) => setForm((prev) => ({ ...prev, memoryCategory: e.target.value }))}
                 placeholder="Ex : Accessoires mobiles, Chaise de bureau"
               />
               <p className="text-xs text-muted-foreground">
-                UtilisÃ©e pour appliquer le coefficient de rÃ©alitÃ© moyen et la densitÃ© historique de la catÃ©gorie.
+                Utilisée pour appliquer le coefficient de réalité moyen et la densité historique de la catégorie.
               </p>
             </div>
 
@@ -955,7 +955,7 @@ export default function SourcingIndicatifPage() {
                 <div>
                   <p className="text-sm font-semibold text-slate-950">Matching image catalogue</p>
                   <p className="text-xs text-muted-foreground">
-                    Chargez une photo produit pour retrouver plus vite un Ã©quivalent dÃ©jÃ  connu.
+                    Chargez une photo produit pour retrouver plus vite un équivalent déjà connu.
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -981,12 +981,12 @@ export default function SourcingIndicatifPage() {
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={catalogImagePreview}
-                    alt="AperÃ§u produit"
+                    alt="Aperçu produit"
                     className="h-14 w-14 rounded-lg object-cover"
                   />
                   <div className="text-xs text-muted-foreground">
                     <p className="font-medium text-slate-900">{catalogImageFilename || "Image produit"}</p>
-                    <p>Utilisez l'image pour accÃ©lÃ©rer le matching avec Catalog OS.</p>
+                    <p>Utilisez l'image pour accélérer le matching avec Catalog OS.</p>
                   </div>
                 </div>
               ) : null}
@@ -996,9 +996,9 @@ export default function SourcingIndicatifPage() {
               <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-3">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-sm font-semibold text-amber-950">MÃ©moire catÃ©gorie</p>
+                    <p className="text-sm font-semibold text-amber-950">Mémoire catégorie</p>
                     <p className="text-xs text-amber-900/75">
-                      Le devis s'appuie sur la rÃ©alitÃ© historique Horion avant de suivre aveuglÃ©ment la plateforme.
+                      Le devis s'appuie sur la réalité historique Horion avant de suivre aveuglément la plateforme.
                     </p>
                   </div>
                   {categoryHintLoading ? <Badge variant="outline">Chargement...</Badge> : null}
@@ -1006,7 +1006,7 @@ export default function SourcingIndicatifPage() {
                 {categoryMemoryHint ? (
                   <div className="mt-3 grid gap-2 md:grid-cols-3">
                     <div className="rounded-lg border border-amber-200 bg-white px-3 py-2">
-                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Coeff. rÃ©alitÃ©</p>
+                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Coeff. réalité</p>
                       <p className="font-semibold text-slate-950">
                         {categoryMemoryHint.averageRealityCoefficient != null
                           ? categoryMemoryHint.averageRealityCoefficient.toFixed(2)
@@ -1014,7 +1014,7 @@ export default function SourcingIndicatifPage() {
                       </p>
                     </div>
                     <div className="rounded-lg border border-amber-200 bg-white px-3 py-2">
-                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Poids mÃ©moire</p>
+                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Poids mémoire</p>
                       <p className="font-semibold text-slate-950">
                         {categoryMemoryHint.averageBufferedWeightKg != null
                           ? `${categoryMemoryHint.averageBufferedWeightKg.toFixed(1)} kg`
@@ -1022,7 +1022,7 @@ export default function SourcingIndicatifPage() {
                       </p>
                     </div>
                     <div className="rounded-lg border border-amber-200 bg-white px-3 py-2">
-                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Ã‰chantillon</p>
+                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">�0chantillon</p>
                       <p className="font-semibold text-slate-950">
                         {categoryMemoryHint.historicalSampleCount || 0} historique(s)
                       </p>
@@ -1030,7 +1030,7 @@ export default function SourcingIndicatifPage() {
                   </div>
                 ) : (
                   <p className="mt-3 text-xs text-muted-foreground">
-                    Pas encore assez d'historique pour cette catÃ©gorie. Le moteur retombe sur le pricing plateforme.
+                    Pas encore assez d'historique pour cette catégorie. Le moteur retombe sur le pricing plateforme.
                   </p>
                 )}
               </div>
@@ -1166,7 +1166,7 @@ export default function SourcingIndicatifPage() {
                   <SelectContent>
                     {RISK_LEVEL_OPTIONS.map((r) => (
                       <SelectItem key={r.value} value={r.value}>
-                        {r.label} â€” {r.desc}
+                        {r.label} � {r.desc}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1181,7 +1181,7 @@ export default function SourcingIndicatifPage() {
             <div className="rounded-xl border bg-background p-3 text-sm">
               <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 <Zap className="h-3.5 w-3.5" />
-                ParamÃ¨tres pricing auto-calculÃ©s
+                Paramètres pricing auto-calculés
               </div>
               <div className="grid grid-cols-3 gap-2 text-center">
                 <div className="rounded-lg border bg-muted/40 px-2 py-2">
@@ -1190,7 +1190,7 @@ export default function SourcingIndicatifPage() {
                     {(derivedPricing.bufferPct * 100).toFixed(0)}%
                   </p>
                   <p className="text-[10px] text-muted-foreground">
-                    {form.riskLevel} Ã— {LOCAL_PLATFORMS.has(form.platform) ? "local" : "intl"}
+                    {form.riskLevel} � {LOCAL_PLATFORMS.has(form.platform) ? "local" : "intl"}
                   </p>
                 </div>
                 <div className="rounded-lg border bg-muted/40 px-2 py-2">
@@ -1199,7 +1199,7 @@ export default function SourcingIndicatifPage() {
                     {(derivedPricing.invisibleMarginPct * 100).toFixed(0)}%
                   </p>
                   <p className="text-[10px] text-muted-foreground">
-                    {LOCAL_PLATFORMS.has(form.platform) ? "locale â†’ pleine" : "intl â†’ rÃ©duite"}
+                    {LOCAL_PLATFORMS.has(form.platform) ? "locale �  pleine" : "intl �  réduite"}
                   </p>
                 </div>
                 <div className="rounded-lg border bg-muted/40 px-2 py-2">
@@ -1212,7 +1212,7 @@ export default function SourcingIndicatifPage() {
 
             {/* Cargo category */}
             <div className="space-y-1.5">
-              <Label>CatÃ©gorie transport (tarif fret)</Label>
+              <Label>Catégorie transport (tarif fret)</Label>
               <Select
                 value={form.category}
                 onValueChange={(value) =>
@@ -1233,7 +1233,7 @@ export default function SourcingIndicatifPage() {
               </p>
             </div>
 
-            {/* Price input â€” multi-currency */}
+            {/* Price input � multi-currency */}
             <div className="space-y-2">
               <Label>Prix plateforme</Label>
               <div className="flex gap-2">
@@ -1272,18 +1272,18 @@ export default function SourcingIndicatifPage() {
                 <div className="rounded-lg bg-muted/60 px-3 py-2 text-xs text-muted-foreground space-y-0.5">
                   {form.priceCurrency !== "RMB" && (
                     <p>
-                      â‰ˆ {formatCurrency(effectivePriceRmb, "RMB")} (converti en RMB)
+                      �0� {formatCurrency(effectivePriceRmb, "RMB")} (converti en RMB)
                     </p>
                   )}
                   <p className="font-medium text-slate-900">
-                    = {fmtXaf(priceXafEquivalent)} / unitÃ© (coÃ»t pur sans marge)
+                    = {fmtXaf(priceXafEquivalent)} / unité (coût pur sans marge)
                   </p>
                   <p className="text-[10px]">
                     Taux : 1 RMB = {n(form.exchangeRate)} FCFA
                     {form.priceCurrency === "USD" &&
-                      ` Â· 1 USD = ${DEFAULT_FX_RATES.USD_RMB ?? 7.25} RMB`}
+                      ` · 1 USD = ${DEFAULT_FX_RATES.USD_RMB ?? 7.25} RMB`}
                     {form.priceCurrency === "EUR" &&
-                      ` Â· 1 EUR = ${DEFAULT_FX_RATES.EUR_XAF ?? 655.957} FCFA`}
+                      ` · 1 EUR = ${DEFAULT_FX_RATES.EUR_XAF ?? 655.957} FCFA`}
                   </p>
                 </div>
               )}
@@ -1291,7 +1291,7 @@ export default function SourcingIndicatifPage() {
 
             <div className="grid gap-3 md:grid-cols-2">
               <div className="space-y-1.5">
-                <Label>QuantitÃ©</Label>
+                <Label>Quantité</Label>
                 <Input
                   type="number"
                   min="1"
@@ -1341,15 +1341,15 @@ export default function SourcingIndicatifPage() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="space-y-1">
                     <p className="text-sm font-semibold">
-                      {densityBlocked ? "Alerte poids / densitÃ©" : "Suggestion mÃ©moire logistique"}
+                      {densityBlocked ? "Alerte poids / densité" : "Suggestion mémoire logistique"}
                     </p>
                     <p className="text-xs">
                       {result?.transport?.densityValidation?.message ||
                         (categoryMemoryHint?.averageBufferedWeightKg != null
-                          ? `La catÃ©gorie ${categoryMemoryHint.name} tourne historiquement autour de ${categoryMemoryHint.averageBufferedWeightKg.toFixed(
+                          ? `La catégorie ${categoryMemoryHint.name} tourne historiquement autour de ${categoryMemoryHint.averageBufferedWeightKg.toFixed(
                               1
-                            )} kg sÃ©curisÃ©s.`
-                          : "Ajoutez des dimensions pour sÃ©curiser le poids facturable.")}
+                            )} kg sécurisés.`
+                          : "Ajoutez des dimensions pour sécuriser le poids facturable.")}
                     </p>
                   </div>
                   {categoryMemoryHint?.averageBufferedWeightKg != null ? (
@@ -1363,7 +1363,7 @@ export default function SourcingIndicatifPage() {
 
             {/* Exchange rate */}
             <div className="space-y-1.5">
-              <Label>Taux de change RMB â†’ FCFA</Label>
+              <Label>Taux de change RMB �  FCFA</Label>
               <Input
                 type="number"
                 min="1"
@@ -1372,7 +1372,7 @@ export default function SourcingIndicatifPage() {
                 onChange={(e) => setForm((prev) => ({ ...prev, exchangeRate: e.target.value }))}
               />
               <p className="text-xs text-muted-foreground">
-                Taux actuel estimÃ© : {n(form.exchangeRate)} FCFA / RMB. Ajustez selon le marchÃ© du jour.
+                Taux actuel estimé : {n(form.exchangeRate)} FCFA / RMB. Ajustez selon le marché du jour.
               </p>
             </div>
 
@@ -1382,16 +1382,16 @@ export default function SourcingIndicatifPage() {
               <div className="grid gap-2 md:grid-cols-2">
                 {[
                   ["isPureBattery", "Batterie pure"],
-                  ["isLiquid", "Liquide / cosmÃ©tique"],
+                  ["isLiquid", "Liquide / cosmétique"],
                   ["isDrone", "Drone"],
                   ["isFlammable", "Inflammable"],
                   ["isExplosive", "Explosif"],
                   ["isSpray", "Spray"],
-                  ["isIllegal", "Produit illÃ©gal/rÃ©glementÃ©"],
+                  ["isIllegal", "Produit illégal/réglementé"],
                   ["isToxicChemical", "Chimique toxique"],
-                  ["isWeaponReplica", "Arme/rÃ©plique"],
-                  ["isMedicalSupplement", "SupplÃ©ment/mÃ©dicament"],
-                  ["isUndeclared", "Colis non dÃ©clarÃ©"],
+                  ["isWeaponReplica", "Arme/réplique"],
+                  ["isMedicalSupplement", "Supplément/médicament"],
+                  ["isUndeclared", "Colis non déclaré"],
                   ["isFragile", "Colis fragile"],
                 ].map(([field, label]) => (
                   <label key={field} className="flex items-center gap-2 text-sm">
@@ -1413,7 +1413,7 @@ export default function SourcingIndicatifPage() {
                       setForm((prev) => ({ ...prev, hasImportAuthorization: Boolean(checked) }))
                     }
                   />
-                  <span>Autorisation import (mÃ©dicaments)</span>
+                  <span>Autorisation import (médicaments)</span>
                 </label>
                 <label className="flex items-center gap-2 text-sm">
                   <Checkbox
@@ -1442,7 +1442,7 @@ export default function SourcingIndicatifPage() {
           </CardContent>
         </Card>
 
-        {/* â”€â”€ RIGHT: Results â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {/* ���� RIGHT: Results �������������������������������������������������������������������������������������������� */}
         <div className="space-y-4">
           {!result ? (
             <Card className="h-full">
@@ -1452,13 +1452,13 @@ export default function SourcingIndicatifPage() {
             </Card>
           ) : (
             <>
-              {/* Pricing Rationale â€” internal tool */}
+              {/* Pricing Rationale � internal tool */}
               {result.pricingRationale && (
                 <Card className={`border ${result.pricingRationale.isLocalPlatform ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"}`}>
                   <CardHeader className="pb-2">
                     <CardTitle className="flex items-center gap-2 text-base">
                       <Info className="h-4 w-4" />
-                      Logique de prix appliquÃ©e
+                      Logique de prix appliquée
                       <Badge variant="outline" className="ml-auto text-xs">
                         Usage interne uniquement
                       </Badge>
@@ -1479,11 +1479,11 @@ export default function SourcingIndicatifPage() {
                           {(result.pricingRationale.invisibleMarginPct * 100).toFixed(0)}%
                         </p>
                         <p className="text-muted-foreground">
-                          {result.pricingRationale.isLocalPlatform ? "Pleine" : "RÃ©duite"}
+                          {result.pricingRationale.isLocalPlatform ? "Pleine" : "Réduite"}
                         </p>
                       </div>
                       <div className="rounded-lg border bg-white/80 px-2 py-2">
-                        <p className="text-muted-foreground">Profit brut estimÃ©</p>
+                        <p className="text-muted-foreground">Profit brut estimé</p>
                         <p className="text-lg font-bold text-emerald-700">
                           {result.pricingRationale.profitExpectedPct}%
                         </p>
@@ -1500,7 +1500,7 @@ export default function SourcingIndicatifPage() {
                     {/* Internal margin amount */}
                     <div className="rounded-lg border bg-white/80 px-3 py-2 text-xs">
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">BÃ©nÃ©fice net projetÃ© (si sourcing OK)</span>
+                        <span className="text-muted-foreground">Bénéfice net projeté (si sourcing OK)</span>
                         <span className="font-semibold text-emerald-700">
                           {fmtXaf(result.margin.internalMarginXAF + result.margin.serviceFeeXAF * 0.4)}
                         </span>
@@ -1508,7 +1508,7 @@ export default function SourcingIndicatifPage() {
                       <div className="flex justify-between mt-1">
                         <span className="text-muted-foreground">Marge globale</span>
                         <span className={`font-semibold ${result.margin.marginAlert === "OK" ? "text-emerald-700" : result.margin.marginAlert === "WARNING" ? "text-amber-700" : "text-rose-700"}`}>
-                          {result.margin.marginPct.toFixed(1)}% â€” {result.margin.marginAlertLabel}
+                          {result.margin.marginPct.toFixed(1)}% � {result.margin.marginAlertLabel}
                         </span>
                       </div>
                     </div>
@@ -1518,9 +1518,9 @@ export default function SourcingIndicatifPage() {
 
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle>Lecture logistique sÃ©curisÃ©e</CardTitle>
+                  <CardTitle>Lecture logistique sécurisée</CardTitle>
                   <CardDescription>
-                    Buffers Horion, volumÃ©trique et poids facturable arrondi au supÃ©rieur.
+                    Buffers Horion, volumétrique et poids facturable arrondi au supérieur.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="grid gap-3 md:grid-cols-2">
@@ -1529,11 +1529,11 @@ export default function SourcingIndicatifPage() {
                     <p className="mt-1 text-lg font-semibold">{result.transport.actualWeightKg.toFixed(2)} kg</p>
                   </div>
                   <div className="rounded-lg border p-3">
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Poids sÃ©curisÃ©</p>
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Poids sécurisé</p>
                     <p className="mt-1 text-lg font-semibold">{result.transport.bufferedWeightKg.toFixed(2)} kg</p>
                   </div>
                   <div className="rounded-lg border p-3">
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Poids volumÃ©trique</p>
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Poids volumétrique</p>
                     <p className="mt-1 text-lg font-semibold">
                       {result.transport.bufferedVolumetricWeightKg != null
                         ? `${result.transport.bufferedVolumetricWeightKg.toFixed(2)} kg`
@@ -1546,7 +1546,7 @@ export default function SourcingIndicatifPage() {
                       {result.transport.chargeableWeightKg.toFixed(0)} kg
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Ce poids sert de base Ã  la facturation transitaire.
+                      Ce poids sert de base à la facturation transitaire.
                     </p>
                   </div>
                 </CardContent>
@@ -1555,9 +1555,9 @@ export default function SourcingIndicatifPage() {
               {/* Transport options */}
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle>Options transport et dÃ©lais</CardTitle>
+                  <CardTitle>Options transport et délais</CardTitle>
                   <CardDescription>
-                    La facture client affiche les moyens transport avec coÃ»t et dÃ©lai.
+                    La facture client affiche les moyens transport avec coût et délai.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
@@ -1565,9 +1565,9 @@ export default function SourcingIndicatifPage() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Option</TableHead>
-                        <TableHead>DÃ©lai</TableHead>
-                        <TableHead>CoÃ»t</TableHead>
-                        <TableHead className="w-[110px]">SÃ©lection</TableHead>
+                        <TableHead>Délai</TableHead>
+                        <TableHead>Coût</TableHead>
+                        <TableHead className="w-[110px]">Sélection</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1590,8 +1590,8 @@ export default function SourcingIndicatifPage() {
                                   </p>
                                   {option.freightPartnerName && (
                                     <p className="text-xs text-muted-foreground">
-                                      Base nÃ©gociÃ©e: {option.freightPartnerName}
-                                      {option.incoterm ? ` â€¢ ${option.incoterm}` : ""}
+                                      Base négociée: {option.freightPartnerName}
+                                      {option.incoterm ? ` ⬢ ${option.incoterm}` : ""}
                                     </p>
                                   )}
                                   {option.reason && (
@@ -1626,16 +1626,16 @@ export default function SourcingIndicatifPage() {
               {/* Client-facing summary */}
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle>SynthÃ¨se client (visible)</CardTitle>
+                  <CardTitle>Synthèse client (visible)</CardTitle>
                   <CardDescription>
-                    Marge interne masquÃ©e. Frais service (10%) s{"'"}appliquent au produit uniquement.
+                    Marge interne masquée. Frais service (10%) s{"'"}appliquent au produit uniquement.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {lineItems.length > 0 && (
                     <div className="rounded-lg border p-3">
                       <p className="text-sm font-medium mb-2">
-                        Produits ajoutÃ©s au devis ({lineItems.length})
+                        Produits ajoutés au devis ({lineItems.length})
                       </p>
                       <div className="space-y-2">
                         {lineItems.map((item, idx) => (
@@ -1644,16 +1644,16 @@ export default function SourcingIndicatifPage() {
                               <div>
                                 <p className="font-medium text-sm">{item.description}</p>
                                 <p className="text-muted-foreground">
-                                  {item.category} â€¢ x{item.quantity} â€¢{" "}
+                                  {item.category} ⬢ x{item.quantity} ⬢{" "}
                                   {item.selectedTransport.label} ({item.selectedTransport.delayLabel})
                                   {item.riskLevel && (
-                                    <span className="ml-1">â€¢ risque {item.riskLevel}</span>
+                                    <span className="ml-1">⬢ risque {item.riskLevel}</span>
                                   )}
                                 </p>
                                 {item.productBufferPct !== undefined && (
                                   <p className="text-muted-foreground">
-                                    Buffer {(item.productBufferPct * 100).toFixed(0)}% Â·
-                                    Marge {item.invisibleMarginPct != null ? `${(item.invisibleMarginPct * 100).toFixed(0)}%` : "â€”"}
+                                    Buffer {(item.productBufferPct * 100).toFixed(0)}% ·
+                                    Marge {item.invisibleMarginPct != null ? `${(item.invisibleMarginPct * 100).toFixed(0)}%` : "�"}
                                   </p>
                                 )}
                               </div>
@@ -1697,16 +1697,16 @@ export default function SourcingIndicatifPage() {
                         {fmtXaf(quoteTotals.totalXAF)}
                       </div>
                       <p className="text-xs text-emerald-700">
-                        Soit {fmtXaf(quoteTotals.quantity > 0 ? quoteTotals.totalXAF / quoteTotals.quantity : 0)} / unitÃ©
+                        Soit {fmtXaf(quoteTotals.quantity > 0 ? quoteTotals.totalXAF / quoteTotals.quantity : 0)} / unité
                       </p>
                     </div>
                   </div>
 
                   <div className="rounded-lg border p-3 text-sm">
-                    <p className="font-medium mb-1">RÃ¨gle DDP</p>
+                    <p className="font-medium mb-1">Règle DDP</p>
                     <p className="text-muted-foreground">
-                      Douane standard non facturÃ©e dans l{"'"}estimation indicatif.
-                      Cas spÃ©ciaux de dÃ©douanement exceptionnel restent Ã  la charge du propriÃ©taire.
+                      Douane standard non facturée dans l{"'"}estimation indicatif.
+                      Cas spéciaux de dédouanement exceptionnel restent à la charge du propriétaire.
                     </p>
                   </div>
 
@@ -1748,7 +1748,7 @@ export default function SourcingIndicatifPage() {
                           variant="outline"
                           onClick={async () => {
                             await navigator.clipboard.writeText(landingUrl);
-                            toast.success("Lien copiÃ©.");
+                            toast.success("Lien copié.");
                           }}
                         >
                           <Link2 className="h-4 w-4" />

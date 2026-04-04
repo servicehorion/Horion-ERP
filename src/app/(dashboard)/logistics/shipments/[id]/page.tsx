@@ -384,12 +384,12 @@ export default async function ShipmentDetailPage({ params }: { params: { id: str
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Route className="h-4 w-4" />
-              Timeline tracking
+              Suivi de trajet
             </CardTitle>
           </CardHeader>
           <CardContent>
             {projection.trackingEvents.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Aucun evenement tracking enregistre.</p>
+              <p className="text-sm text-muted-foreground">Aucun événement de tracking enregistré.</p>
             ) : (
               <div className="space-y-3">
                 {projection.trackingEvents.map((event) => (
@@ -438,20 +438,20 @@ export default async function ShipmentDetailPage({ params }: { params: { id: str
                     <div key={task.id} className="rounded-lg border p-3">
                       <p className="font-medium">{task.title}</p>
                       <p className="text-xs text-muted-foreground">
-                        {task.status} · due {formatDate(task.dueDate || task.slaDeadline)}
+                        {task.status} · échéance {formatDate(task.dueDate || task.slaDeadline)}
                       </p>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-muted-foreground">Aucune tache shipment active.</p>
+                <p className="text-muted-foreground">Aucune tâche d'expédition active.</p>
               )}
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle>Incidents & couts</CardTitle>
+              <CardTitle>Incidents &amp; coûts</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
               <p className="text-muted-foreground">

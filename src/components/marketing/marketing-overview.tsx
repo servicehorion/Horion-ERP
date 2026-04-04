@@ -15,20 +15,20 @@ import type {
   MarketingStats, ContentPostItem, CampaignItem, BrandSettings,
 } from "@/lib/actions/marketing.actions";
 
-// â”€â”€ Config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ���� Config ������������������������������������������������������������������������������������������������������������������������������������
 
 const PLATFORM_CONFIG: Record<string, { label: string; emoji: string; color: string; bg: string }> = {
-  FACEBOOK:  { label: "Facebook",  emoji: "ðŸ“˜", color: "text-blue-600",   bg: "surface-info"   },
-  INSTAGRAM: { label: "Instagram", emoji: "ðŸ“·", color: "text-pink-600",   bg: "bg-pink-50 dark:bg-pink-950/30"   },
-  LINKEDIN:  { label: "LinkedIn",  emoji: "ðŸ’¼", color: "text-indigo-600", bg: "bg-indigo-50 dark:bg-indigo-950/30" },
-  TIKTOK:    { label: "TikTok",    emoji: "ðŸŽµ", color: "text-slate-700",  bg: "bg-slate-50 dark:bg-slate-800/30"  },
-  EMAIL:     { label: "Email",     emoji: "ðŸ“§", color: "text-gray-600",   bg: "bg-gray-50 dark:bg-gray-800/30"    },
-  WHATSAPP:  { label: "WhatsApp",  emoji: "ðŸ’¬", color: "text-green-600",  bg: "surface-success"  },
+  FACEBOOK:  { label: "Facebook",  emoji: "�x�", color: "text-blue-600",   bg: "surface-info"   },
+  INSTAGRAM: { label: "Instagram", emoji: "�x�", color: "text-pink-600",   bg: "bg-pink-50 dark:bg-pink-950/30"   },
+  LINKEDIN:  { label: "LinkedIn",  emoji: "�x�", color: "text-indigo-600", bg: "bg-indigo-50 dark:bg-indigo-950/30" },
+  TIKTOK:    { label: "TikTok",    emoji: "�x}�", color: "text-slate-700",  bg: "bg-slate-50 dark:bg-slate-800/30"  },
+  EMAIL:     { label: "Email",     emoji: "�x�", color: "text-gray-600",   bg: "bg-gray-50 dark:bg-gray-800/30"    },
+  WHATSAPP:  { label: "WhatsApp",  emoji: "�x�", color: "text-green-600",  bg: "surface-success"  },
 };
 
 const WEEKLY_GOAL = 3; // posts per week target
 
-// â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ���� Helpers ������������������������������������������������������������������������������������������������������������������������������������
 
 function computeBrandHealth(stats: MarketingStats, posts: ContentPostItem[], campaigns: CampaignItem[]) {
   const sevenDaysAgo = Date.now() - 7 * 24 * 3600 * 1000;
@@ -37,9 +37,9 @@ function computeBrandHealth(stats: MarketingStats, posts: ContentPostItem[], cam
   const active      = campaigns.filter((c) => c.status === "active").length;
 
   const scores = [
-    { label: "PrÃ©sence",    score: Math.min(30, stats.publishedPosts * 3), max: 30, color: "bg-blue-400"   },
-    { label: "RÃ©gularitÃ©",  score: Math.min(20, recentPosts * 4),          max: 20, color: "bg-green-400"  },
-    { label: "DiversitÃ©",   score: Math.min(20, platforms * 5),            max: 20, color: "bg-purple-400" },
+    { label: "Présence",    score: Math.min(30, stats.publishedPosts * 3), max: 30, color: "bg-blue-400"   },
+    { label: "Régularité",  score: Math.min(20, recentPosts * 4),          max: 20, color: "bg-green-400"  },
+    { label: "Diversité",   score: Math.min(20, platforms * 5),            max: 20, color: "bg-purple-400" },
     { label: "Campagnes",   score: Math.min(15, active * 8),               max: 15, color: "bg-orange-400" },
     { label: "Distribution",score: Math.min(15, stats.activeChannels * 3), max: 15, color: "bg-pink-400"   },
   ];
@@ -61,7 +61,7 @@ function buildUrgentActions(posts: ContentPostItem[], campaigns: CampaignItem[])
   const actions: { label: string; severity: "error" | "warning"; count: number }[] = [];
 
   const review = posts.filter((p) => p.status === "review").length;
-  if (review > 0) actions.push({ label: `${review} post${review > 1 ? "s" : ""} en attente de rÃ©vision`, severity: "warning", count: review });
+  if (review > 0) actions.push({ label: `${review} post${review > 1 ? "s" : ""} en attente de révision`, severity: "warning", count: review });
 
   const expiring = campaigns.filter((c) => {
     if (c.status !== "active" || !c.endDate) return false;
@@ -70,27 +70,27 @@ function buildUrgentActions(posts: ContentPostItem[], campaigns: CampaignItem[])
   if (expiring > 0) actions.push({ label: `${expiring} campagne${expiring > 1 ? "s" : ""} expire dans 3 jours`, severity: "error", count: expiring });
 
   const overdue = posts.filter((p) => p.status === "scheduled" && p.scheduledAt && p.scheduledAt.getTime() < now).length;
-  if (overdue > 0) actions.push({ label: `${overdue} post${overdue > 1 ? "s" : ""} planifiÃ©${overdue > 1 ? "s" : ""} dÃ©passÃ©${overdue > 1 ? "s" : ""}`, severity: "error", count: overdue });
+  if (overdue > 0) actions.push({ label: `${overdue} post${overdue > 1 ? "s" : ""} planifié${overdue > 1 ? "s" : ""} dépassé${overdue > 1 ? "s" : ""}`, severity: "error", count: overdue });
 
   const lowScore = posts.filter((p) => p.status === "draft" && computeContentScore(p) < 50).length;
-  if (lowScore > 0) actions.push({ label: `${lowScore} brouillon${lowScore > 1 ? "s" : ""} avec score qualitÃ© < 50`, severity: "warning", count: lowScore });
+  if (lowScore > 0) actions.push({ label: `${lowScore} brouillon${lowScore > 1 ? "s" : ""} avec score qualité < 50`, severity: "warning", count: lowScore });
 
   return actions.slice(0, 4);
 }
 
 function buildRecommendations(stats: MarketingStats, posts: ContentPostItem[], campaigns: CampaignItem[]) {
   const recs: { icon: string; text: string; priority: "high" | "medium" | "low" }[] = [];
-  if (stats.publishedPosts === 0)          recs.push({ icon: "ðŸš€", text: "Publiez votre premier contenu pour lancer votre prÃ©sence digitale.", priority: "high" });
-  else if (stats.publishedPosts < 5)       recs.push({ icon: "ðŸ“ˆ", text: "Augmentez la cadence â€” visez 3 posts/semaine minimum.", priority: "high" });
-  if (stats.activeCampaigns === 0)         recs.push({ icon: "ðŸŽ¯", text: "Lancez une campagne de notoriÃ©tÃ© pour booster votre visibilitÃ©.", priority: "high" });
-  if (stats.draftPosts > 3)               recs.push({ icon: "âœï¸", text: `${stats.draftPosts} brouillons en attente â€” planifiez-les pour maintenir le rythme.`, priority: "medium" });
+  if (stats.publishedPosts === 0)          recs.push({ icon: "�xa�", text: "Publiez votre premier contenu pour lancer votre présence digitale.", priority: "high" });
+  else if (stats.publishedPosts < 5)       recs.push({ icon: "�x�", text: "Augmentez la cadence � visez 3 posts/semaine minimum.", priority: "high" });
+  if (stats.activeCampaigns === 0)         recs.push({ icon: "�x}�", text: "Lancez une campagne de notoriété pour booster votre visibilité.", priority: "high" });
+  if (stats.draftPosts > 3)               recs.push({ icon: "�S�️", text: `${stats.draftPosts} brouillons en attente � planifiez-les pour maintenir le rythme.`, priority: "medium" });
   const formats = new Set(posts.filter((p) => p.status === "published").map((p) => p.format));
-  if (formats.size < 3)                    recs.push({ icon: "ðŸŒ", text: "Diversifiez les canaux â€” LinkedIn + Instagram essentiels en B2B logistique.", priority: "medium" });
-  if (stats.activeChannels < 3)            recs.push({ icon: "ðŸ“¡", text: "Connectez plus de canaux pour maximiser la distribution.", priority: "medium" });
-  if (posts.some((p) => p.status === "review")) recs.push({ icon: "ðŸ‘ï¸", text: "Des posts attendent une rÃ©vision avant publication.", priority: "high" });
-  recs.push({ icon: "ðŸ¤–", text: "Studio IA â€” gÃ©nÃ©rez du contenu adaptÃ© Ã  chaque plateforme en 1 clic.", priority: "low" });
-  recs.push({ icon: "ðŸ“Š", text: "Identifiez vos formats les plus performants dans l'onglet Analytics.", priority: "low" });
-  recs.push({ icon: "ðŸ—“ï¸", text: "Planifiez 2 semaines Ã  l'avance dans le Calendrier Ã‰ditorial.", priority: "low" });
+  if (formats.size < 3)                    recs.push({ icon: "�xR�", text: "Diversifiez les canaux � LinkedIn + Instagram essentiels en B2B logistique.", priority: "medium" });
+  if (stats.activeChannels < 3)            recs.push({ icon: "�x�", text: "Connectez plus de canaux pour maximiser la distribution.", priority: "medium" });
+  if (posts.some((p) => p.status === "review")) recs.push({ icon: "�x�️", text: "Des posts attendent une révision avant publication.", priority: "high" });
+  recs.push({ icon: "�x�", text: "Studio IA � générez du contenu adapté à chaque plateforme en 1 clic.", priority: "low" });
+  recs.push({ icon: "�x`", text: "Identifiez vos formats les plus performants dans l'onglet Analytics.", priority: "low" });
+  recs.push({ icon: "�x️", text: "Planifiez 2 semaines à l'avance dans le Calendrier �0ditorial.", priority: "low" });
   return recs.slice(0, 5);
 }
 
@@ -107,10 +107,10 @@ function getActivityFeed(posts: ContentPostItem[], campaigns: CampaignItem[]) {
   for (const p of posts.slice(0, 10)) {
     const label = p.title ?? p.body?.slice(0, 40) ?? "Post sans titre";
     const cfg = PLATFORM_CONFIG[p.format];
-    events.push({ time: p.createdAt, icon: cfg?.emoji ?? "ðŸ“„", label: `Post ${p.status === "published" ? "publiÃ©" : "crÃ©Ã©"} â€” ${label}`, type: p.status });
+    events.push({ time: p.createdAt, icon: cfg?.emoji ?? "�x", label: `Post ${p.status === "published" ? "publié" : "créé"} � ${label}`, type: p.status });
   }
   for (const c of campaigns.slice(0, 5)) {
-    events.push({ time: c.createdAt, icon: "ðŸŽ¯", label: `Campagne crÃ©Ã©e â€” ${c.name}`, type: "campaign" });
+    events.push({ time: c.createdAt, icon: "�x}�", label: `Campagne créée � ${c.name}`, type: "campaign" });
   }
   return events.sort((a, b) => b.time.getTime() - a.time.getTime()).slice(0, 6);
 }
@@ -126,7 +126,7 @@ function getPlatformPulse(posts: ContentPostItem[]) {
   });
 }
 
-// â”€â”€ Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ���� Component ����������������������������������������������������������������������������������������������������������������������������
 
 interface Props {
   stats: MarketingStats;
@@ -155,11 +155,11 @@ export function MarketingOverview({ stats, posts, campaigns, brandSettings }: Pr
     : 0;
 
   const scoreColor    = health.score >= 70 ? "text-green-400" : health.score >= 40 ? "text-yellow-400" : "text-red-400";
-  const scoreLabel    = health.score >= 70 ? "Excellente" : health.score >= 40 ? "En progression" : "Ã€ renforcer";
+  const scoreLabel    = health.score >= 70 ? "Excellente" : health.score >= 40 ? "En progression" : "ì renforcer";
 
   return (
     <div className="space-y-5 pt-4">
-      {/* â”€â”€ Mission Control Bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ���� Mission Control Bar �������������������������������������������������������������������������������� */}
       <div className="flex items-center justify-between flex-wrap gap-2 rounded-xl border bg-gradient-to-r from-slate-900 to-slate-800 px-5 py-3 text-white">
         <div className="flex items-center gap-3">
           <span className="flex items-center gap-1.5 text-xs font-semibold text-red-400">
@@ -167,7 +167,7 @@ export function MarketingOverview({ stats, posts, campaigns, brandSettings }: Pr
             LIVE
           </span>
           <span className="text-slate-400 text-xs">|</span>
-          <span className="text-sm font-bold text-white">{brandSettings.name} â€” Marketing OS</span>
+          <span className="text-sm font-bold text-white">{brandSettings.name} � Marketing OS</span>
           <span className="text-slate-400 text-xs">|</span>
           <span className="text-xs text-slate-400">
             {new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
@@ -176,7 +176,7 @@ export function MarketingOverview({ stats, posts, campaigns, brandSettings }: Pr
         <div className="flex items-center gap-4 text-xs text-slate-300">
           <span className="flex items-center gap-1.5">
             <CheckCircle2 className="h-3.5 w-3.5 text-green-400" />
-            {stats.publishedPosts} publiÃ©s
+            {stats.publishedPosts} publiés
           </span>
           <span className="flex items-center gap-1.5">
             <Megaphone className="h-3.5 w-3.5 text-purple-400" />
@@ -193,13 +193,13 @@ export function MarketingOverview({ stats, posts, campaigns, brandSettings }: Pr
         </div>
       </div>
 
-      {/* â”€â”€ KPI Chips â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ���� KPI Chips ������������������������������������������������������������������������������������������������������ */}
       <div className="flex flex-wrap gap-2">
         {[
-          { icon: <CheckCircle2 className="h-4 w-4 text-green-600" />, value: stats.publishedPosts, label: "PubliÃ©s",      color: "bg-green-50 border-green-200 dark:bg-green-950/20"  },
-          { icon: <Clock className="h-4 w-4 text-blue-600" />,         value: stats.scheduledPosts, label: "PlanifiÃ©s",    color: "bg-blue-50 border-blue-200 dark:bg-blue-950/20"     },
+          { icon: <CheckCircle2 className="h-4 w-4 text-green-600" />, value: stats.publishedPosts, label: "Publiés",      color: "bg-green-50 border-green-200 dark:bg-green-950/20"  },
+          { icon: <Clock className="h-4 w-4 text-blue-600" />,         value: stats.scheduledPosts, label: "Planifiés",    color: "bg-blue-50 border-blue-200 dark:bg-blue-950/20"     },
           { icon: <FileText className="h-4 w-4 text-gray-500" />,      value: stats.draftPosts,     label: "Brouillons",   color: "bg-gray-50 border-gray-200 dark:bg-gray-950/20"     },
-          { icon: <Eye className="h-4 w-4 text-yellow-600" />,         value: reviewCount,          label: "En rÃ©vision",  color: "bg-yellow-50 border-yellow-200 dark:bg-yellow-950/20" },
+          { icon: <Eye className="h-4 w-4 text-yellow-600" />,         value: reviewCount,          label: "En révision",  color: "bg-yellow-50 border-yellow-200 dark:bg-yellow-950/20" },
           { icon: <Megaphone className="h-4 w-4 text-purple-600" />,   value: stats.activeCampaigns,label: "Campagnes",    color: "bg-purple-50 border-purple-200 dark:bg-purple-950/20"},
           { icon: <BarChart3 className="h-4 w-4 text-indigo-600" />,   value: `${avgScore}/100`,    label: "Score moyen",  color: "bg-indigo-50 border-indigo-200 dark:bg-indigo-950/20"},
         ].map((kpi) => (
@@ -211,10 +211,10 @@ export function MarketingOverview({ stats, posts, campaigns, brandSettings }: Pr
         ))}
       </div>
 
-      {/* â”€â”€ Main Grid â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ���� Main Grid ������������������������������������������������������������������������������������������������������ */}
       <div className="grid gap-5 lg:grid-cols-3">
 
-        {/* Col 1 â€” Weekly Goal + Alerts + Upcoming */}
+        {/* Col 1 � Weekly Goal + Alerts + Upcoming */}
         <div className="space-y-4">
 
           {/* Weekly Publishing Goal */}
@@ -235,7 +235,7 @@ export function MarketingOverview({ stats, posts, campaigns, brandSettings }: Pr
               <div className="space-y-2">
                 <Progress value={goalPct} className="h-3" />
                 <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>{goalPct >= 100 ? "ðŸŽ‰ Objectif atteint !" : `${WEEKLY_GOAL - thisWeekPosts} post${WEEKLY_GOAL - thisWeekPosts > 1 ? "s" : ""} restant${WEEKLY_GOAL - thisWeekPosts > 1 ? "s" : ""}`}</span>
+                  <span>{goalPct >= 100 ? "�x}0 Objectif atteint !" : `${WEEKLY_GOAL - thisWeekPosts} post${WEEKLY_GOAL - thisWeekPosts > 1 ? "s" : ""} restant${WEEKLY_GOAL - thisWeekPosts > 1 ? "s" : ""}`}</span>
                   <span>{goalPct}%</span>
                 </div>
               </div>
@@ -293,16 +293,16 @@ export function MarketingOverview({ stats, posts, campaigns, brandSettings }: Pr
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-sm font-semibold">
                 <CalendarClock className="h-4 w-4 text-blue-500" />
-                Publications Ã  venir (7j)
+                Publications à venir (7j)
               </CardTitle>
             </CardHeader>
             <CardContent>
               {upcoming.length === 0 ? (
-                <p className="text-xs text-muted-foreground py-1">Aucune publication planifiÃ©e</p>
+                <p className="text-xs text-muted-foreground py-1">Aucune publication planifiée</p>
               ) : (
                 <div className="space-y-2.5">
                   {upcoming.map((post) => {
-                    const p = PLATFORM_CONFIG[post.format] ?? { emoji: "ðŸ“„" };
+                    const p = PLATFORM_CONFIG[post.format] ?? { emoji: "�x" };
                     return (
                       <div key={post.id} className="flex items-start gap-2 text-xs">
                         <span className="text-base leading-none mt-0.5">{p.emoji}</span>
@@ -319,7 +319,7 @@ export function MarketingOverview({ stats, posts, campaigns, brandSettings }: Pr
           </Card>
         </div>
 
-        {/* Col 2 â€” Brand Health + Platform Pulse */}
+        {/* Col 2 � Brand Health + Platform Pulse */}
         <div className="space-y-4">
           {/* Brand Health Score */}
           <div className="rounded-xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-5 text-white shadow-lg">
@@ -372,7 +372,7 @@ export function MarketingOverview({ stats, posts, campaigns, brandSettings }: Pr
                     </div>
                     <p className={`text-xs font-semibold ${p.color}`}>{p.label}</p>
                     <p className="text-xs text-muted-foreground">
-                      {p.recent > 0 ? `+${p.recent} cette sem.` : p.total > 0 ? `${p.published} publiÃ©s` : "Inactif"}
+                      {p.recent > 0 ? `+${p.recent} cette sem.` : p.total > 0 ? `${p.published} publiés` : "Inactif"}
                     </p>
                   </div>
                 ))}
@@ -390,9 +390,9 @@ export function MarketingOverview({ stats, posts, campaigns, brandSettings }: Pr
             </CardHeader>
             <CardContent className="space-y-2.5">
               {[
-                { label: "PubliÃ©s",    value: stats.publishedPosts, color: "bg-green-500"  },
-                { label: "PlanifiÃ©s",  value: stats.scheduledPosts, color: "bg-blue-500"   },
-                { label: "RÃ©vision",   value: reviewCount,          color: "bg-yellow-500" },
+                { label: "Publiés",    value: stats.publishedPosts, color: "bg-green-500"  },
+                { label: "Planifiés",  value: stats.scheduledPosts, color: "bg-blue-500"   },
+                { label: "Révision",   value: reviewCount,          color: "bg-yellow-500" },
                 { label: "Brouillons", value: stats.draftPosts,     color: "bg-gray-400"   },
               ].map((item) => (
                 <div key={item.label} className="space-y-1">
@@ -409,7 +409,7 @@ export function MarketingOverview({ stats, posts, campaigns, brandSettings }: Pr
           </Card>
         </div>
 
-        {/* Col 3 â€” AI Recommendations + Activity Feed */}
+        {/* Col 3 � AI Recommendations + Activity Feed */}
         <div className="space-y-4">
           {/* AI Recommendations */}
           <Card className="border-purple-200 bg-gradient-to-br from-purple-50/80 to-indigo-50/80 dark:from-purple-950/30 dark:to-indigo-950/30">
@@ -439,12 +439,12 @@ export function MarketingOverview({ stats, posts, campaigns, brandSettings }: Pr
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-sm font-semibold">
                 <RefreshCw className="h-4 w-4 text-blue-500" />
-                ActivitÃ© rÃ©cente
+                Activité récente
               </CardTitle>
             </CardHeader>
             <CardContent>
               {feed.length === 0 ? (
-                <p className="text-xs text-muted-foreground">Aucune activitÃ© enregistrÃ©e</p>
+                <p className="text-xs text-muted-foreground">Aucune activité enregistrée</p>
               ) : (
                 <div className="space-y-0">
                   {feed.map((event, i) => (
@@ -469,7 +469,7 @@ export function MarketingOverview({ stats, posts, campaigns, brandSettings }: Pr
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-sm font-semibold">
                 <Target className="h-4 w-4 text-indigo-500" />
-                IdentitÃ© de marque
+                Identité de marque
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -495,7 +495,7 @@ export function MarketingOverview({ stats, posts, campaigns, brandSettings }: Pr
         </div>
       </div>
 
-      {/* â”€â”€ Active Campaigns Strip â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ���� Active Campaigns Strip ������������������������������������������������������������������������������ */}
       {active.length > 0 && (
         <Card>
           <CardHeader className="pb-3">

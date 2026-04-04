@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, Plus, Trash2 } from "lucide-react";
@@ -88,7 +88,7 @@ export function OrderForm({
         return;
       }
 
-      toast.success(mode === "edit" ? "Commande mise Ã  jour" : "Commande crÃ©Ã©e avec succÃ¨s");
+      toast.success(mode === "edit" ? "Commande mise à jour" : "Commande créée avec succès");
       const targetId = mode === "edit" ? orderId : result.data?.id;
       if (targetId) {
         router.push(`/orders/${targetId}`);
@@ -116,7 +116,7 @@ export function OrderForm({
                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                   <FormControl>
                     <SelectTrigger>
-                      <SelectValue placeholder="SÃ©lectionner un client" />
+                      <SelectValue placeholder="Sélectionner un client" />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
@@ -137,7 +137,7 @@ export function OrderForm({
             name="priority"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>PrioritÃ©</FormLabel>
+                <FormLabel>Priorité</FormLabel>
                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                   <FormControl>
                     <SelectTrigger>
@@ -190,7 +190,7 @@ export function OrderForm({
             name="logisticsCost"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Coût logistique</FormLabel>
+                <FormLabel>Co�t logistique</FormLabel>
                 <FormControl>
                   <Input
                     type="number"
@@ -293,7 +293,7 @@ export function OrderForm({
                   name={`items.${index}.quantity`}
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>QuantitÃ©</FormLabel>
+                      <FormLabel>Quantité</FormLabel>
                       <FormControl>
                         <Input
                           {...field}
@@ -382,7 +382,7 @@ export function OrderForm({
               <FormControl>
                 <Textarea
                   {...field}
-                  placeholder="Informations supplÃ©mentaires..."
+                  placeholder="Informations supplémentaires..."
                   rows={4}
                 />
               </FormControl>
@@ -402,7 +402,7 @@ export function OrderForm({
           </Button>
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {mode === "edit" ? "Mettre Ã  jour" : "CrÃ©er la commande"}
+            {mode === "edit" ? "Mettre à jour" : "Créer la commande"}
           </Button>
         </div>
       </form>

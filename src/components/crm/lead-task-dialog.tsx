@@ -48,7 +48,7 @@ export function LeadTaskDialog({
         toast.error(res.error);
         return;
       }
-      toast.success("Tache creee");
+      toast.success("Tâche créée");
       setOpen(false);
       setDescription("");
     });

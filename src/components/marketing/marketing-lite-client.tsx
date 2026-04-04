@@ -60,15 +60,15 @@ const CAMPAIGN_STATUS_LABELS: Record<string, { label: string; className: string 
   draft: { label: "Brouillon", className: "bg-slate-100 text-slate-700" },
   active: { label: "Active", className: "bg-emerald-100 text-emerald-700" },
   paused: { label: "En pause", className: "bg-amber-100 text-amber-700" },
-  completed: { label: "Terminee", className: "bg-blue-100 text-blue-700" },
+  completed: { label: "Terminée", className: "bg-blue-100 text-blue-700" },
 };
 
 const EMAIL_STATUS_LABELS: Record<string, { label: string; className: string }> = {
   DRAFT: { label: "Brouillon", className: "bg-slate-100 text-slate-700" },
-  SCHEDULED: { label: "Planifiee", className: "bg-blue-100 text-blue-700" },
+  SCHEDULED: { label: "Planifiée", className: "bg-blue-100 text-blue-700" },
   SENDING: { label: "En envoi", className: "bg-amber-100 text-amber-700" },
-  SENT: { label: "Envoyee", className: "bg-emerald-100 text-emerald-700" },
-  CANCELLED: { label: "Annulee", className: "bg-rose-100 text-rose-700" },
+  SENT: { label: "Envoyée", className: "bg-emerald-100 text-emerald-700" },
+  CANCELLED: { label: "Annulée", className: "bg-rose-100 text-rose-700" },
 };
 
 function formatMoney(value: number) {
@@ -379,7 +379,7 @@ function QuickBroadcastDialog({
         return;
       }
 
-      toast.success("Campagne Lite creee.");
+      toast.success("Campagne Lite créée.");
       onCreated(response.data);
       setOpen(false);
       reset();
@@ -650,7 +650,7 @@ function QuickEmailDialog({
         return;
       }
 
-      toast.success("Campagne email creee.");
+      toast.success("Campagne email créée.");
       onCreated(response.data);
       setOpen(false);
       reset();

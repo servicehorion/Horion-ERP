@@ -95,7 +95,7 @@ export function PipelineIntentDialog({
         return;
       }
 
-      toast.success("Intention ajoutÃ©e");
+      toast.success("Intention ajoutée");
       setOpen(false);
       form.reset();
       router.refresh();
@@ -143,9 +143,9 @@ export function PipelineIntentDialog({
                 name="productCategory"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>CatÃ©gorie</FormLabel>
+                    <FormLabel>Catégorie</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="Ex: Ã‰nergie" />
+                      <Input {...field} placeholder="Ex: �0nergie" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -156,7 +156,7 @@ export function PipelineIntentDialog({
                 name="estimatedOrderDate"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Date estimÃ©e</FormLabel>
+                    <FormLabel>Date estimée</FormLabel>
                     <FormControl>
                       <Input {...field} type="date" />
                     </FormControl>
@@ -169,7 +169,7 @@ export function PipelineIntentDialog({
                 name="estimatedSize"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Montant estimÃ©</FormLabel>
+                    <FormLabel>Montant estimé</FormLabel>
                     <FormControl>
                       <Input
                         type="number"
@@ -201,7 +201,7 @@ export function PipelineIntentDialog({
                       <SelectContent>
                         {Object.values(CURRENCIES).map((c) => (
                           <SelectItem key={c.code} value={c.code}>
-                            {c.code} â€” {c.name}
+                            {c.code} � {c.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -215,7 +215,7 @@ export function PipelineIntentDialog({
                 name="probability"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>ProbabilitÃ© (%)</FormLabel>
+                    <FormLabel>Probabilité (%)</FormLabel>
                     <FormControl>
                       <Input
                         type="number"

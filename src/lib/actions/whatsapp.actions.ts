@@ -1316,3 +1316,114 @@ export async function getContactActiveOrders(
   }
 }
 
+// ── Execute WhatsApp Broadcast Campaign ──────────────────────────────────────
+
+export async function executeBroadcast(campaignId: string, messageBody: string) {
+  try {
+    const user = await getSession();
+    checkPermission(user.role, "whatsapp.broadcast");
+
+    const prismaAny = prisma as any;
+    if (!prismaAny.whatsappCampaign) return { error: "Module campagnes non disponible" };
+
+    const campaign = await prismaAny.whatsappCampaign.findFirst({
+      where: { id: campaignId, tenantId: user.tenantId },
+    });
+    if (!campaign) return { error: "Campagne introuvable" };
+    if (campaign.status === "SENT") return { error: "Campagne déjà envoyée" };
+
+    // Fetch pending sends
+    const sends = prismaAny.whatsappCampaignSend
+      ? await prismaAny.whatsappCampaignSend.findMany({
+          where: { campaignId, status: "PENDING" },
+          include: {
+            waContact: {
+              include: {
+                conversations: {
+                  where: { tenantId: user.tenantId, status: "OPEN" },
+                  orderBy: { updatedAt: "desc" as const },
+                  take: 1,
+                  include: { account: true },
+                },
+              },
+            },
+          },
+        })
+      : [];
+
+    let sent = 0;
+    let failed = 0;
+
+    for (const send of sends) {
+      try {
+        const waContact = send.waContact;
+        if (!waContact?.phone) { failed++; continue; }
+
+        let conversationId: string | undefined = waContact.conversations?.[0]?.id;
+
+        // If no open conversation, look up any conversation or skip
+        if (!conversationId) {
+          const existing = await prisma.whatsappConversation.findFirst({
+            where: { waContactId: waContact.id, tenantId: user.tenantId },
+            orderBy: { updatedAt: "desc" },
+            select: { id: true },
+          });
+          conversationId = existing?.id;
+        }
+
+        if (!conversationId) {
+          // No conversation — attempt direct WAHA send without conversation record
+          const wahaBase = process.env.WAHA_BASE_URL;
+          const wahaKey = process.env.WAHA_API_KEY;
+          if (wahaBase) {
+            const phone = waContact.phone.replace(/\D/g, "");
+            await fetch(`${wahaBase}/api/sendText`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                ...(wahaKey ? { "X-Api-Key": wahaKey } : {}),
+              },
+              body: JSON.stringify({ chatId: `${phone}@c.us`, text: messageBody, session: "default" }),
+            });
+          }
+          sent++;
+        } else {
+          await WhatsappMessageService.sendText({
+            tenantId: user.tenantId,
+            conversationId,
+            body: messageBody,
+          });
+          sent++;
+        }
+
+        // Mark send as SENT
+        if (prismaAny.whatsappCampaignSend) {
+          await prismaAny.whatsappCampaignSend.update({
+            where: { id: send.id },
+            data: { status: "SENT", sentAt: new Date() },
+          });
+        }
+      } catch {
+        failed++;
+        if (prismaAny.whatsappCampaignSend) {
+          await prismaAny.whatsappCampaignSend.update({
+            where: { id: send.id },
+            data: { status: "FAILED" },
+          }).catch(() => null);
+        }
+      }
+    }
+
+    // Update campaign status
+    await prismaAny.whatsappCampaign.update({
+      where: { id: campaignId },
+      data: { status: "SENT", sentAt: new Date() },
+    });
+
+    revalidatePath("/whatsapp");
+    return { data: { sent, failed, total: sends.length } };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Erreur exécution broadcast" };
+  }
+}
+

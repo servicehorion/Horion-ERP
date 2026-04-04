@@ -25,7 +25,7 @@ export function ExportProductsButton() {
     a.download = `catalogue-produits-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success("Export catalogue telecharge");
+    toast.success("Export catalogue téléchargé");
   }
 
   return (

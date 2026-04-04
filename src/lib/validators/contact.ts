@@ -13,6 +13,7 @@ export const createContactSchema = z.object({
   tags: z.array(z.string()).default([]),
   ownerId: z.string().optional(),
   collaboratorIds: z.array(z.string()).default([]),
+  customFields: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const updateContactSchema = z.object({
@@ -28,6 +29,7 @@ export const updateContactSchema = z.object({
   tags: z.array(z.string()).optional(),
   ownerId: z.string().optional().nullable(),
   collaboratorIds: z.array(z.string()).optional(),
+  customFields: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const createLeadSchema = z.object({

@@ -95,7 +95,7 @@ export function TaskTableClient({ tasks, teamMembers }: TaskTableClientProps) {
       const res = await bulkAssignTasks(Array.from(selected), userId);
       if (res.error) toast.error(res.error);
       else {
-        toast.success(`${selected.size} tache(s) assignee(s)`);
+        toast.success(`${selected.size} tâche(s) assignée(s)`);
         setSelected(new Set());
         router.refresh();
       }
@@ -120,7 +120,7 @@ export function TaskTableClient({ tasks, teamMembers }: TaskTableClientProps) {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      toast.success("Export CSV telecharge");
+      toast.success("Export CSV téléchargé");
     } catch {
       toast.error("Erreur export");
     } finally {

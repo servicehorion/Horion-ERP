@@ -115,7 +115,7 @@ export function GoalsClient({ goals, members }: GoalsClientProps) {
       toast.error(res.error);
       return;
     }
-    toast.success("Key result ajoute");
+    toast.success("Key result ajouté");
     router.refresh();
   };
 

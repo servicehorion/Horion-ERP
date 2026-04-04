@@ -59,7 +59,7 @@ export function ProofUploadForm({
       <div className="flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4">
         <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" />
         <div>
-          <p className="text-sm font-semibold text-emerald-900">Preuve envoyee</p>
+          <p className="text-sm font-semibold text-emerald-900">Preuve envoyée</p>
           <p className="text-xs text-emerald-700">
             Notre equipe finance va verifier votre preuve sous 24h ouvrees.
           </p>

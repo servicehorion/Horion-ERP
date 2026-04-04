@@ -827,7 +827,7 @@ export function SourcingCatalogOS({ stats, analytics }: Props) {
                     <Button
                       size="sm"
                       className="w-full"
-                      onClick={() => toast.success("Workflow negociation lance")}
+                      onClick={() => toast.success("Workflow de négociation lancé")}
                     >
                       Demarrer negociation
                     </Button>
@@ -865,7 +865,7 @@ export function SourcingCatalogOS({ stats, analytics }: Props) {
                       size="sm"
                       variant="outline"
                       className="w-full"
-                      onClick={() => toast.success("Outreach lance pour top fournisseurs")}
+                      onClick={() => toast.success("Outreach lancé pour les top fournisseurs")}
                     >
                       Envoyer outreach
                     </Button>

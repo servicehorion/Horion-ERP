@@ -16,6 +16,7 @@ export class ContactService {
     ownerId?: string;
     onboardedById?: string;
     collaboratorIds?: string[];
+    customFields?: Record<string, unknown>;
   }) {
     const collaboratorIds = (data.collaboratorIds || []).filter(Boolean);
     return prisma.contact.create({
@@ -33,6 +34,7 @@ export class ContactService {
         tags: data.tags || [],
         ownerId: data.ownerId,
         onboardedById: data.onboardedById,
+        ...(data.customFields ? { customFields: data.customFields as Prisma.InputJsonValue } : {}),
         collaborators: collaboratorIds.length > 0
           ? {
               createMany: {
@@ -68,10 +70,12 @@ export class ContactService {
     tags: string[];
     ownerId: string | null;
     collaboratorIds: string[];
+    customFields: Record<string, unknown>;
   }>) {
-    const { collaboratorIds, ...updateData } = data;
+    const { collaboratorIds, customFields, ...updateData } = data;
     const payload: Prisma.ContactUpdateInput = {
       ...updateData,
+      ...(customFields !== undefined ? { customFields: customFields as Prisma.InputJsonValue } : {}),
     };
 
     if (collaboratorIds !== undefined) {

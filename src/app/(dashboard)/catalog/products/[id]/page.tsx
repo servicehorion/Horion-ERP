@@ -18,6 +18,7 @@ import {
   getProductIntelligence,
 } from "@/lib/actions/catalog.actions";
 import { CatalogProvenancePanel } from "@/components/catalog/catalog-provenance-panel";
+import { ProductMediaUpload } from "@/components/catalog/product-media-upload";
 import { ProductStatusSelect } from "@/components/catalog/product-status-select";
 import { formatCurrency } from "@/config/currencies";
 
@@ -588,26 +589,7 @@ export default async function ProductDetailPage({ params }: { params: { id: stri
           <Card>
             <CardHeader><CardTitle>Médiathèque</CardTitle></CardHeader>
             <CardContent>
-              {p.media.length === 0 ? (
-                <p className="text-center text-muted-foreground py-6">Aucun média associé</p>
-              ) : (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {p.media.map((m: any) => (
-                    <div key={m.id} className="border rounded-lg p-3 space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Image className="h-4 w-4 text-muted-foreground" />
-                        <Badge variant="secondary" className="text-xs">{m.type}</Badge>
-                      </div>
-                      <a href={m.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline truncate block">
-                        {m.filename || "Voir"}
-                      </a>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(m.createdAt).toLocaleDateString("fr-FR")}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <ProductMediaUpload productId={p.id} initialMedia={p.media} />
             </CardContent>
           </Card>
         </TabsContent>

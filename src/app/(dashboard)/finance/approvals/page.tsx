@@ -134,7 +134,7 @@ export default async function FinanceApprovalsPage() {
             <Button className="md:col-span-6 justify-self-start" size="sm" type="submit">Ajouter regle</Button>
           </form>
           {rules.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Aucune regle active. Fallback: validation FINANCE_MANAGER sous 24h.</p>
+            <p className="text-sm text-muted-foreground">Aucune règle active. Fallback : validation FINANCE_MANAGER sous 24h.</p>
           ) : (
             <div className="space-y-2">
               {rules.map((rule) => (

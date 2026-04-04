@@ -52,7 +52,7 @@ export default async function NewLeadPage() {
         </Button>
         <div>
           <h1 className="text-3xl font-bold">Nouveau lead</h1>
-          <p className="text-muted-foreground">Creer un lead dans le CRM</p>
+          <p className="text-muted-foreground">Créer un lead dans le CRM</p>
         </div>
       </div>
 

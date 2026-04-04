@@ -56,7 +56,7 @@ export function OrderAttachments({ orderId, attachments, canEdit }: OrderAttachm
         if (res.error) {
           toast.error(res.error);
         } else {
-          toast.success("Document ajoute");
+          toast.success("Document ajouté");
           setName("");
           setUrl("");
           setType("link");

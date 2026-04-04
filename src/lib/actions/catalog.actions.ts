@@ -370,12 +370,27 @@ export async function createMedia(formData: Record<string, unknown>) {
     const validated = createMediaSchema.parse(formData);
     const media = await CatalogMediaService.create(user.tenantId, validated);
 
+    if (validated.productId) revalidatePath(`/catalog/products/${validated.productId}`);
     revalidatePath("/catalog/vault");
     revalidatePath("/catalog");
     revalidateCatalogCaches(user.tenantId);
     return { data: media };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur lors de l'ajout" };
+  }
+}
+
+export async function deleteMedia(mediaId: string) {
+  try {
+    const user = await getSession();
+    checkPermission(user.role, "catalog.manage");
+    const media = await CatalogMediaService.delete(mediaId);
+    if (media?.productId) revalidatePath(`/catalog/products/${media.productId}`);
+    revalidatePath("/catalog/vault");
+    revalidateCatalogCaches(user.tenantId);
+    return { data: true };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Erreur lors de la suppression" };
   }
 }
 

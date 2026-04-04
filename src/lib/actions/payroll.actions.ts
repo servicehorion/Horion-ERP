@@ -96,7 +96,11 @@ export async function addPayrollLine(formData: FormData) {
     const userId = String(formData.get("userId") || "");
     const baseSalary = toNumber(formData.get("baseSalary"), "Salaire");
     const allowances = Number(formData.get("allowances") || 0);
-    const deductions = Number(formData.get("deductions") || 0);
+    const deductionsRaw = formData.get("deductions");
+    // If deductions field is empty, pass undefined → PayrollService auto-computes CNSS + IRPP
+    const deductions = deductionsRaw && String(deductionsRaw).trim() !== ""
+      ? Number(deductionsRaw)
+      : undefined;
 
     if (!runId || !userId) throw new Error("Champs manquants");
 

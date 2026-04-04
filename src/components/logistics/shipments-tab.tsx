@@ -271,7 +271,7 @@ export function ShipmentsTab({
       });
       if (res.error) toast.error(res.error);
       else {
-        toast.success("Cout ajoute");
+        toast.success("Coût ajouté");
         setCostForm({ type: "", amount: "", currency: "USD", notes: "" });
         router.refresh();
       }
@@ -369,7 +369,7 @@ export function ShipmentsTab({
       }
       const url = res.data.url;
       await navigator.clipboard.writeText(url);
-      toast.success("Lien copie dans le presse-papier");
+      toast.success("Lien copié dans le presse-papier");
     });
   };
 
@@ -863,11 +863,11 @@ export function ShipmentsTab({
                   <div className="space-y-1 rounded-md border p-3">
                     <p className="text-sm font-medium">Responsabilite active</p>
                     <p className="text-sm text-muted-foreground">
-                      Principal: {selectedShipment.workflow?.responsibility?.primaryOwner?.name || "Non defini"}
+                      Principal: {selectedShipment.workflow?.responsibility?.primaryOwner?.name || "Non défini"}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Backup: {selectedShipment.workflow?.responsibility?.backupOwner?.name || "Non defini"} | Manager:{" "}
-                      {selectedShipment.workflow?.responsibility?.managerOwner?.name || "Non defini"}
+                      Backup: {selectedShipment.workflow?.responsibility?.backupOwner?.name || "Non défini"} | Manager:{" "}
+                      {selectedShipment.workflow?.responsibility?.managerOwner?.name || "Non défini"}
                     </p>
                     {selectedShipment.workflow?.responsibility?.assignmentReason ? (
                       <p className="text-xs text-muted-foreground">

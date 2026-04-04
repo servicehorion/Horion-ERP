@@ -1,4 +1,4 @@
-﻿import { formatDate } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { ORDER_STATUS_LABELS } from "@/config/order-statuses";
 
@@ -20,7 +20,7 @@ export function OrderTimeline({ entries }: OrderTimelineProps) {
   if (entries.length === 0) {
     return (
       <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
-        Aucun Ã©vÃ©nement pour le moment
+        Aucun événement pour le moment
       </div>
     );
   }
@@ -74,11 +74,11 @@ function getActionLabel(
   toValue: string | null
 ): string {
   if (event === "order_created") {
-    return "Commande crÃ©Ã©e";
+    return "Commande créée";
   }
 
   if (event === "status_changed" && toValue) {
-    return `Statut changÃ© vers ${getStatusLabel(toValue)}`;
+    return `Statut changé vers ${getStatusLabel(toValue)}`;
   }
 
   return event;

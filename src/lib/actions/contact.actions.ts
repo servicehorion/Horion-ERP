@@ -47,7 +47,7 @@ export async function createContact(formData: Record<string, unknown>) {
         select: { name: true },
       });
       if (duplicate) {
-        return { error: `Doublon : le contact "${duplicate.name}" utilise déjà ce numéro` };
+        return { error: `Doublon : le contact "${duplicate.name}" utilise d�j� ce num�ro` };
       }
     }
 
@@ -64,7 +64,7 @@ export async function createContact(formData: Record<string, unknown>) {
         tenantId: user.tenantId,
         type: "CONTACT_CREATED",
         title: `Nouveau contact: ${contact.name}`,
-        message: `${user.name || user.email} a créé un contact`,
+        message: `${user.name || user.email} a cr�� un contact`,
         entityType: "contact",
         entityId: contact.id,
       }
@@ -84,7 +84,7 @@ export async function createContact(formData: Record<string, unknown>) {
     return { data: contact };
   } catch (error) {
     console.error("Error creating contact:", error);
-    return { error: error instanceof Error ? error.message : "Erreur lors de la création du contact" };
+    return { error: error instanceof Error ? error.message : "Erreur lors de la cr�ation du contact" };
   }
 }
 
@@ -95,7 +95,7 @@ export async function updateContact(contactId: string, formData: Record<string, 
 
     const scope = await getCrmContactScopeWithDelegation(user);
     if (!scope) {
-      return { error: "Accès refusé" };
+      return { error: "Acc�s refus�" };
     }
 
     const existing = await ContactService.getById(contactId, scope);
@@ -122,8 +122,8 @@ export async function updateContact(contactId: string, formData: Record<string, 
       {
         tenantId: user.tenantId,
         type: "CONTACT_UPDATED",
-        title: `Contact mis à jour: ${contact.name}`,
-        message: `${user.name || user.email} a mis à jour le contact`,
+        title: `Contact mis � jour: ${contact.name}`,
+        message: `${user.name || user.email} a mis � jour le contact`,
         entityType: "contact",
         entityId: contactId,
       }
@@ -144,7 +144,7 @@ export async function updateContact(contactId: string, formData: Record<string, 
     return { data: contact };
   } catch (error) {
     console.error("Error updating contact:", error);
-    return { error: error instanceof Error ? error.message : "Erreur lors de la mise à jour" };
+    return { error: error instanceof Error ? error.message : "Erreur lors de la mise � jour" };
   }
 }
 
@@ -155,7 +155,7 @@ export async function deleteContact(contactId: string) {
 
     const scope = await getCrmContactScopeWithDelegation(user);
     if (!scope) {
-      return { error: "Accès refusé" };
+      return { error: "Acc�s refus�" };
     }
 
     const existing = await ContactService.getById(contactId, scope);
@@ -195,7 +195,7 @@ export async function getContacts(options?: {
 
     const scope = await getCrmContactScopeWithDelegation(user);
     if (!scope) {
-      return { error: "Accès refusé" };
+      return { error: "Acc�s refus�" };
     }
     const result = await ContactService.list(user.tenantId, {
       type: options?.type as ContactType | undefined,
@@ -205,7 +205,7 @@ export async function getContacts(options?: {
       scopeWhere: scope,
     });
     return { data: result.contacts };
-  } catch (error) {    return { error: error instanceof Error ? error.message : "Erreur lors de la récupération" };
+  } catch (error) {    return { error: error instanceof Error ? error.message : "Erreur lors de la r�cup�ration" };
   }
 }
 
@@ -216,7 +216,7 @@ export async function getContactById(contactId: string) {
 
     const scope = await getCrmContactScopeWithDelegation(user);
     if (!scope) {
-      return { error: "Accès refusé" };
+      return { error: "Acc�s refus�" };
     }
 
     const contact = await ContactService.getById(contactId, scope);
@@ -226,7 +226,7 @@ export async function getContactById(contactId: string) {
     return { data: contact };
   } catch (error) {
     console.error("Error fetching contact:", error);
-    return { error: error instanceof Error ? error.message : "Erreur lors de la récupération" };
+    return { error: error instanceof Error ? error.message : "Erreur lors de la r�cup�ration" };
   }
 }
 
@@ -236,11 +236,11 @@ export async function getContactTypeCount() {
     checkPermission(user.role, "contact.view");
     const scope = await getCrmContactScopeWithDelegation(user);
     if (!scope) {
-      return { error: "Accès refusé" };
+      return { error: "Acc�s refus�" };
     }
     return { data: await ContactService.getTypeCount(user.tenantId, scope) };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Erreur lors de la récupération" };
+    return { error: error instanceof Error ? error.message : "Erreur lors de la r�cup�ration" };
   }
 }
 
@@ -254,7 +254,7 @@ export async function createLead(formData: Record<string, unknown>) {
     const validated = createLeadSchema.parse(formData);
     const contactScope = await getCrmContactScopeWithDelegation(user);
     if (!contactScope) {
-      return { error: "Accès refusé" };
+      return { error: "Acc�s refus�" };
     }
     const allowedContact = await ContactService.getById(validated.contactId, contactScope);
     if (!allowedContact) {
@@ -280,7 +280,7 @@ export async function createLead(formData: Record<string, unknown>) {
         tenantId: user.tenantId,
         type: "LEAD_CREATED",
         title: `Nouveau lead: ${lead.contact?.name || "Lead"}`,
-        message: `${user.name || user.email} a créé un lead`,
+        message: `${user.name || user.email} a cr�� un lead`,
         entityType: "lead",
         entityId: lead.id,
       }
@@ -291,7 +291,7 @@ export async function createLead(formData: Record<string, unknown>) {
     return { data: lead };
   } catch (error) {
     console.error("Error creating lead:", error);
-    return { error: error instanceof Error ? error.message : "Erreur lors de la création du lead" };
+    return { error: error instanceof Error ? error.message : "Erreur lors de la cr�ation du lead" };
   }
 }
 
@@ -308,7 +308,7 @@ export async function getLeads(options?: {
     checkPermission(user.role, "lead.view");
     const scope = await getCrmLeadScopeWithDelegation(user);
     if (!scope) {
-      return { error: "Accès refusé" };
+      return { error: "Acc�s refus�" };
     }
     const result = await LeadService.list(user.tenantId, {
       status: options?.status as LeadStatus | undefined,
@@ -325,7 +325,7 @@ export async function getLeads(options?: {
       totalPages: result.totalPages,
       page: result.page,
     };
-  } catch (error) {    return { error: error instanceof Error ? error.message : "Erreur lors de la récupération" };
+  } catch (error) {    return { error: error instanceof Error ? error.message : "Erreur lors de la r�cup�ration" };
   }
 }
 
@@ -336,7 +336,7 @@ export async function updateLeadStatus(leadId: string, status: string) {
 
     const scope = await getCrmLeadScopeWithDelegation(user);
     if (!scope) {
-      return { error: "Accès refusé" };
+      return { error: "Acc�s refus�" };
     }
     const existing = await LeadService.getById(leadId, scope);
     if (!existing) {
@@ -366,8 +366,8 @@ export async function updateLeadStatus(leadId: string, status: string) {
       {
         tenantId: user.tenantId,
         type: status === "QUALIFIED" ? "LEAD_CONVERTED" : "LEAD_UPDATED",
-        title: `Lead ${status === "QUALIFIED" ? "converti" : "mis à jour"}: ${lead.contact?.name || "Lead"}`,
-        message: `${user.name || user.email} a mis à jour le statut`,
+        title: `Lead ${status === "QUALIFIED" ? "converti" : "mis � jour"}: ${lead.contact?.name || "Lead"}`,
+        message: `${user.name || user.email} a mis � jour le statut`,
         entityType: "lead",
         entityId: leadId,
       }
@@ -378,7 +378,7 @@ export async function updateLeadStatus(leadId: string, status: string) {
     revalidatePath("/crm");
     return { data: lead };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Erreur lors de la mise à jour" };
+    return { error: error instanceof Error ? error.message : "Erreur lors de la mise � jour" };
   }
 }
 
@@ -389,7 +389,7 @@ export async function validateLead(leadId: string) {
 
     const scope = await getCrmLeadScopeWithDelegation(user);
     if (!scope) {
-      return { error: "Accès refusé" };
+      return { error: "Acc�s refus�" };
     }
     const existing = await LeadService.getById(leadId, scope);
     if (!existing) {
@@ -445,7 +445,7 @@ export async function getLeadById(leadId: string) {
     checkPermission(user.role, "lead.view");
     const scope = await getCrmLeadScopeWithDelegation(user);
     if (!scope) {
-      return { error: "Accès refusé" };
+      return { error: "Acc�s refus�" };
     }
     const lead = await LeadService.getById(leadId, scope);
     if (!lead) {
@@ -454,7 +454,7 @@ export async function getLeadById(leadId: string) {
     return { data: lead };
   } catch (error) {
     console.error("Error fetching lead:", error);
-    return { error: error instanceof Error ? error.message : "Erreur lors de la récupération" };
+    return { error: error instanceof Error ? error.message : "Erreur lors de la r�cup�ration" };
   }
 }
 
@@ -465,7 +465,7 @@ export async function updateLead(leadId: string, data: Record<string, unknown>) 
 
     const scope = await getCrmLeadScopeWithDelegation(user);
     if (!scope) {
-      return { error: "Accès refusé" };
+      return { error: "Acc�s refus�" };
     }
     const existing = await LeadService.getById(leadId, scope);
     if (!existing) {
@@ -505,8 +505,8 @@ export async function updateLead(leadId: string, data: Record<string, unknown>) 
       {
         tenantId: user.tenantId,
         type: assignedChanged ? "LEAD_ASSIGNED" : "LEAD_UPDATED",
-        title: `${assignedChanged ? "Lead assigné" : "Lead mis à jour"}: ${lead.contact?.name || "Lead"}`,
-        message: `${user.name || user.email} a modifié le lead`,
+        title: `${assignedChanged ? "Lead assign�" : "Lead mis � jour"}: ${lead.contact?.name || "Lead"}`,
+        message: `${user.name || user.email} a modifi� le lead`,
         entityType: "lead",
         entityId: leadId,
       }
@@ -517,7 +517,7 @@ export async function updateLead(leadId: string, data: Record<string, unknown>) 
     return { data: lead };
   } catch (error) {
     console.error("Error updating lead:", error);
-    return { error: error instanceof Error ? error.message : "Erreur lors de la mise à jour" };
+    return { error: error instanceof Error ? error.message : "Erreur lors de la mise � jour" };
   }
 }
 
@@ -561,11 +561,11 @@ export async function getLeadPipeline() {
     checkPermission(user.role, "lead.view");
     const scope = await getCrmLeadScopeWithDelegation(user);
     if (!scope) {
-      return { error: "Accès refusé" };
+      return { error: "Acc�s refus�" };
     }
     return { data: await LeadService.getPipelineStats(user.tenantId, scope) };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Erreur lors de la récupération" };
+    return { error: error instanceof Error ? error.message : "Erreur lors de la r�cup�ration" };
   }
 }
 
@@ -573,11 +573,11 @@ export async function exportContactsCSV() {
   try {
     const user = await getSession();
     if (!canExportCrm(user.role)) {
-      return { error: "Accès refusé" };
+      return { error: "Acc�s refus�" };
     }
     const scope = await getCrmContactScopeWithDelegation(user);
     if (!scope) {
-      return { error: "Accès refusé" };
+      return { error: "Acc�s refus�" };
     }
     const result = await ContactService.list(user.tenantId, { limit: 10000, scopeWhere: scope });
     const contacts = result.contacts;
@@ -596,7 +596,7 @@ export async function exportContactsCSV() {
       "Nom",
       "Type",
       "Entreprise",
-      "Téléphone",
+      "T�l�phone",
       "Email",
       "WhatsApp",
       "Ville",
@@ -604,7 +604,7 @@ export async function exportContactsCSV() {
       "Score de confiance",
       "Commandes",
       "Leads",
-      "Créé le",
+      "Cr�� le",
     ];
 
     const rows = contacts.map((c) => [
@@ -772,7 +772,7 @@ export async function sendEmailToContact(
 
     const scope = await getCrmContactScopeWithDelegation(user);
     if (!scope) {
-      return { error: "AccÃ¨s refusÃ©" };
+      return { error: "Accès refusé" };
     }
 
     const contact = await ContactService.getById(contactId, scope);
@@ -866,7 +866,7 @@ export async function getContactTimeline(contactId: string, limit = 100) {
     checkPermission(user.role, "contact.view");
     const scope = await getCrmContactScopeWithDelegation(user);
     if (!scope) {
-      return { error: "Accès refusé" };
+      return { error: "Acc�s refus�" };
     }
     const contact = await ContactService.getById(contactId, scope);
     if (!contact) {
@@ -1000,7 +1000,7 @@ export async function getContactTimeline(contactId: string, limit = 100) {
         id: `order:${t.id}`,
         type: "order",
         title: `Commande ${t.order.orderNumber}`,
-        description: `${t.event}${t.fromValue || t.toValue ? ` (${t.fromValue || "-"} → ${t.toValue || "-"})` : ""}${t.note ? ` — ${t.note}` : ""}`,
+        description: `${t.event}${t.fromValue || t.toValue ? ` (${t.fromValue || "-"} � ${t.toValue || "-"})` : ""}${t.note ? `  ${t.note}` : ""}`,
         date: t.createdAt,
         link: `/orders/${t.orderId}`,
       })),
@@ -1008,7 +1008,7 @@ export async function getContactTimeline(contactId: string, limit = 100) {
         id: `payment:${p.id}`,
         type: "payment",
         title: `Paiement ${p.status}`,
-        description: `${p.direction} — ${p.amount} ${p.currency} — Cmd ${p.order.orderNumber}`,
+        description: `${p.direction}  ${p.amount} ${p.currency}  Cmd ${p.order.orderNumber}`,
         date: p.createdAt,
         link: `/orders/${p.orderId}`,
       })),
@@ -1016,7 +1016,7 @@ export async function getContactTimeline(contactId: string, limit = 100) {
         id: `dispute:${d.id}`,
         type: "dispute",
         title: `Litige ${d.type}`,
-        description: `${d.status} — Cmd ${d.order.orderNumber}`,
+        description: `${d.status}  Cmd ${d.order.orderNumber}`,
         date: d.createdAt,
         link: `/orders/${d.orderId}`,
       })),
@@ -1088,7 +1088,7 @@ export async function getContactTimeline(contactId: string, limit = 100) {
         id: `task:${t.id}`,
         type: "task",
         title: t.title,
-        description: `Statut : ${t.status}${t.slaDeadline ? ` · Échéance SLA : ${t.slaDeadline.toLocaleDateString("fr-FR")}` : ""}`,
+        description: `Statut : ${t.status}${t.slaDeadline ? ` � �ch�ance SLA : ${t.slaDeadline.toLocaleDateString("fr-FR")}` : ""}`,
         date: t.createdAt,
         link: `/tasks?entity=${t.entityType}:${t.entityId}`,
       })),
@@ -1120,7 +1120,7 @@ export async function deleteContacts(ids: string[]) {
     const user = await getSession();
     checkPermission(user.role, "contact.manage");
 
-    if (!ids.length) return { error: "Aucun contact sélectionné" };
+    if (!ids.length) return { error: "Aucun contact s�lectionn�" };
 
     const { count } = await prisma.contact.deleteMany({
       where: { id: { in: ids }, tenantId: user.tenantId },
@@ -1201,7 +1201,7 @@ export async function importContacts(rows: Record<string, string>[]) {
   }
 }
 
-// ─── Lead Archive / Delete Actions ──────────────────────────────────────────
+//     Lead Archive / Delete Actions                                           
 
 export async function archiveLead(leadId: string): Promise<{ success?: boolean; error?: string }> {
   try {
@@ -1209,7 +1209,7 @@ export async function archiveLead(leadId: string): Promise<{ success?: boolean; 
     checkPermission(user.role, "lead.manage");
     const scope = await getCrmLeadScopeWithDelegation(user);
     const existing = await LeadService.getById(leadId, scope ?? undefined);
-    if (!existing) return { error: "Lead introuvable ou accès refusé" };
+    if (!existing) return { error: "Lead introuvable ou acc�s refus�" };
 
     await LeadService.archive(leadId);
     await AuditService.log({
@@ -1254,7 +1254,7 @@ export async function deleteLead(leadId: string): Promise<{ success?: boolean; e
     checkPermission(user.role, "lead.manage");
     const scope = await getCrmLeadScopeWithDelegation(user);
     const existing = await LeadService.getById(leadId, scope ?? undefined);
-    if (!existing) return { error: "Lead introuvable ou accès refusé" };
+    if (!existing) return { error: "Lead introuvable ou acc�s refus�" };
 
     await LeadService.deleteLead(leadId);
     await AuditService.log({
@@ -1323,7 +1323,7 @@ export async function bulkArchiveLeads(ids: string[]): Promise<{ archived?: numb
   }
 }
 
-// ─── Contact Merge / Deduplication ──────────────────────────────────────────
+//     Contact Merge / Deduplication                                           
 
 export async function findDuplicateContacts(contactId: string) {
   try {
@@ -1382,7 +1382,7 @@ export async function mergeContacts(
 
     if (!keep || !merge) return { error: "Un des contacts est introuvable" };
     if (keep.tenantId !== user.tenantId || merge.tenantId !== user.tenantId)
-      return { error: "Accès refusé" };
+      return { error: "Acc�s refus�" };
 
     // Merge tags (union without duplicates)
     const keepTags = Array.isArray(keep.tags) ? (keep.tags as string[]) : [];

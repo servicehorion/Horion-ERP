@@ -76,7 +76,7 @@ function ProofCard({ payment, mode }: { payment: Payment; mode: "review" | "wait
       if (res?.error) {
         toast.error(res.error);
       } else {
-        toast.success("Paiement valide - commande lancee.");
+        toast.success("Paiement validé — commande lancée.");
         setDone(true);
       }
     });
@@ -211,7 +211,7 @@ export function ProofReviewList({ payments }: { payments: Payment[] }) {
   if (payments.length === 0) {
     return (
       <EmptyState
-        title="Aucune preuve a verifier"
+        title="Aucune preuve à vérifier"
         description="Les preuves de paiement envoyees par les clients apparaitront ici."
       />
     );

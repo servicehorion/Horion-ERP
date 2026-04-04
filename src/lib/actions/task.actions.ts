@@ -1,5 +1,4 @@
-﻿"use server";
-
+"use server";
 import { getSession } from "@/lib/session";
 import { TaskService } from "@/lib/services/task.service";
 import { TaskIntelligenceService } from "@/lib/services/task-intelligence.service";
@@ -187,8 +186,8 @@ export async function getTaskById(taskId: string) {
         parent: { select: { id: true, title: true } },
       },
     });
-    if (!task || task.tenantId !== user.tenantId) return { error: "TÃ¢che introuvable" };
-    if (!canAccessTaskModule(user.role, task.module)) return { error: "AccÃ¨s refusÃ©" };
+    if (!task || task.tenantId !== user.tenantId) return { error: "Tâche introuvable" };
+    if (!canAccessTaskModule(user.role, task.module)) return { error: "Accès refusé" };
     return { data: task };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur" };
@@ -208,7 +207,7 @@ export async function getTaskActivity(taskId: string) {
       },
       select: { id: true },
     });
-    if (!task) return { error: "TÃƒÂ¢che introuvable" };
+    if (!task) return { error: "TÒ¢che introuvable" };
     // Combine AuditLog + TaskComment for unified activity
     const [auditLogs, comments] = await Promise.all([
       prisma.auditLog.findMany({
@@ -273,8 +272,8 @@ export async function updateTaskStatus(taskId: string, newStatus: string) {
     checkPermission(user.role, "task.update");
 
     const existing = await prisma.task.findUnique({ where: { id: taskId } });
-    if (!existing || existing.tenantId !== user.tenantId) return { error: "TÃ¢che introuvable" };
-    if (!canAccessTaskModule(user.role, existing.module)) return { error: "AccÃ¨s refusÃ©" };
+    if (!existing || existing.tenantId !== user.tenantId) return { error: "Tâche introuvable" };
+    if (!canAccessTaskModule(user.role, existing.module)) return { error: "Accès refusé" };
 
     let task;
     if (newStatus === "COMPLETED") {
@@ -319,8 +318,8 @@ export async function assignTask(taskId: string, userId: string) {
     checkPermission(user.role, "task.assign");
 
     const task = await prisma.task.findUnique({ where: { id: taskId } });
-    if (!task || task.tenantId !== user.tenantId) return { error: "Tâche introuvable" };
-    if (!canAccessTaskModule(user.role, task.module)) return { error: "Accès refusé" };
+    if (!task || task.tenantId !== user.tenantId) return { error: "T�che introuvable" };
+    if (!canAccessTaskModule(user.role, task.module)) return { error: "Acc�s refus�" };
 
     const assignee = await prisma.user.findUnique({
       where: { id: userId },
@@ -328,7 +327,7 @@ export async function assignTask(taskId: string, userId: string) {
     });
     if (!assignee || assignee.tenantId !== user.tenantId) return { error: "Utilisateur introuvable" };
     if (!canAccessTaskModule(assignee.role, task.module)) {
-      return { error: "Assignation impossible: rôle non autorisé" };
+      return { error: "Assignation impossible: r�le non autoris�" };
     }
 
     const assignment = await TaskService.assignTask(taskId, userId);
@@ -424,7 +423,7 @@ export async function createManualTask(formData: {
     revalidateTask();
     return { data: task };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Erreur crÃ©ation" };
+    return { error: error instanceof Error ? error.message : "Erreur création" };
   }
 }
 
@@ -461,7 +460,7 @@ export async function addTaskComment(taskId: string, content: string, mentions: 
         {
           tenantId: user.tenantId,
           type: "MENTION",
-          title: `${user.name} vous a mentionnÃ©`,
+          title: `${user.name} vous a mentionné`,
           message: content.slice(0, 200),
           entityType: "task",
           entityId: taskId,
@@ -486,8 +485,8 @@ export async function approveTask(taskId: string, decision: string, comment?: st
     checkPermission(user.role, "task.update");
 
     const task = await prisma.task.findUnique({ where: { id: taskId } });
-    if (!task || task.tenantId !== user.tenantId) return { error: "TÃ¢che introuvable" };
-    if (!canAccessTaskModule(user.role, task.module)) return { error: "Accès refusé" };
+    if (!task || task.tenantId !== user.tenantId) return { error: "Tâche introuvable" };
+    if (!canAccessTaskModule(user.role, task.module)) return { error: "Acc�s refus�" };
 
     if (decision === "APPROVED") {
       const readiness = await TaskWorkflowService.getTaskWorkflowSnapshot(taskId);
@@ -515,7 +514,7 @@ export async function approveTask(taskId: string, decision: string, comment?: st
     await NotificationService.notifyTaskWatchers(taskId, {
       tenantId: user.tenantId,
       type: "APPROVAL_DECIDED",
-      title: `TÃ¢che ${decision.toLowerCase()}: ${task.title}`,
+      title: `Tâche ${decision.toLowerCase()}: ${task.title}`,
       message: comment,
     }, user.id);
 
@@ -550,10 +549,10 @@ export async function createSubtask(parentTaskId: string, data: {
     checkPermission(user.role, "task.update");
 
     const parent = await prisma.task.findUnique({ where: { id: parentTaskId } });
-    if (!parent || parent.tenantId !== user.tenantId) return { error: "TÃ¢che parent introuvable" };
-    if (!canAccessTaskModule(user.role, parent.module)) return { error: "AccÃ¨s refusÃ©" };
+    if (!parent || parent.tenantId !== user.tenantId) return { error: "Tâche parent introuvable" };
+    if (!canAccessTaskModule(user.role, parent.module)) return { error: "Accès refusé" };
     const targetModule = data.module ?? parent.module;
-    if (!canAccessTaskModule(user.role, targetModule)) return { error: "Accès refusé" };
+    if (!canAccessTaskModule(user.role, targetModule)) return { error: "Acc�s refus�" };
 
     if (data.assigneeId) {
       const assignee = await prisma.user.findUnique({
@@ -562,7 +561,7 @@ export async function createSubtask(parentTaskId: string, data: {
       });
       if (!assignee || assignee.tenantId !== user.tenantId) return { error: "Utilisateur introuvable" };
       if (!canAccessTaskModule(assignee.role, targetModule)) {
-        return { error: "Assignation impossible: rôle non autorisé" };
+        return { error: "Assignation impossible: r�le non autoris�" };
       }
     }
 
@@ -598,8 +597,8 @@ export async function getSubtaskProgress(parentTaskId: string) {
       where: { id: parentTaskId },
       select: { tenantId: true, module: true },
     });
-    if (!parent || parent.tenantId !== user.tenantId) return { error: "Tâche introuvable" };
-    if (!canAccessTaskModule(user.role, parent.module)) return { error: "Accès refusé" };
+    if (!parent || parent.tenantId !== user.tenantId) return { error: "T�che introuvable" };
+    if (!canAccessTaskModule(user.role, parent.module)) return { error: "Acc�s refus�" };
     return { data: await SubtaskService.getProgress(parentTaskId) };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur" };
@@ -616,7 +615,7 @@ export async function addTaskDependency(taskId: string, dependsOnId: string, typ
     checkPermission(user.role, "task.update");
 
     const task = await prisma.task.findUnique({ where: { id: taskId } });
-    if (!task || task.tenantId !== user.tenantId) return { error: "TÃ¢che introuvable" };
+    if (!task || task.tenantId !== user.tenantId) return { error: "Tâche introuvable" };
 
     const dep = await TaskDependencyService.addDependency(
       taskId, dependsOnId, (type as DependencyType) ?? "BLOCKS"
@@ -641,8 +640,8 @@ export async function removeTaskDependency(taskId: string, dependsOnId: string) 
     checkPermission(user.role, "task.update");
 
     const task = await prisma.task.findUnique({ where: { id: taskId } });
-    if (!task || task.tenantId !== user.tenantId) return { error: "TÃ¢che introuvable" };
-    if (!canAccessTaskModule(user.role, task.module)) return { error: "AccÃ¨s refusÃ©" };
+    if (!task || task.tenantId !== user.tenantId) return { error: "Tâche introuvable" };
+    if (!canAccessTaskModule(user.role, task.module)) return { error: "Accès refusé" };
 
     await TaskDependencyService.removeDependency(taskId, dependsOnId);
 
@@ -662,8 +661,8 @@ export async function watchTask(taskId: string) {
     const user = await getSession();
     checkPermission(user.role, "task.view");
     const task = await prisma.task.findUnique({ where: { id: taskId } });
-    if (!task || task.tenantId !== user.tenantId) return { error: "TÃ¢che introuvable" };
-    if (!canAccessTaskModule(user.role, task.module)) return { error: "AccÃ¨s refusÃ©" };
+    if (!task || task.tenantId !== user.tenantId) return { error: "Tâche introuvable" };
+    if (!canAccessTaskModule(user.role, task.module)) return { error: "Accès refusé" };
     await prisma.taskWatcher.upsert({
       where: { taskId_userId: { taskId, userId: user.id } },
       update: {},
@@ -681,8 +680,8 @@ export async function unwatchTask(taskId: string) {
     const user = await getSession();
     checkPermission(user.role, "task.view");
     const task = await prisma.task.findUnique({ where: { id: taskId } });
-    if (!task || task.tenantId !== user.tenantId) return { error: "TÃ¢che introuvable" };
-    if (!canAccessTaskModule(user.role, task.module)) return { error: "AccÃ¨s refusÃ©" };
+    if (!task || task.tenantId !== user.tenantId) return { error: "Tâche introuvable" };
+    if (!canAccessTaskModule(user.role, task.module)) return { error: "Accès refusé" };
     await prisma.taskWatcher.deleteMany({ where: { taskId, userId: user.id } });
     revalidatePath(`/tasks/${taskId}`);
     return { data: true };
@@ -730,7 +729,7 @@ export async function createTaskTemplate(formData: {
   try {
     const user = await getSession();
     checkPermission(user.role, "task.update");
-    if (!canAccessTaskModule(user.role, formData.module)) return { error: "Accès refusé" };
+    if (!canAccessTaskModule(user.role, formData.module)) return { error: "Acc�s refus�" };
 
     const template = await TaskTemplateService.createTemplate({
       tenantId: user.tenantId,
@@ -761,8 +760,8 @@ export async function instantiateTemplate(templateId: string, vars?: Record<stri
     checkPermission(user.role, "task.update");
 
     const template = await TaskTemplateService.getTemplate(templateId);
-    if (!template || template.tenantId !== user.tenantId) return { error: "Modèle introuvable" };
-    if (!canAccessTaskModule(user.role, template.module)) return { error: "Accès refusé" };
+    if (!template || template.tenantId !== user.tenantId) return { error: "Mod�le introuvable" };
+    if (!canAccessTaskModule(user.role, template.module)) return { error: "Acc�s refus�" };
 
     const result = await TaskTemplateService.instantiate(templateId, {
       tenantId: user.tenantId,
@@ -782,7 +781,7 @@ export async function duplicateTaskTemplate(templateId: string) {
     checkPermission(user.role, "task.update");
 
     const original = await TaskTemplateService.getTemplate(templateId);
-    if (!original || original.tenantId !== user.tenantId) return { error: "Modèle introuvable" };
+    if (!original || original.tenantId !== user.tenantId) return { error: "Mod�le introuvable" };
 
     const copy = await prisma.taskTemplate.create({
       data: {
@@ -1001,7 +1000,7 @@ export async function updateTask(taskId: string, data: {
     checkPermission(user.role, "task.update");
 
     const task = await prisma.task.findUnique({ where: { id: taskId } });
-    if (!task || task.tenantId !== user.tenantId) return { error: "TÃ¢che introuvable" };
+    if (!task || task.tenantId !== user.tenantId) return { error: "Tâche introuvable" };
 
     const updated = await prisma.task.update({
       where: { id: taskId },
@@ -1037,7 +1036,7 @@ export async function deleteTask(taskId: string) {
     checkPermission(user.role, "task.update");
 
     const task = await prisma.task.findUnique({ where: { id: taskId } });
-    if (!task || task.tenantId !== user.tenantId) return { error: "TÃ¢che introuvable" };
+    if (!task || task.tenantId !== user.tenantId) return { error: "Tâche introuvable" };
 
     // Delete child relations first
     await prisma.$transaction([
@@ -1087,8 +1086,8 @@ export async function duplicateTask(taskId: string) {
         },
       },
     });
-    if (!task || task.tenantId !== user.tenantId) return { error: "TÃ¢che introuvable" };
-    if (!canAccessTaskModule(user.role, task.module)) return { error: "AccÃ¨s refusÃ©" };
+    if (!task || task.tenantId !== user.tenantId) return { error: "Tâche introuvable" };
+    if (!canAccessTaskModule(user.role, task.module)) return { error: "Accès refusé" };
 
     const parseWorkflowRequirements = (customFields: unknown) => {
       if (!customFields || typeof customFields !== "object" || Array.isArray(customFields)) return undefined;
@@ -1240,7 +1239,7 @@ export async function logTaskTime(taskId: string, hours: number, note?: string) 
     checkPermission(user.role, "task.update");
 
     const task = await prisma.task.findUnique({ where: { id: taskId } });
-    if (!task || task.tenantId !== user.tenantId) return { error: "TÃ¢che introuvable" };
+    if (!task || task.tenantId !== user.tenantId) return { error: "Tâche introuvable" };
 
     const newActual = (task.actualHours ?? 0) + hours;
     await prisma.task.update({
@@ -1452,7 +1451,7 @@ export async function exportTasksData(format: "csv") {
     checkPermission(user.role, "task.view");
     const allowedModules = getTaskAllowedModules(user.role);
     if (allowedModules !== "*" && allowedModules.length === 0) {
-      return { error: "Accès refusé" };
+      return { error: "Acc�s refus�" };
     }
     const tasks = await prisma.task.findMany({
       where: {
@@ -1468,7 +1467,7 @@ export async function exportTasksData(format: "csv") {
     });
 
     if (format === "csv") {
-      const headers = "ID,Titre,Module,Statut,PrioritÃ©,AssignÃ©,SLA,CrÃ©Ã©,ComplÃ©tÃ©";
+      const headers = "ID,Titre,Module,Statut,Priorité,Assigné,SLA,Créé,Complété";
       const rows = tasks.map((t) =>
         [
           t.id,
@@ -1485,7 +1484,7 @@ export async function exportTasksData(format: "csv") {
       return { data: [headers, ...rows].join("\n") };
     }
 
-    return { error: "Format non supportÃ©" };
+    return { error: "Format non supporté" };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Erreur" };
   }
@@ -1500,8 +1499,8 @@ export async function getTaskAttachments(taskId: string) {
     const user = await getSession();
     checkPermission(user.role, "task.view");
     const task = await prisma.task.findUnique({ where: { id: taskId }, select: { tenantId: true, module: true } });
-    if (!task || task.tenantId !== user.tenantId) return { error: "TÃ¢che introuvable" };
-    if (!canAccessTaskModule(user.role, task.module)) return { error: "AccÃ¨s refusÃ©" };
+    if (!task || task.tenantId !== user.tenantId) return { error: "Tâche introuvable" };
+    if (!canAccessTaskModule(user.role, task.module)) return { error: "Accès refusé" };
 
     const attachments = await prisma.taskAttachment.findMany({
       where: { taskId },
@@ -1523,8 +1522,8 @@ export async function addTaskAttachment(taskId: string, data: {
     const user = await getSession();
     checkPermission(user.role, "task.update");
     const task = await prisma.task.findUnique({ where: { id: taskId }, select: { tenantId: true, title: true, module: true } });
-    if (!task || task.tenantId !== user.tenantId) return { error: "TÃ¢che introuvable" };
-    if (!canAccessTaskModule(user.role, task.module)) return { error: "AccÃ¨s refusÃ©" };
+    if (!task || task.tenantId !== user.tenantId) return { error: "Tâche introuvable" };
+    if (!canAccessTaskModule(user.role, task.module)) return { error: "Accès refusé" };
 
     if (!data.name.trim() || !data.url.trim()) return { error: "Nom et URL requis" };
 
@@ -1545,8 +1544,8 @@ export async function addTaskAttachment(taskId: string, data: {
       {
         tenantId: user.tenantId,
         type: "ATTACHMENT_ADDED",
-        title: `PiÃ¨ce jointe ajoutÃ©e: ${task.title}`,
-        message: `${user.name} a ajoutÃ© "${data.name}"`,
+        title: `Pièce jointe ajoutée: ${task.title}`,
+        message: `${user.name} a ajouté "${data.name}"`,
       },
       user.id
     );
@@ -1572,8 +1571,8 @@ export async function removeTaskAttachment(attachmentId: string) {
       where: { id: attachmentId },
       include: { task: { select: { tenantId: true, module: true } } },
     });
-    if (!attachment || attachment.task.tenantId !== user.tenantId) return { error: "PiÃ¨ce jointe introuvable" };
-    if (!canAccessTaskModule(user.role, attachment.task.module)) return { error: "AccÃ¨s refusÃ©" };
+    if (!attachment || attachment.task.tenantId !== user.tenantId) return { error: "Pièce jointe introuvable" };
+    if (!canAccessTaskModule(user.role, attachment.task.module)) return { error: "Accès refusé" };
 
     await prisma.taskAttachment.delete({ where: { id: attachmentId } });
 

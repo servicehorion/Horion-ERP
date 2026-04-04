@@ -298,6 +298,15 @@ export async function updateShipmentStatus(shipmentId: string, status: string) {
 
     await LogisticsGovernanceService.assertShipmentTransition(shipmentId, status as any);
 
+    // Fetch order contact for WhatsApp notification
+    const orderWithContact = await prisma.order.findUnique({
+      where: { id: shipment.order.id },
+      select: {
+        orderNumber: true,
+        contact: { select: { name: true, whatsapp: true, phone: true } },
+      },
+    });
+
     const updated = await prisma.shipment.update({
       where: { id: shipmentId },
       data: { status: status as any },
@@ -307,11 +316,45 @@ export async function updateShipmentStatus(shipmentId: string, status: string) {
     await NotificationService.notifyMany(teamIds, {
       tenantId: user.tenantId,
       type: "SHIPMENT_UPDATED",
-      title: "Expedition mise a jour",
-      message: `Statut expedition: ${status}`,
+      title: "Expédition mise à jour",
+      message: `Statut expédition : ${status}`,
       entityType: "shipment",
       entityId: shipmentId,
     });
+
+    // WhatsApp notification au client
+    const contactPhone = orderWithContact?.contact?.whatsapp || orderWithContact?.contact?.phone;
+    const orderNumber = orderWithContact?.orderNumber ?? shipmentId.slice(0, 8);
+    const clientName = orderWithContact?.contact?.name ?? "Client";
+    if (contactPhone) {
+      const STATUS_LABELS: Record<string, string> = {
+        PENDING: "En attente",
+        CONFIRMED: "Confirmé",
+        IN_TRANSIT: "En transit",
+        AT_CUSTOMS: "En douane",
+        DELIVERED: "Livré",
+        CANCELLED: "Annulé",
+      };
+      const statusLabel = STATUS_LABELS[status] ?? status;
+      const wahaBase = process.env.WAHA_BASE_URL;
+      const wahaKey = process.env.WAHA_API_KEY;
+      const phone = contactPhone.replace(/\D/g, "");
+      const message = `Bonjour ${clientName} ! 📦 Votre commande *${orderNumber}* vient d'être mise à jour.\n\nStatut expédition : *${statusLabel}*\n\nMerci de votre confiance — Équipe Horion.`;
+      if (wahaBase && phone) {
+        try {
+          await fetch(`${wahaBase}/api/sendText`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(wahaKey ? { "X-Api-Key": wahaKey } : {}),
+            },
+            body: JSON.stringify({ chatId: `${phone}@c.us`, text: message, session: "default" }),
+          });
+        } catch {
+          // Non-blocking — WhatsApp failure should not block status update
+        }
+      }
+    }
 
     await notifyShipmentSlaIfNeeded({
       shipment: updated,

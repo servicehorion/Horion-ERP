@@ -24,7 +24,7 @@ export function VatExportButton({ reportId }: { reportId: string }) {
     a.download = `vat-report-${reportId}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success("Export TVA telecharge");
+    toast.success("Export TVA téléchargé");
   }
 
   return (

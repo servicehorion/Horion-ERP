@@ -297,6 +297,19 @@ export default async function ContactDetailPage({ params }: Props) {
                     {contact.city}, {contact.country}
                   </div>
                 )}
+                {/* Identifiants fiscaux Congo */}
+                {((contact as any).customFields as any)?.rccm && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">RCCM :</span> {((contact as any).customFields as any).rccm}
+                  </div>
+                )}
+                {((contact as any).customFields as any)?.nif && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">NIF :</span> {((contact as any).customFields as any).nif}
+                  </div>
+                )}
                 {ownerName && (
                   <div className="flex items-center gap-2 text-sm">
                     <User className="h-4 w-4 text-muted-foreground" />

@@ -44,7 +44,7 @@ import {
 import { StatusBadge, PriorityBadge } from "@/components/shared/status-badge";
 import { CurrencyDisplay } from "@/components/shared/currency-display";
 import { OrderTimeline } from "./order-timeline";
-import { updateOrderStatus, duplicateOrder, archiveOrder, restoreOrder, deleteOrder, calculateMargin } from "@/lib/actions/order.actions";
+import { updateOrderStatus, duplicateOrder, archiveOrder, restoreOrder, deleteOrder, calculateMargin, generatePurchaseOrderPdf } from "@/lib/actions/order.actions";
 import { ORDER_STATUS_LABELS, ORDER_STATUS_TRANSITIONS } from "@/config/order-statuses";
 import { formatDate } from "@/lib/utils";
 import { Loader2, CheckCircle2, AlertCircle, XCircle } from "lucide-react";
@@ -387,6 +387,7 @@ export function OrderDetail({
   const [isPortalLink, setIsPortalLink] = useState(false);
   const [isEdiSend, setIsEdiSend] = useState(false);
   const [isClosingDelivery, setIsClosingDelivery] = useState(false);
+  const [isGeneratingPO, setIsGeneratingPO] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState(order.status);
   const [pendingBlockedStatus, setPendingBlockedStatus] = useState<string | null>(null);
   const allowedStatuses = buildAllowedStatuses(order.status);
@@ -569,6 +570,27 @@ export function OrderDetail({
     }
   }
 
+  async function handleGeneratePO() {
+    setIsGeneratingPO(true);
+    try {
+      const res = await generatePurchaseOrderPdf(order.id);
+      if (res.error) { toast.error(res.error); return; }
+      const bytes = Uint8Array.from(atob(res.data!), (c) => c.charCodeAt(0));
+      const blob = new Blob([bytes], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = res.filename || `BC-${order.orderNumber}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Bon de commande généré");
+    } catch {
+      toast.error("Erreur génération BC");
+    } finally {
+      setIsGeneratingPO(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -582,6 +604,10 @@ export function OrderDetail({
         <div className="flex flex-wrap items-center gap-2">
           <StatusBadge status={order.status} />
           <PriorityBadge priority={order.priority} />
+          <Button variant="outline" size="sm" onClick={handleGeneratePO} disabled={isGeneratingPO}>
+            {isGeneratingPO && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            BC Fournisseur PDF
+          </Button>
           {canEdit && (
             <Button variant="outline" size="sm" asChild>
               <Link href={`/orders/${order.id}/edit`}>Modifier</Link>

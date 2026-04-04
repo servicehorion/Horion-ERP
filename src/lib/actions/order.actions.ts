@@ -1,4 +1,4 @@
-﻿"use server";
+"use server";
 
 import { getSession } from "@/lib/session";
 import { OrderService } from "@/lib/services/order.service";
@@ -15,6 +15,7 @@ import { Prisma, type OrderStatus } from "@prisma/client";
 import * as orderLogisticsActions from "./order-logistics.actions";
 import { randomUUID } from "crypto";
 import { renderQuotePdf, type QuotePdfItem } from "@/lib/pdf/quote-pdf";
+import { renderPurchaseOrderPdf } from "@/lib/pdf/purchase-order-pdf";
 import { applyIndicatifTransportSelection } from "@/lib/quotes/indicatif-pricing";
 import { emitEvent } from "@/lib/events";
 import { serializeDecimals, toPlainData } from "@/lib/utils";
@@ -146,7 +147,7 @@ export async function createOrder(formData: {
     return { data: toPlainData(order) };
   } catch (error) {
     console.error("Error creating order:", error);
-    return { error: error instanceof Error ? error.message : "Erreur lors de la crÃ©ation de la commande" };
+    return { error: error instanceof Error ? error.message : "Erreur lors de la création de la commande" };
   }
 }
 
@@ -174,7 +175,7 @@ export async function getOrders(options?: {
       page: result.page,
       limit: result.limit,
     };
-  } catch (error) {    return { error: error instanceof Error ? error.message : "Erreur lors de la rÃ©cupÃ©ration des commandes" };
+  } catch (error) {    return { error: error instanceof Error ? error.message : "Erreur lors de la récupération des commandes" };
   }
 }
 
@@ -191,7 +192,7 @@ export async function getOrderById(orderId: string) {
     return { data: order };
   } catch (error) {
     console.error("Error fetching order:", error);
-    return { error: error instanceof Error ? error.message : "Erreur lors de la rÃ©cupÃ©ration de la commande" };
+    return { error: error instanceof Error ? error.message : "Erreur lors de la récupération de la commande" };
   }
 }
 
@@ -282,8 +283,8 @@ export async function updateOrder(orderId: string, formData: Record<string, unkn
     await NotificationService.notifyMany(teamIds, {
       tenantId: user.tenantId,
       type: "ORDER_UPDATED",
-      title: `Commande mise Ã  jour`,
-      message: `${user.name || user.email} a mis Ã  jour la commande`,
+      title: `Commande mise à jour`,
+      message: `${user.name || user.email} a mis à jour la commande`,
       entityType: "order",
       entityId: orderId,
     });
@@ -293,7 +294,7 @@ export async function updateOrder(orderId: string, formData: Record<string, unkn
     return { data: order };
   } catch (error) {
     console.error("Error updating order:", error);
-    return { error: error instanceof Error ? error.message : "Erreur lors de la mise ÃƒÂ  jour" };
+    return { error: error instanceof Error ? error.message : "Erreur lors de la mise Ò  jour" };
   }
 }
 
@@ -456,8 +457,8 @@ export async function updateOrderTeam(orderId: string, data: { ownerId?: string 
     await NotificationService.notifyMany(teamIds, {
       tenantId: user.tenantId,
       type: "ORDER_TEAM_UPDATED",
-      title: `Equipe commande mise Ã  jour`,
-      message: `${user.name || user.email} a modifiÃ© l'Ã©quipe de la commande`,
+      title: `Equipe commande mise à jour`,
+      message: `${user.name || user.email} a modifié l'équipe de la commande`,
       entityType: "order",
       entityId: orderId,
     });
@@ -465,7 +466,7 @@ export async function updateOrderTeam(orderId: string, data: { ownerId?: string 
     revalidatePath(`/orders/${orderId}`);
     return { data: order };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Erreur lors de la mise Ã  jour de l'Ã©quipe" };
+    return { error: error instanceof Error ? error.message : "Erreur lors de la mise à jour de l'équipe" };
   }
 }
 
@@ -475,7 +476,7 @@ export async function getOrderStatusCounts() {
     checkPermission(user.role, "order.view");
     return { data: await OrderService.getStatusCounts(user.tenantId) };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Erreur lors de la rÃ©cupÃ©ration des compteurs" };
+    return { error: error instanceof Error ? error.message : "Erreur lors de la récupération des compteurs" };
   }
 }
 
@@ -639,7 +640,7 @@ export async function sendQuote(quoteId: string) {
       !canRoleApproveQuote(quote.approvedBy.role, policy)
     ) {
       return {
-        error: `Ce devis doit être validé par ${getQuoteApprovalGateLabel(policy.requiredGate)} avant envoi.`,
+        error: `Ce devis doit �tre valid� par ${getQuoteApprovalGateLabel(policy.requiredGate)} avant envoi.`,
       };
     }
 
@@ -752,7 +753,7 @@ export async function approveQuote(quoteId: string, note?: string) {
     const policy = await getQuoteApprovalPolicy(user.tenantId, Number(quote.total));
     if (!canRoleApproveQuote(user.role, policy)) {
       return {
-        error: `Ce devis doit être validé par ${getQuoteApprovalGateLabel(policy.requiredGate)}.`,
+        error: `Ce devis doit �tre valid� par ${getQuoteApprovalGateLabel(policy.requiredGate)}.`,
       };
     }
 
@@ -831,7 +832,7 @@ export async function rejectQuoteApproval(quoteId: string, note?: string) {
     const policy = await getQuoteApprovalPolicy(user.tenantId, Number(quote.total));
     if (!canRoleApproveQuote(user.role, policy)) {
       return {
-        error: `Ce devis doit être traité par ${getQuoteApprovalGateLabel(policy.requiredGate)}.`,
+        error: `Ce devis doit �tre trait� par ${getQuoteApprovalGateLabel(policy.requiredGate)}.`,
       };
     }
 
@@ -913,7 +914,7 @@ export async function sendQuoteEmail(quoteId: string, to: string) {
       !canRoleApproveQuote(quote.approvedBy.role, policy)
     ) {
       return {
-        error: `Ce devis doit être validé par ${getQuoteApprovalGateLabel(policy.requiredGate)} avant envoi email.`,
+        error: `Ce devis doit �tre valid� par ${getQuoteApprovalGateLabel(policy.requiredGate)} avant envoi email.`,
       };
     }
 
@@ -1068,7 +1069,7 @@ export async function acceptQuoteAndPreparePaymentByToken(
           approvedById: null,
           approvedAt: null,
           approvalNote: repricedIndicatif
-            ? "Revalidation interne requise après modification du transport."
+            ? "Revalidation interne requise apr�s modification du transport."
             : "Revalidation interne requise avant paiement.",
           paymentToken: null,
           paymentExpiry: null,
@@ -1099,7 +1100,7 @@ export async function acceptQuoteAndPreparePaymentByToken(
       revalidatePath("/quotes");
       revalidatePath("/tasks");
       return {
-        error: `Le nouveau montant doit être revalidé par ${getQuoteApprovalGateLabel(
+        error: `Le nouveau montant doit �tre revalid� par ${getQuoteApprovalGateLabel(
           approvalPolicy.requiredGate
         )} avant paiement.`,
       };
@@ -1240,7 +1241,7 @@ export async function signQuoteByToken(token: string, signer: { name: string; em
       !quote.approvedBy ||
       !canRoleApproveQuote(quote.approvedBy.role, approvalPolicy)
     ) {
-      return { error: "Ce devis doit être validé en interne avant signature." };
+      return { error: "Ce devis doit �tre valid� en interne avant signature." };
     }
 
     const headerStore = await headers();
@@ -1389,7 +1390,7 @@ export async function acceptQuote(quoteId: string) {
 
     const updated = await updateQuoteStatusInternal(quoteId, "ACCEPTED");
     if (["DEMANDE", "RECHERCHE_PRODUIT", "DEVIS"].includes(quote.order.status)) {
-      await OrderService.updateStatus(quote.order.id, "PAIEMENT_EN_COURS", user.id, "Devis accepté manuellement");
+      await OrderService.updateStatus(quote.order.id, "PAIEMENT_EN_COURS", user.id, "Devis accept� manuellement");
     }
     await syncDemandStatusForQuote(quoteId);
 
@@ -1566,9 +1567,9 @@ export async function exportQuotePDF(quoteId: string) {
       !canRoleApproveQuote(quote.approvedBy.role, approvalPolicy)
     ) {
       return {
-        error: `Le devis doit être validé par ${getQuoteApprovalGateLabel(
+        error: `Le devis doit �tre valid� par ${getQuoteApprovalGateLabel(
           approvalPolicy.requiredGate
-        )} avant téléchargement.`,
+        )} avant t�l�chargement.`,
       };
     }
 
@@ -1766,4 +1767,99 @@ export async function sendOrderEdi(...args: Parameters<typeof orderLogisticsActi
 
 export async function recalculateOrderBudget(...args: Parameters<typeof orderLogisticsActions.recalculateOrderBudget>) {
   return orderLogisticsActions.recalculateOrderBudget(...args);
+}
+
+// ── Bon de Commande Fournisseur (Purchase Order PDF) ─────────────────────────
+
+export async function generatePurchaseOrderPdf(orderId: string) {
+  try {
+    const user = await getSession();
+    checkPermission(user.role, "order.view");
+
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        contact: true,
+        items: {
+          include: { product: true, supplier: true },
+        },
+        quotes: {
+          where: { isActive: true },
+          orderBy: { createdAt: "desc" },
+          take: 1,
+        },
+      },
+    });
+    if (!order || order.tenantId !== user.tenantId) {
+      return { error: "Commande introuvable" };
+    }
+
+    const currency = "USD"; // POs to China suppliers are in USD or CNY
+    const orderItems = order.items ?? [];
+    const activeQuote = order.quotes?.[0];
+
+    const items = orderItems.length > 0
+      ? orderItems.map((oi: any) => ({
+          productName: oi.product?.name ?? oi.description ?? "Article",
+          productNameCn: null,
+          sku: oi.product?.sku ?? null,
+          quantity: oi.quantity ?? 1,
+          unitPrice: Number(oi.unitPrice ?? 0),
+          currency: oi.currency ?? currency,
+          lineTotal: Number(oi.unitPrice ?? 0) * (oi.quantity ?? 1),
+          specifications: oi.notes ?? null,
+        }))
+      : [
+          {
+            productName: order.notes ?? "Articles selon commande",
+            productNameCn: null,
+            sku: null,
+            quantity: 1,
+            unitPrice: Number(order.totalClient ?? 0),
+            currency,
+            lineTotal: Number(order.totalClient ?? 0),
+            specifications: null,
+          },
+        ];
+
+    const subtotal = items.reduce((sum: number, item: any) => sum + item.lineTotal, 0);
+    const shippingCost = activeQuote ? Number(activeQuote.logisticsCost ?? 0) : null;
+    const total = subtotal + (shippingCost ?? 0);
+
+    // Determine supplier from first order item
+    const primarySupplier = (orderItems[0] as any)?.supplier;
+
+    const pdfBuffer = await renderPurchaseOrderPdf({
+      poNumber: `PO-${order.orderNumber}`,
+      orderDate: new Date(order.createdAt).toLocaleDateString("fr-FR"),
+      deliveryDeadline: order.estimatedDelivery
+        ? new Date(order.estimatedDelivery).toLocaleDateString("fr-FR")
+        : null,
+      buyerName: "Horion Congo",
+      buyerAddress: "Brazzaville, République du Congo",
+      buyerEmail: "servicehorion@gmail.com",
+      buyerPhone: "+242 06 460 08 31",
+      supplierName: primarySupplier?.name ?? "Fournisseur",
+      supplierNameCn: null,
+      supplierContact: primarySupplier?.contactName ?? null,
+      supplierEmail: primarySupplier?.email ?? null,
+      supplierWechat: primarySupplier?.wechat ?? null,
+      supplierAlibaba: primarySupplier?.alibaba ?? null,
+      items,
+      subtotal,
+      shippingCost,
+      total,
+      currency,
+      paymentTerms: "30% acompte à la confirmation, 70% avant expédition / 30% deposit on confirmation, 70% before shipment",
+      incoterms: "FOB Guangzhou",
+      notes: order.notes ?? null,
+    });
+
+    return {
+      data: pdfBuffer.toString("base64"),
+      filename: `BC-${order.orderNumber}.pdf`,
+    };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Erreur génération BC" };
+  }
 }

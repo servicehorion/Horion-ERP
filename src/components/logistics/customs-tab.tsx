@@ -69,7 +69,7 @@ export function CustomsTab({
       });
       if (res.error) toast.error(res.error);
       else {
-        toast.success("Document ajoute");
+        toast.success("Document ajouté");
         setDocForm({ name: "", url: "", note: "" });
         router.refresh();
       }
@@ -286,7 +286,7 @@ export function CustomsTab({
             <div className="grid gap-2">
               <Label>Resolution</Label>
               <Input
-                placeholder="Note de resolution"
+                placeholder="Note de résolution"
                 value={resolutionNote}
                 onChange={(e) => setResolutionNote(e.target.value)}
               />

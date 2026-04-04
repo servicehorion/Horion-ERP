@@ -549,7 +549,7 @@ export function WhatsAppClient({
                               const res = await assignWhatsAppConversation(activeConversation.id, value);
                               if (res?.error) toast.error(res.error);
                               else {
-                                toast.success("Conversation assignee");
+                                toast.success("Conversation assignée");
                                 router.refresh();
                               }
                             });
@@ -580,7 +580,7 @@ export function WhatsAppClient({
                               const res = await assignWhatsAppConversation(activeConversation.id, viewerId);
                               if (res?.error) toast.error(res.error);
                               else {
-                                toast.success("Conversation assignee");
+                                toast.success("Conversation assignée");
                                 router.refresh();
                               }
                             });
@@ -679,7 +679,7 @@ export function WhatsAppClient({
                             const res = await addWhatsAppConversationTags(activeConversation.id, tags);
                             if (res?.error) toast.error(res.error);
                             else {
-                              toast.success("Tags ajoutes");
+                              toast.success("Tags ajoutés");
                               setTagDraft("");
                               router.refresh();
                             }
@@ -730,7 +730,7 @@ export function WhatsAppClient({
                               toast.error(res.error);
                               return;
                             }
-                            toast.success("Tache de relance creee");
+                            toast.success("Tâche de relance créée");
                             router.refresh();
                           });
                         }}
@@ -751,7 +751,7 @@ export function WhatsAppClient({
                               toast.error(res.error);
                               return;
                             }
-                            toast.success("Tache creee depuis la conversation");
+                            toast.success("Tâche créée depuis la conversation");
                             router.refresh();
                           });
                         }}
@@ -1348,7 +1348,7 @@ function WhatsAppBroadcasts({ campaigns }: { campaigns: WhatsAppCampaignItem[] }
       });
       if (res?.error) toast.error(res.error);
       else {
-        toast.success("Campagne creee");
+        toast.success("Campagne créée");
         setName("");
         setObjective("");
         setSegment("");
@@ -1463,7 +1463,7 @@ function WhatsAppTemplates({ templates }: { templates: WhatsAppTemplateItem[] })
       const res = await addWhatsAppTemplateVersion(versionTemplateId, versionBody.trim(), vars);
       if (res?.error) toast.error(res.error);
       else {
-        toast.success("Version ajoutee");
+        toast.success("Version ajoutée");
         setVersionBody("");
         setVersionVars("");
         router.refresh();
@@ -1626,7 +1626,7 @@ function WhatsAppAutomations({ flows }: { flows: WhatsAppBotFlowItem[] }) {
       });
       if (res?.error) toast.error(res.error);
       else {
-        toast.success("Automatisation creee");
+        toast.success("Automatisation créée");
         setName("");
         setTrigger("KEYWORD");
         setTriggerValue("");

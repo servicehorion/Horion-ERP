@@ -13,7 +13,7 @@ const ARCHIVED_MODULES = [
   { href: "/finance/payroll", title: "Paie", reason: "Trop fragile pour du vibe coding en phase operations." },
   { href: "/finance/periods", title: "Periodes", reason: "Comptabilite froide, pas pilotage cash-first." },
   { href: "/finance/journals", title: "Journaux", reason: "Garde-fou comptable, plus noyau operationnel." },
-  { href: "/finance/ledger", title: "Grand livre", reason: "Disponible au besoin, retire du coeur produit." },
+  { href: "/finance/ledger", title: "Grand livre", reason: "Disponible au besoin, retiré du cœur produit." },
   { href: "/finance/forecast", title: "Forecast", reason: "A revisiter apres stabilisation du cash reel." },
   { href: "/finance/budgets", title: "Budgets", reason: "Secondaire tant que le flux transactionnel n'est pas totalement ferme." },
   { href: "/finance/cost-centers", title: "Centres de cout", reason: "Peu prioritaire pour Horion a ce stade." },

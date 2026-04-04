@@ -37,7 +37,7 @@ export function LeadAssigneeSelect({
       if (result.error) {
         toast.error(result.error);
       } else {
-        toast.success("Assignation mise Ã  jour");
+        toast.success("Assignation mise à jour");
         router.refresh();
       }
     } finally {
@@ -55,7 +55,7 @@ export function LeadAssigneeSelect({
         <SelectValue placeholder="Assigner" />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value="none">Non assignÃ©</SelectItem>
+        <SelectItem value="none">Non assigné</SelectItem>
         {teamMembers.map((m) => (
           <SelectItem key={m.id} value={m.id}>
             {m.name || m.email}

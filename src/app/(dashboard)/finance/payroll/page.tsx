@@ -1,6 +1,6 @@
 import { getSession } from "@/lib/session";
 import { checkPermission } from "@/lib/permissions";
-import { PayrollService } from "@/lib/services/payroll.service";
+import { PayrollService, computeCongoPayrollDeductions } from "@/lib/services/payroll.service";
 import { prisma } from "@/lib/db";
 import { upsertPayrollProfile, createPayrollRun, addPayrollLine, markPayrollRunPaid } from "@/lib/actions/payroll.actions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PageHeader } from "@/components/shared/page-header";
+import { Badge } from "@/components/ui/badge";
+import { formatCurrency } from "@/config/currencies";
 
 export const metadata = { title: "Paie | Horion ERP" };
 
@@ -79,17 +81,20 @@ export default async function FinancePayrollPage() {
                   </Button>
                 </div>
               </div>
-              <form action={addPayrollLine} className="grid grid-cols-1 md:grid-cols-6 gap-2">
+              <form action={addPayrollLine} className="grid grid-cols-1 md:grid-cols-6 gap-2 items-end">
                 <input type="hidden" name="runId" value={run.id} />
                 <select name="userId" className="h-9 rounded-md border bg-transparent px-3 text-sm" required>
-                  <option value="">Employe</option>
+                  <option value="">Employé</option>
                   {users.map((u) => (
                     <option key={u.id} value={u.id}>{u.name}</option>
                   ))}
                 </select>
-                <Input name="baseSalary" type="number" step="0.01" placeholder="Base" required />
-                <Input name="allowances" type="number" step="0.01" placeholder="Primes" />
-                <Input name="deductions" type="number" step="0.01" placeholder="Retenues" />
+                <Input name="baseSalary" type="number" step="0.01" placeholder="Salaire base (XAF)" required />
+                <Input name="allowances" type="number" step="0.01" placeholder="Primes (XAF)" />
+                <div className="space-y-1">
+                  <Input name="deductions" type="number" step="0.01" placeholder="Retenues manuelles" />
+                  <p className="text-xs text-muted-foreground">Vide = CNSS + IRPP auto</p>
+                </div>
                 <Button type="submit" size="sm" variant="outline">Ajouter ligne</Button>
               </form>
 
@@ -97,24 +102,47 @@ export default async function FinancePayrollPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Employe</TableHead>
+                      <TableHead>Employé</TableHead>
+                      <TableHead>Base</TableHead>
+                      <TableHead>Primes</TableHead>
                       <TableHead>Brut</TableHead>
-                      <TableHead>Net</TableHead>
+                      <TableHead className="text-orange-700">CNSS (4.725%)</TableHead>
+                      <TableHead className="text-orange-700">IRPP</TableHead>
+                      <TableHead>Net à payer</TableHead>
                       <TableHead>Statut</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {run.lines.map((line) => (
+                    {run.lines.map((line) => {
+                      const gross = Number(line.gross);
+                      const deductions = Number(line.deductions);
+                      const taxInfo = computeCongoPayrollDeductions(gross);
+                      // If deductions match auto-computed, show breakdown; otherwise show raw deductions
+                      const isAutoCnss = Math.abs(deductions - taxInfo.totalDeductions) < 2;
+                      return (
                       <TableRow key={line.id}>
                         <TableCell>{line.user?.name}</TableCell>
-                        <TableCell>{Number(line.gross).toFixed(0)} XAF</TableCell>
-                        <TableCell>{Number(line.net).toFixed(0)} XAF</TableCell>
-                        <TableCell>{line.status}</TableCell>
+                        <TableCell>{formatCurrency(Number(line.baseSalary), "XAF")}</TableCell>
+                        <TableCell>{formatCurrency(Number(line.allowances), "XAF")}</TableCell>
+                        <TableCell className="font-medium">{formatCurrency(gross, "XAF")}</TableCell>
+                        <TableCell className="text-orange-700">
+                          {isAutoCnss ? formatCurrency(taxInfo.cnss, "XAF") : "—"}
+                        </TableCell>
+                        <TableCell className="text-orange-700">
+                          {isAutoCnss ? formatCurrency(taxInfo.irpp, "XAF") : "—"}
+                        </TableCell>
+                        <TableCell className="font-semibold text-green-700">{formatCurrency(Number(line.net), "XAF")}</TableCell>
+                        <TableCell>
+                          <Badge variant={line.status === "PAID" ? "default" : "secondary"}>
+                            {line.status === "PAID" ? "Payé" : "En attente"}
+                          </Badge>
+                        </TableCell>
                       </TableRow>
-                    ))}
+                      );
+                    })}
                     {run.lines.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={4} className="text-center text-sm text-muted-foreground">
+                        <TableCell colSpan={8} className="text-center text-sm text-muted-foreground">
                           Aucune ligne
                         </TableCell>
                       </TableRow>

@@ -98,7 +98,7 @@ export function TaskCreateDialog({ teamMembers = [], projects = [] }: TaskCreate
         return;
       }
 
-      toast.success("Tache creee avec succes");
+      toast.success("Tâche créée avec succès");
       setOpen(false);
       resetForm();
       router.refresh();

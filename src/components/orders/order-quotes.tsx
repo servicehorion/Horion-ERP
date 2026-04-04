@@ -186,7 +186,7 @@ export function OrderQuotes({
           : await rejectQuoteApproval(quoteId);
       if (res.error) toast.error(res.error);
       else {
-        toast.success("Validation mise Ã  jour");
+        toast.success("Validation mise à jour");
         router.refresh();
       }
     } catch {
@@ -203,7 +203,7 @@ export function OrderQuotes({
       const res = await sendQuoteEmail(emailQuoteId, emailTarget);
       if (res.error) toast.error(res.error);
       else {
-        toast.success("Email envoyÃ©");
+        toast.success("Email envoyé");
         setEmailOpen(false);
         router.refresh();
       }
@@ -220,10 +220,10 @@ export function OrderQuotes({
       const res = await generatePaymentLink(quoteId);
       if (res.error) { toast.error(res.error); return; }
       await navigator.clipboard.writeText(res.data!.url);
-      toast.success("Lien de paiement copié dans le presse-papier");
+      toast.success("Lien de paiement copi� dans le presse-papier");
       router.refresh();
     } catch {
-      toast.error("Erreur lors de la génération du lien");
+      toast.error("Erreur lors de la g�n�ration du lien");
     } finally {
       setWorkingId(null);
     }
@@ -480,7 +480,7 @@ export function OrderQuotes({
                         )}
                         {quote.signedAt && (
                           <span className="text-[11px] text-emerald-700">
-                            SignÃ©: {formatDate(quote.signedAt)}
+                            Signé: {formatDate(quote.signedAt)}
                           </span>
                         )}
                       </div>
@@ -565,7 +565,7 @@ export function OrderQuotes({
                           onClick={() => {
                             const baseUrl = window.location.origin;
                             navigator.clipboard.writeText(`${baseUrl}/pay/${quote.paymentToken}`);
-                            toast.success("Lien copié");
+                            toast.success("Lien copi�");
                           }}
                         >
                           <Copy className="mr-1 h-3 w-3" />

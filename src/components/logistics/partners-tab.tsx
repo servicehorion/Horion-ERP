@@ -118,7 +118,7 @@ export function PartnersTab({
           : await createFreightPartner(payload);
       if (res.error) toast.error(res.error);
       else {
-        toast.success(formMode === "edit" ? "Partenaire mis a jour" : "Partenaire ajoute");
+        toast.success(formMode === "edit" ? "Partenaire mis à jour" : "Partenaire ajouté");
         setAddPartnerOpen(false);
         setPartnerForm({
           name: "",

@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
@@ -14,7 +14,7 @@ const prismaAny = prisma as any;
 export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session?.user) {
-    return NextResponse.json({ error: "Non authentifiÃ©" }, { status: 401 });
+    return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
   }
 
   const { role, tenantId, id: userId } = session.user as {
@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
 
   const allowed = ["ADMIN", "DIRECTION", "CEO"].includes(role);
   if (!allowed) {
-    return NextResponse.json({ error: "AccÃ¨s refusÃ©" }, { status: 403 });
+    return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
   }
 
   const contact = await prismaAny.contact.findFirst({

@@ -498,7 +498,7 @@ export function AnalyticsDashboard({ stats, posts, campaigns }: Props) {
                       <div className="flex items-center justify-between text-sm">
                         <span className="font-semibold truncate">{c.name}</span>
                         <Badge variant="secondary" className={`text-xs shrink-0 ${c.status === "active" ? "bg-green-100 text-green-800" : c.status === "completed" ? "bg-purple-100 text-purple-800" : c.status === "planning" ? "bg-yellow-100 text-yellow-800" : "bg-gray-100 text-gray-800"}`}>
-                          {c.status === "active" ? "Active" : c.status === "completed" ? "Terminée" : c.status === "planning" ? "Planning" : c.status === "paused" ? "En pause" : c.status}
+                          {c.status === "active" ? "Active" : c.status === "completed" ? "Terminée" : c.status === "planning" ? "En préparation" : c.status === "paused" ? "En pause" : c.status}
                         </Badge>
                       </div>
                       <div className="flex items-center justify-between text-xs text-muted-foreground">

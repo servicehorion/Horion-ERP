@@ -22,7 +22,7 @@ import {
 
 const prismaAny = prisma as any;
 
-// â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ���� Helpers ������������������������������������������������������������������������������������������������������������������������������������
 
 async function getTenantSettings(tenantId: string) {
   const tenant = await prismaAny.tenant.findUnique({
@@ -32,7 +32,7 @@ async function getTenantSettings(tenantId: string) {
   return (tenant?.settings as Record<string, unknown>) ?? {};
 }
 
-// â”€â”€ Analytics â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ���� Analytics ����������������������������������������������������������������������������������������������������������������������������������
 
 export async function getCrmAnalytics() {
   try {
@@ -254,7 +254,7 @@ export async function getCrmAnalytics() {
   }
 }
 
-// â”€â”€ Pipelines â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ���� Pipelines ��������������������������������������������������������������������������������������������������������������������������������
 
 export async function getPipelines() {
   try {
@@ -353,7 +353,7 @@ export async function createQuoteFromLead(leadId: string) {
       return { error: "Lead introuvable" };
     }
     if (!lead.estimatedValue) {
-      return { error: "Valeur estimÃ©e manquante" };
+      return { error: "Valeur estimée manquante" };
     }
 
     const order = await OrderService.create(user.tenantId, {
@@ -446,7 +446,7 @@ export async function createQuoteFromLead(leadId: string) {
       {
         tenantId: user.tenantId,
         type: "QUOTE_CREATED",
-        title: `Devis crÃ©Ã© depuis CRM`,
+        title: `Devis créé depuis CRM`,
         message: `Lead ${lead.id} converti en devis`,
         entityType: "quote",
         entityId: quote.id,
@@ -485,7 +485,7 @@ export async function assignLeadToPipeline(
   }
 }
 
-// â”€â”€ Custom Fields â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ���� Custom Fields ������������������������������������������������������������������������������������������������������������������������
 
 export type FieldDef = {
   key: string;
@@ -631,7 +631,7 @@ export async function updateContactCustomFields(
   }
 }
 
-// â”€â”€ Meetings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ���� Meetings ����������������������������������������������������������������������������������������������������������������������������������
 
 export async function getMeetings(filters: {
   contactId?: string;
@@ -775,7 +775,7 @@ export async function deleteMeeting(id: string) {
   }
 }
 
-// â”€â”€ Nurturing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ���� Nurturing ��������������������������������������������������������������������������������������������������������������������������������
 
 export async function getNurturingSequences() {
   try {

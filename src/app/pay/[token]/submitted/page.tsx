@@ -86,8 +86,8 @@ export default async function PaymentSubmittedPage({
 
   const steps = [
     { label: "Paiement soumis", done: true, active: false },
-    { label: "Verification Horion", done: false, active: true },
-    { label: "Execution de la commande", done: false, active: false },
+    { label: "Vérification Horion", done: false, active: true },
+    { label: "Exécution de la commande", done: false, active: false },
   ];
 
   return (

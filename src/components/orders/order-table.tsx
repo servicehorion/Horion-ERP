@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { ColumnDef } from "@tanstack/react-table";
 import { ArrowUpDown, MoreHorizontal } from "lucide-react";
@@ -35,7 +35,7 @@ export const orderColumns: ColumnDef<OrderTableRow>[] = [
           variant="ghost"
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
         >
-          NÂ° Commande
+          N° Commande
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       );
@@ -64,7 +64,7 @@ export const orderColumns: ColumnDef<OrderTableRow>[] = [
   },
   {
     accessorKey: "priority",
-    header: "PrioritÃ©",
+    header: "Priorité",
     cell: ({ row }) => {
       return <PriorityBadge priority={row.getValue("priority")} />;
     },
@@ -125,12 +125,12 @@ export const orderColumns: ColumnDef<OrderTableRow>[] = [
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
             <DropdownMenuItem asChild>
-              <Link href={`/orders/${order.id}`}>Voir dÃ©tails</Link>
+              <Link href={`/orders/${order.id}`}>Voir détails</Link>
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => navigator.clipboard.writeText(order.orderNumber)}
             >
-              Copier NÂ° commande
+              Copier N° commande
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

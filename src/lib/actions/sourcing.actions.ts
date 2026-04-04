@@ -119,7 +119,7 @@ export async function createSourcingCase(formData: Record<string, unknown>) {
     return { data: sc };
   } catch (error) {
     console.error("Error creating sourcing case:", error);
-    return { error: error instanceof Error ? error.message : "Erreur lors de la création" };
+    return { error: error instanceof Error ? error.message : "Erreur lors de la cr�ation" };
   }
 }
 
@@ -140,7 +140,7 @@ export async function getSourcingCases(options?: {
     });
     return { data: result };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Erreur lors de la récupération" };
+    return { error: error instanceof Error ? error.message : "Erreur lors de la r�cup�ration" };
   }
 }
 
@@ -154,7 +154,7 @@ export async function getSourcingCaseById(id: string) {
     }
     return { data: sc };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Erreur lors de la récupération" };
+    return { error: error instanceof Error ? error.message : "Erreur lors de la r�cup�ration" };
   }
 }
 
@@ -188,7 +188,7 @@ export async function updateSourcingStatus(id: string, formData: Record<string, 
     revalidatePath("/sourcing/cases");
     return { data: sc };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Erreur lors de la mise à jour" };
+    return { error: error instanceof Error ? error.message : "Erreur lors de la mise � jour" };
   }
 }
 
@@ -265,7 +265,7 @@ export async function selectSourcingSupplier(id: string, formData: Record<string
     revalidatePath("/sourcing/cases");
     return { data: sc };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Erreur lors de la sélection" };
+    return { error: error instanceof Error ? error.message : "Erreur lors de la s�lection" };
   }
 }
 
@@ -369,16 +369,16 @@ export async function exportSourcingCasesCSV() {
 
     const headers = [
       "Commande", "Client", "Besoin", "Statut", "Budget", "Devise",
-      "Fournisseur", "Offres", "Négociations", "Créé le",
+      "Fournisseur", "Offres", "N�gociations", "Cr�� le",
     ];
 
     const statusLabels: Record<string, string> = {
       SEARCHING: "Recherche",
-      OFFERS_RECEIVED: "Offres reçues",
-      NEGOTIATING: "Négociation",
-      SELECTED: "Sélectionné",
-      CONFIRMED: "Confirmé",
-      CANCELLED: "Annulé",
+      OFFERS_RECEIVED: "Offres re�ues",
+      NEGOTIATING: "N�gociation",
+      SELECTED: "S�lectionn�",
+      CONFIRMED: "Confirm�",
+      CANCELLED: "Annul�",
     };
 
     const rows = cases.map((c) => [
@@ -593,7 +593,7 @@ export async function getSourcingAssignees() {
 }
 
 // ============================================================
-// SOURCING LEVEL — PROMOTE TO PROFOND
+// SOURCING LEVEL  PROMOTE TO PROFOND
 // ============================================================
 
 export async function promoteToProFond(caseId: string) {
@@ -629,7 +629,7 @@ export async function promoteToProFond(caseId: string) {
 }
 
 // ============================================================
-// SOURCING PROFOND — POIDS & DIMENSIONS
+// SOURCING PROFOND  POIDS & DIMENSIONS
 // ============================================================
 
 export async function updateSourcingWeights(
@@ -713,7 +713,7 @@ export async function updateSourcingWeights(
     revalidatePath(`/sourcing/cases/${caseId}`);
     return { data: updated, transport };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Erreur mise à jour poids" };
+    return { error: error instanceof Error ? error.message : "Erreur mise � jour poids" };
   }
 }
 
@@ -771,14 +771,14 @@ export async function simulateSourcingMargin(
 }
 
 // ============================================================
-// CEO — APPROUVER MARGE < 30%
+// CEO  APPROUVER MARGE < 30%
 // ============================================================
 
 export async function approveSourcingMarginCeo(caseId: string) {
   try {
     const user = await getSession();
     if (!["ADMIN", "CEO", "DIRECTION"].includes(user.role)) {
-      return { error: "Réservé CEO / Direction" };
+      return { error: "R�serv� CEO / Direction" };
     }
 
     const existing = await SourcingCaseService.getById(caseId);
@@ -810,7 +810,7 @@ export async function approveSourcingMarginCeo(caseId: string) {
 }
 
 // ============================================================
-// CAPITALISATION — CONFIRMED → CATALOGUE
+// CAPITALISATION  CONFIRMED � CATALOGUE
 // ============================================================
 
 export async function capitalizeToCatalog(caseId: string) {
@@ -823,7 +823,7 @@ export async function capitalizeToCatalog(caseId: string) {
       return { error: "Cas introuvable" };
     }
     if (sc.status !== "CONFIRMED") {
-      return { error: "Cas non confirmé" };
+      return { error: "Cas non confirm�" };
     }
 
     const existing = await prisma.catalogProduct.findFirst({
@@ -922,7 +922,7 @@ export async function createGroupageBatch(data: {
     revalidatePath("/sourcing/groupage");
     return { data: batch };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Erreur création batch" };
+    return { error: error instanceof Error ? error.message : "Erreur cr�ation batch" };
   }
 }
 
@@ -1135,7 +1135,7 @@ export async function createShipmentsFromGroupageBatch(batchId: string) {
     revalidatePath("/logistics");
     return { data: { created, skipped } };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Erreur creation expÃ©ditions" };
+    return { error: error instanceof Error ? error.message : "Erreur creation expéditions" };
   }
 }
 
@@ -1198,7 +1198,7 @@ export async function detectGroupageOpportunities() {
 
     return { data: { cases, byDestination } };
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "Erreur détection" };
+    return { error: error instanceof Error ? error.message : "Erreur d�tection" };
   }
 }
 
