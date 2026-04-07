@@ -74,6 +74,23 @@ const PUBLIC_PAGE_PREFIXES = [
   "/verification/",
 ];
 
+const PUBLIC_ASSET_EXTENSIONS = [
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".webp",
+  ".gif",
+  ".svg",
+  ".ico",
+  ".txt",
+  ".xml",
+  ".json",
+  ".mp4",
+  ".webm",
+  ".woff",
+  ".woff2",
+];
+
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
@@ -128,6 +145,7 @@ export async function middleware(req: NextRequest) {
   if (
     pathname.startsWith("/api/auth") ||
     pathname.startsWith("/_next") ||
+    PUBLIC_ASSET_EXTENSIONS.some((ext) => pathname.toLowerCase().endsWith(ext)) ||
     PUBLIC_PAGE_ROUTES.has(pathname) ||
     PUBLIC_PAGE_PREFIXES.some((prefix) => pathname.startsWith(prefix))
   ) {
