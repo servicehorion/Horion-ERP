@@ -155,7 +155,10 @@ export async function middleware(req: NextRequest) {
   // Read JWT (edge compatible)
   const token = await getToken({
     req,
-    secret: process.env.NEXTAUTH_SECRET ?? process.env.AUTH_SECRET,
+    // Keep the secret precedence aligned with NextAuth config in src/lib/auth.ts.
+    // If both env vars exist and differ, preferring NEXTAUTH_SECRET here would
+    // make middleware reject a token that auth.ts just issued with AUTH_SECRET.
+    secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
   });
 
   // Login page
