@@ -152,13 +152,13 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // Read JWT (edge compatible)
+  // Auth.js v5: let getToken read AUTH_SECRET from env automatically.
+  // Passing secret explicitly can cause mismatches with internal JWT signing.
+  // Explicitly set the v5 cookie name to avoid v4/v5 cookie name mismatch.
+  const cookiePrefix = req.nextUrl.protocol === "https:" ? "__Secure-" : "";
   const token = await getToken({
     req,
-    // Keep the secret precedence aligned with NextAuth config in src/lib/auth.ts.
-    // If both env vars exist and differ, preferring NEXTAUTH_SECRET here would
-    // make middleware reject a token that auth.ts just issued with AUTH_SECRET.
-    secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
+    cookieName: `${cookiePrefix}authjs.session-token`,
   });
 
   // Login page

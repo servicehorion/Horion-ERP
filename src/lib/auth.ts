@@ -176,7 +176,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   pages: {
     signIn: "/login",
   },
-  secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
+  // Auth.js v5 reads AUTH_SECRET from env. Explicit secret removed to avoid mismatch.
   session: {
     strategy: "jwt",
     maxAge: 8 * 60 * 60,     // Session expires after 8 h (work day)
